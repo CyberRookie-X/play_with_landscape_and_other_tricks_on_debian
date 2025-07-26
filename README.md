@@ -480,7 +480,7 @@ services:
 # 常见网络应用、compose 安装
 ## ArozOS NAS 网页桌面操作系统
 ArozOS 少量路由器相关功能建议不开启    
-[ArozOS项目仓库](https://github.com/ArozOS/ArozOS)|[ArozOS官网](https://os.aroz.org/)
+[ArozOS官网](https://os.aroz.org/)|[ArozOS项目仓库](https://github.com/tobychui/arozos)
 
 ```shell
 # 使用脚本在主机中安装（非docker版）
