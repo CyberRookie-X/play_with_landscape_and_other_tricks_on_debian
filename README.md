@@ -26,7 +26,7 @@ debian版本：12
 - [landscape 使用](#landscape-使用)
 - [用 dpanel 部署 dockercompose](#用-dpanel-部署-dockercompose)
   - [使用 dpanel 的必要性](#使用-dpanel-的必要性)
-  - [dpanel 与 dpanel lite](#dpanel-与-dpanel-lite)
+  - [dpanel标准版 与 dpanel lite](#dpanel标准版-与-dpanel-lite)
   - [直接安装 dpanel](#直接安装-dpanel)
   - [容器安装 dpanel](#容器安装-dpanel)
   - [在其他机器上使用 dpanel管理本机docker](#在其他机器上使用-dpanel管理本机docker)
@@ -283,7 +283,10 @@ systemctl disable landscape-router.service
 dpanel 集成 dockercompose 应用商店，便于一键部署容器应用。    
 [dpanel 文档](https://dpanel.cc/#/zh-cn/install/docker) |
 [dpanel 演示站/demo](https://dpanel.park1991.com/dpanel/ui/user/login)
-##  dpanel 与 dpanel lite 
+##  dpanel标准版 与 dpanel lite 
+
+标准版本中提供了域名绑定及证书功能，需要绑定 80 及 443 端口。Lite版与标准版只有镜像地址区别，除不再需要映射 80 及 443 端口外，其余配置均一致。  
+个人推荐 lite 版，标准版额外功能网页相对简陋，何不traefik？如需更丰富的配置可使用[Nginx-UI](https://nginxui.com/zh_CN/guide/devcontainer.html)、[Nginx Proxy Manager](https://nginxproxymanager.com/)、[OpenResty Manager](https://om.uusec.com/cn/)等项目。
 
 ## 直接安装 dpanel
 
