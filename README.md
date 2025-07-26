@@ -13,6 +13,7 @@ debian版本：12
   - [重启系统生效](#重启系统生效)
 - [docker、docker compose 安装](#dockerdocker-compose-安装)
 - [landscape 安装](#landscape-安装)
+  - [安装 pppd](#安装-pppd)
   - [创建 landscape systemd 服务文件](#创建-landscape-systemd-服务文件)
   - [下载并上传 landscape-router](#下载并上传-landscape-router)
   - [修改网卡配置](#修改网卡配置)
@@ -151,6 +152,13 @@ curl -fsSL https://get.docker.com | bash -s docker --mirror AzureChinaCloud
 返回docker版本信息即为成功   
    
 # landscape 安装
+
+## 安装 pppd
+```shell
+apt install ppp -y
+pppd -version
+
+```
 
 ## 创建 landscape systemd 服务文件   
 
