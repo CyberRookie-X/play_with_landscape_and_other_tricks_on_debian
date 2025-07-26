@@ -286,7 +286,7 @@ dpanel 集成 dockercompose 应用商店，便于一键部署容器应用。
 ##  dpanel标准版 与 dpanel lite 
 
 标准版本中提供了域名绑定及证书功能，需要绑定 80 及 443 端口。Lite版与标准版只有镜像地址区别，除不再需要映射 80 及 443 端口外，其余配置均一致。  
-个人推荐 lite 版，标准版额外功能网页相对简陋，何不traefik？如需更丰富的配置可使用[Nginx UI](https://nginxui.com/zh_CN/guide/about.html)、[Nginx Proxy Manager](https://nginxproxymanager.com/)、[OpenResty Manager](https://om.uusec.com/cn/)等项目。
+个人推荐 lite 版，标准版额外功能网页相对简陋，何不traefik？如需更丰富的配置可使用 [Nginx UI](https://nginxui.com/zh_CN/guide/about.html)、[Nginx Proxy Manager](https://nginxproxymanager.com/)、[OpenResty Manager](https://om.uusec.com/cn/) 等项目。
 
 ## 直接安装 dpanel
 
