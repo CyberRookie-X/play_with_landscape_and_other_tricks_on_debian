@@ -73,7 +73,7 @@ systemctl restart ssh
 
 ### 注释或删除 Swap 挂载项
 ```shell
- nano /etc/fstab
+nano /etc/fstab
 ```
 找到包含 swap 的行（通常类似 /swapfile 或 /dev/mapper/...-swap），在行首添加 # 注释掉，例如：
 ```diff
@@ -238,7 +238,7 @@ ss -nutlp
 nano /etc/apache2/ports.conf
 ```
    
- listen 80 改到 8080   
+listen 80 改到 8080   
 ```shell
 systemctl restart apache2
 ```
