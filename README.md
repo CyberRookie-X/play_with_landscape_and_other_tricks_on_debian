@@ -354,7 +354,7 @@ while true; do
     if [[ $? -ne 0 ]]; then
         echo "审计程序 进程异常退出，检查日志..."
         # 在这里添加日志检查或其他错误处理
-        sleep 3
+        sleep 5
     fi
 done
 
