@@ -86,7 +86,7 @@ systemctl restart ssh
 systemctl --type swap
 
 # 禁用所有 Swap 单元（替换 UNIT_NAME 为实际名称）
- systemctl mask UNIT_NAME.swap
+systemctl mask UNIT_NAME.swap
 ```
 ## 修改软件源（可选）
 ```shell
@@ -357,7 +357,6 @@ while true; do
         sleep 5
     fi
 done
-
 ```
 ## 端口映射方式 部署审计容器-compose
 ```yaml
