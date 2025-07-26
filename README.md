@@ -337,7 +337,7 @@ systemctl status docker
 
 ## 下面以审计程序为例，介绍接应容器部署
 ## 创建审计程序启动脚本
-```yaml
+```bash
 #!/bin/bash
 
 ip rule add fwmark 0x1/0x1 lookup 100
@@ -346,7 +346,7 @@ ip route add local default dev lo table 100
 # 启动审计程序守护进程
 while true; do
     echo "启动 审计程序..."
-    /app/audit/audit -d /app/audit/config
+    /app/server/audit -d /app/server/config
 	# 前一个为审计程序二进制文件 后一个为审计程序配置文件目录
     echo "审计程序 退出，等待1秒后重启..."
     sleep 1
