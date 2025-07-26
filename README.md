@@ -38,7 +38,7 @@ debian版本：12
   - [独立网桥方式 部署审计容器-compose](#独立网桥方式-部署审计容器-compose)
 - [常见网络应用、compose 安装](#常见网络应用compose-安装)
   - [ArozOS NAS 网页桌面操作系统](#arozos-nas-网页桌面操作系统)
-  - [集客AC-dockercompose](#集客ac-dockercompose)
+  - [集客AC dockercompose](#集客ac-dockercompose)
   - [ddns-go dockercompose](#ddns-go-dockercompose)
 
 # debian 安
@@ -242,7 +242,7 @@ ss -nutlp
 nano /etc/apache2/ports.conf
 ```
    
-listen 80 改到 8080   
+listen 由 80 改到 8080   
 ```shell
 systemctl restart apache2
 ```
@@ -490,7 +490,7 @@ ArozOS 少量路由器相关功能建议不开启
 # 使用脚本在主机中安装（非docker版）
 wget -O install.sh https://raw.githubusercontent.com/tobychui/arozos/master/installer/install.sh && bash install.sh
 ```
-## 集客AC-dockercompose
+## 集客AC dockercompose
 
 ```yaml
 name: gecoosac
