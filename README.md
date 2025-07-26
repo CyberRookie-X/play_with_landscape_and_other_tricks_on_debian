@@ -4,17 +4,14 @@ debian版本：12
 [Landscape 文档网站](https://landscape.whileaway.dev/introduction.html) | [Landscape github](https://github.com/ThisSeanZhang/landscape)
 # 目录
 - [debian 安装](#debian-安装)
-  - [debian安装](#debian-安装)
+  - [debian安装](#debian-安装-1)
   - [时区修改到上海](#时区修改到上海)
-  - [开启 root ssh](#开启-root-ssh)
+  - [允许root用户使用密码登录ssh](#允许root用户使用密码登录ssh)
   - [关闭 swap](#关闭-swap)
-    - [nano 用法简述](#nano-用法简述)
-    - [注释或删除 Swap 挂载项](#注释或删除-swap-挂载项)
-    - [禁用 systemd 管理的 Swap 单元（若有）](#禁用-systemd-管理的-swap-单元若有)
+  - [修改软件源（可选）](#修改软件源可选)
   - [升级内核，到 6.9以上](#升级内核到-69以上)
   - [重启系统生效](#重启系统生效)
-- [docker 安装](#docker-安装)
-  - [脚本安装docker](#脚本安装docker)
+- [docker、docker compose 安装](#dockerdocker-compose-安装)
 - [landscape 安装](#landscape-安装)
   - [创建 landscape systemd 服务文件](#创建-landscape-systemd-服务文件)
   - [下载并上传 landscape-router](#下载并上传-landscape-router)
@@ -33,8 +30,6 @@ debian版本：12
   - [直接安装 dpanel](#直接安装-dpanel)
   - [容器安装 dpanel](#容器安装-dpanel)
   - [在其他机器上使用 dpanel管理本机docker](#在其他机器上使用-dpanel管理本机docker)
-    - [创建docker tcp](#创建docker-tcp)
-    - [docker tcp 开启 TLS加密(略)](#docker-tcp-开启-tls加密略)
 - [常见网络应用、compose 安装](#常见网络应用compose-安装)
   - [ArozOS NAS 网页桌面操作系统](#arozos-nas-网页桌面操作系统)
   - [集客AC-dockercompose](#集客ac-dockercompose)
@@ -87,7 +82,25 @@ systemctl --type swap
 # 禁用所有 Swap 单元（替换 UNIT_NAME 为实际名称）
  systemctl mask UNIT_NAME.swap
 ```
+## 修改软件源（可选）
+```shell
+# 若软件源非为国内源，可以考虑修改软件源为国内源，例如ustc源
+nano /etc/apt/sources.list
+```
+```shell
+# ustc源
+deb https://mirrors.ustc.edu.cn/debian/ bookworm main contrib non-free non-free-firmware
+deb-src https://mirrors.ustc.edu.cn/debian/ bookworm main contrib non-free non-free-firmware
 
+deb https://mirrors.ustc.edu.cn/debian/ bookworm-updates main contrib non-free non-free-firmware
+deb-src https://mirrors.ustc.edu.cn/debian/ bookworm-updates main contrib non-free non-free-firmware
+
+deb https://mirrors.ustc.edu.cn/debian/ bookworm-backports main contrib non-free non-free-firmware
+deb-src https://mirrors.ustc.edu.cn/debian/ bookworm-backports main contrib non-free non-free-firmware
+
+deb https://mirrors.ustc.edu.cn/debian-security/ bookworm-security main contrib non-free non-free-firmware
+deb-src https://mirrors.ustc.edu.cn/debian-security/ bookworm-security main contrib non-free non-free-firmware
+```
 ## 升级内核，到 6.9以上   
 
 ```shell
@@ -109,30 +122,11 @@ update-grub
 # 重启系统生效
 reboot
 ```
-# docker 安装
-
-## 脚本安装docker   
+# docker、docker compose 安装
 
 注释掉原有所有行，换掉下面的源。如已选择合适的源则可跳过。   
 ```shell
-# 修改软件源
-nano /etc/apt/sources.list
-```
-```shell
-deb https://mirrors.ustc.edu.cn/debian/ bookworm main contrib non-free non-free-firmware
-deb-src https://mirrors.ustc.edu.cn/debian/ bookworm main contrib non-free non-free-firmware
-
-deb https://mirrors.ustc.edu.cn/debian/ bookworm-updates main contrib non-free non-free-firmware
-deb-src https://mirrors.ustc.edu.cn/debian/ bookworm-updates main contrib non-free non-free-firmware
-
-deb https://mirrors.ustc.edu.cn/debian/ bookworm-backports main contrib non-free non-free-firmware
-deb-src https://mirrors.ustc.edu.cn/debian/ bookworm-backports main contrib non-free non-free-firmware
-
-deb https://mirrors.ustc.edu.cn/debian-security/ bookworm-security main contrib non-free non-free-firmware
-deb-src https://mirrors.ustc.edu.cn/debian-security/ bookworm-security main contrib non-free non-free-firmware
-```
-安装curl   
-```shell
+#安装curl   
 apt update
 apt install curl -y
 curl --version
@@ -140,7 +134,7 @@ curl --version
 ```
    
 ```shell
-# 三种方式，选择一种
+# 三种方式，选择一种(已包含dockercompose)
 # 使用官方源安装（国内直接访问较慢）
 curl -fsSL https://get.docker.com | bash
 # 使用阿里源安装
