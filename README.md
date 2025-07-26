@@ -36,9 +36,9 @@ debian版本：12
   - [ArozOS NAS 网页桌面操作系统](#arozos-nas-网页桌面操作系统)
   - [集客AC-dockercompose](#集客ac-dockercompose)
 
-# debian 安
+# debian 安装
 
-## debian安装   
+## debian 安装   
 安装过程省略。   
 建议：   
 1、语言选择英文，避免中文路径与某些软件不兼容。   
