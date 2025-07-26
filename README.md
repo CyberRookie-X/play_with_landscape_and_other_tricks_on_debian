@@ -4,7 +4,7 @@ debian版本：12
 [Landscape 文档网站](https://landscape.whileaway.dev/introduction.html) | [Landscape github](https://github.com/ThisSeanZhang/landscape)
 # 目录
 - [debian 安装](#debian-安装)
-  - [debian安装](#debian-安装-1)
+  - [debian 安装](#debian-安装-1)
   - [时区修改到上海](#时区修改到上海)
   - [允许root用户使用密码登录ssh](#允许root用户使用密码登录ssh)
   - [关闭 swap](#关闭-swap)
@@ -30,12 +30,18 @@ debian版本：12
   - [直接安装 dpanel](#直接安装-dpanel)
   - [容器安装 dpanel](#容器安装-dpanel)
   - [在其他机器上使用 dpanel管理本机docker](#在其他机器上使用-dpanel管理本机docker)
+- [用 docker compose 部署"接应容器"](#用-docker-compose-部署接应容器)
+  - [接应容器概述](#接应容器概述)
+  - [下面以审计程序为例，介绍接应容器部署](#下面以审计程序为例介绍接应容器部署)
+  - [创建审计程序启动脚本](#创建审计程序启动脚本)
+  - [端口映射方式 部署审计容器-compose](#端口映射方式-部署审计容器-compose)
+  - [独立网桥方式 部署审计容器-compose](#独立网桥方式-部署审计容器-compose)
 - [常见网络应用、compose 安装](#常见网络应用compose-安装)
   - [ArozOS NAS 网页桌面操作系统](#arozos-nas-网页桌面操作系统)
   - [集客AC-dockercompose](#集客ac-dockercompose)
   - [ddns-go dockercompose](#ddns-go-dockercompose)
 
-# debian 安装
+# debian 安
 
 ## debian 安装   
 安装过程省略。   
@@ -310,6 +316,164 @@ systemctl status docker
 [DPanel 可视化 Docker 管理面板](https://dpanel.cc/#/zh-cn/manual/system/remote?id=%e4%bd%bf%e7%94%a8-https-%ef%bc%88%e5%bc%80%e5%90%af-tls-%ef%bc%89)    
 
 
+# 用 docker compose 部署“接应容器”
+
+## 接应容器概述
+1、接应容器内可挂载任意具有tproxy入口的程序，如流量镜像审计程序、流量统计程序、防火墙、蜜罐等。
+2、接应容器内，通过 run.sh 脚本启动 特定程序。
+3、landscape 中重定向流量至容器。
+4、接应程序将流量转发至特定程序tproxy端口，交由特定程序处理。
+4、landscape 0.6.8 版本接应容器出口默认为flow 0出口。
+
+## 接应程序配置
+默认设置下， 容器有一个[演示程序](https://github.com/ThisSeanZhang/landscape/blob/main/landscape-ebpf/src/bin/redirect_demo_server.rs) 放置在 `/app/server` 监听 `12345` 端口。
+
+而接应程序是放置在 `/app`， 默认情况下是会将待处理流量转发到，演示程序监听的端口 `12345`。 可以通过设置容器的环境变量改变监听端口: `LAND_PROXY_SERVER_PORT`
+
+可将需要的程序挂载在 `/app/server` 目录下， `/app/start.sh` 默认会去执行 `/app/server/run.sh` 脚本。
+
+## 下面以审计程序为例，介绍接应容器部署
+## 创建审计程序启动脚本
+```yaml
+#!/bin/bash
+
+ip rule add fwmark 0x1/0x1 lookup 100
+ip route add local default dev lo table 100
+
+# 启动审计程序守护进程
+while true; do
+    echo "启动 审计程序..."
+    /app/audit/audit -d /app/audit/config
+	# 前一个为审计程序二进制文件 后一个为审计程序配置文件目录
+    echo "审计程序 退出，等待1秒后重启..."
+    sleep 1
+    # 检查 审计程序 是否正常退出（可选，但推荐）
+    if [[ $? -ne 0 ]]; then
+        echo "审计程序 进程异常退出，检查日志..."
+        # 在这里添加日志检查或其他错误处理
+        sleep 3
+    fi
+done
+
+```
+## 端口映射方式 部署审计容器-compose
+```yaml
+services:
+  audit-1:
+    image: ghcr.io/thisseanzhang/landscape-edge:amd64-xx #需修改容器标签
+    sysctls:
+      - net.ipv4.conf.lo.accept_local=1
+    cap_add:
+      - NET_ADMIN
+      - BPF
+      - PERFMON
+    privileged: true
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: "10m"
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 128M
+    ports:
+      - "外部端口号:内部端口号"        # 静态映射，主要用于映射web端口
+    volumes:
+      - /root/.landscape-router/unix_link/:/ld_unix_link/:ro # 必要映射
+      - /home/audit/audit-1/run.sh:/app/server/run.sh # 修改左边挂载审计程序1启动脚本
+      - /home/audit/audit-1/config:/app/server/config # 修改左边挂载审计程序1配置文件
+      - /home/audit/audit-1/audit:/app/server/audit # 修改左边挂载审计程序1二进制文件
+  audit-2:
+    image: ghcr.io/thisseanzhang/landscape-edge:amd64-xx #需修改容器标签
+    sysctls:
+      - net.ipv4.conf.lo.accept_local=1
+    cap_add:
+      - NET_ADMIN
+      - BPF
+      - PERFMON
+    privileged: true
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: "10m"
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 128M
+    ports:
+      - "外部端口号:内部端口号"        # 静态映射，主要用于映射web端口
+    volumes:
+      - /root/.landscape-router/unix_link/:/ld_unix_link/:ro # 必要映射
+      - /home/audit/audit-2/run.sh:/app/server/run.sh # 挂载审计程序2启动脚本
+      - /home/audit/audit-2/config:/app/server/config # 挂载审计程序2配置文件
+      - /home/audit/audit-2/audit:/app/server/audit # 挂载审计程序2二进制文件
+```
+## 独立网桥方式 部署审计容器-compose
+```yaml
+networks:
+  audit-br:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.100.0.0/16
+          gateway: 172.100.0.254
+services:
+  service-1:
+    image: ghcr.io/thisseanzhang/landscape-edge:amd64-xx #需修改容器标签
+    sysctls:
+      - net.ipv4.conf.lo.accept_local=1
+    cap_add:
+      - NET_ADMIN
+      - BPF
+      - PERFMON
+    privileged: true
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: "10m"
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 128M
+    networks:
+      audit-br:
+        ipv4_address: 172.100.0.1
+    volumes:
+      - /root/.landscape-router/unix_link/:/ld_unix_link/:ro # 必要映射
+      - /home/audit/audit-1/run.sh:/app/server/run.sh # 挂载审计程序1启动脚本
+      - /home/audit/audit-1/config:/app/server/config # 挂载审计程序1配置文件
+      - /home/audit/audit-1/audit:/app/server/audit # 挂载审计程序1二进制文件
+  service-2:
+    image: ghcr.io/thisseanzhang/landscape-edge:amd64-xx #需修改容器标签
+    sysctls:
+      - net.ipv4.conf.lo.accept_local=1
+    cap_add:
+      - NET_ADMIN
+      - BPF
+      - PERFMON
+    privileged: true
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: "10m"
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 128M
+    networks:
+      audit-br:
+        ipv4_address: 172.100.0.2
+    volumes:
+      - /root/.landscape-router/unix_link/:/ld_unix_link/:ro # 必要映射
+      - /home/audit/audit-2/run.sh:/app/server/run.sh # 挂载审计程序2启动脚本
+      - /home/audit/audit-2/config:/app/server/config # 挂载审计程序2配置文件
+      - /home/audit/audit-2/audit:/app/server/audit # 挂载审计程序2二进制文件
+
+```
 
 # 常见网络应用、compose 安装
 ## ArozOS NAS 网页桌面操作系统
