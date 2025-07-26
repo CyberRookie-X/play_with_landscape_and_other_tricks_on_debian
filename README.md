@@ -8,7 +8,11 @@ debian版本：12
   - [时区修改到上海](#时区修改到上海)
   - [开启 root ssh](#开启-root-ssh)
   - [关闭 swap](#关闭-swap)
+    - [nano 用法简述](#nano-用法简述)
+    - [注释或删除 Swap 挂载项](#注释或删除-swap-挂载项)
+    - [禁用 systemd 管理的 Swap 单元（若有）](#禁用-systemd-管理的-swap-单元若有)
   - [升级内核，到 6.9以上](#升级内核到-69以上)
+  - [重启系统生效](#重启系统生效)
 - [docker 安装](#docker-安装)
   - [脚本安装docker](#脚本安装docker)
 - [landscape 安装](#landscape-安装)
@@ -23,7 +27,7 @@ debian版本：12
   - [如何升级 landscape](#如何升级-landscape)
   - [在显示器/终端中 启动/关闭 landscape-router](#在显示器终端中-启动关闭-landscape-router)
 - [landscape 使用](#landscape-使用)
-- [dpanel 安装、配置](#dpanel-安装配置)
+- [用 dpanel 部署 dockercompose](#用-dpanel-部署-dockercompose)
   - [使用 dpanel 的必要性](#使用-dpanel-的必要性)
   - [dpanel 与 dpanel lite](#dpanel-与-dpanel-lite)
   - [直接安装 dpanel](#直接安装-dpanel)
@@ -35,26 +39,27 @@ debian版本：12
   - [ArozOS NAS 网页桌面操作系统](#arozos-nas-网页桌面操作系统)
   - [集客AC-dockercompose](#集客ac-dockercompose)
   - [ddns-go dockercompose](#ddns-go-dockercompose)
+
 # debian 安装
 
 ## debian 安装   
 安装过程省略。   
 建议：   
-1、语言选择英文，避免中文路径与某些软件不兼容。   
+1、语言选择 us/english，避免中文路径与某些软件不兼容,（后面再调整时区到上海）。   
 2、仅需 安装 webserver 、sshserver、标准配置。         
 ![image](./images/1.png)   
 ## 时区修改到上海   
 
-```
-timedatectl list-timezones
+```shell
+#设置时区为上海
 timedatectl set-timezone Asia/Shanghai
 #查看时区
 timedatectl
 ```
    
-## 开启 root ssh    
+## 允许root用户使用密码登录ssh    
 
-```
+```shell
 echo "PermitRootLogin yes" >>/etc/ssh/sshd_config
 
 #重启 ssh   
@@ -66,7 +71,7 @@ systemctl restart ssh
 输入结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。
 
 ### 注释或删除 Swap 挂载项
-```
+```shell
  nano /etc/fstab
 ```
 找到包含 swap 的行（通常类似 /swapfile 或 /dev/mapper/...-swap），在行首添加 # 注释掉，例如：
@@ -75,7 +80,7 @@ systemctl restart ssh
 + #/swapfile none swap sw 0 0
 ```
 ### 禁用 systemd 管理的 Swap 单元（若有）
-```
+```shell
 # 检查激活的 Swap 单元
 systemctl --type swap
 
@@ -85,12 +90,12 @@ systemctl --type swap
 
 ## 升级内核，到 6.9以上   
 
-```
+```shell
 apt update
 apt search linux-image-6.12
 ```
 
-```
+```shell
 # 安装内核镜像及头文件（指定 Backports 源）
 apt install -t bookworm-backports \
     linux-image-6.12.30+bpo-amd64 \
@@ -109,11 +114,11 @@ reboot
 ## 脚本安装docker   
 
 注释掉原有所有行，换掉下面的源。如已选择合适的源则可跳过。   
-```
+```shell
 # 修改软件源
 nano /etc/apt/sources.list
 ```
-```
+```shell
 deb https://mirrors.ustc.edu.cn/debian/ bookworm main contrib non-free non-free-firmware
 deb-src https://mirrors.ustc.edu.cn/debian/ bookworm main contrib non-free non-free-firmware
 
@@ -127,14 +132,14 @@ deb https://mirrors.ustc.edu.cn/debian-security/ bookworm-security main contrib 
 deb-src https://mirrors.ustc.edu.cn/debian-security/ bookworm-security main contrib non-free non-free-firmware
 ```
 安装curl   
-```
+```shell
 apt update
 apt install curl -y
 curl --version
 
 ```
    
-```
+```shell
 # 三种方式，选择一种
 # 使用官方源安装（国内直接访问较慢）
 curl -fsSL https://get.docker.com | bash
@@ -149,11 +154,11 @@ curl -fsSL https://get.docker.com | bash -s docker --mirror AzureChinaCloud
 
 ## 创建 landscape systemd 服务文件   
 
-```
+```shell
 nano /etc/systemd/system/landscape-router.service
 ```
 
-```
+```shell
 [Unit]
 Description=Landscape Router
 
@@ -172,13 +177,13 @@ WantedBy=multi-user.target
 
 [Releases · ThisSeanZhang/landscape](https://github.com/ThisSeanZhang/landscape/releases/)    
 下载 x86 和 static，放到下面创建的目录 。
-```
+```shell
 #创建landscape-router目录。   
 cd /root
 mkdir /root/.landscape-router
 cd /root/.landscape-router
 ```
-```
+```shell
 #上传文件后，赋权
 chmod -R 755 /root/.landscape-router
 ```
@@ -186,10 +191,10 @@ chmod -R 755 /root/.landscape-router
 
 将 LAN 网卡全设置为 manual 后, 将 WAN 的网卡额外在配置文件中设置一个静态 IP, 方便即使路由程序出现故障时, 使用另外一台机器设置静态 IP 后也能进行访问。 使用另外一台主机设置为 192.168.22.0/24 网段的任意地址 (比如: 192.168.22.2/24) , 直连这个网口, 就能连上路由器。   
    
-```
+```shell
 nano /etc/network/interfaces
 ```
-```
+```shell
 auto <第一张网卡名> <- 比如设置为 WAN
 iface <第一张网卡名> inet static
     address 192.168.22.1
@@ -203,22 +208,22 @@ iface <第三张网卡名> inet manual
 ```
 ## 关闭本机 DNS 服务   
 
-```
+```shell
 systemctl stop systemd-resolved
 systemctl disable systemd-resolved
 systemctl mask systemd-resolved
 ```
 ## 重启网络，并启动 landscape-router    
-```
+```shell
 # landscape-router 开机启动
 systemctl enable landscape-router.service
 ```
-```
+```shell
 # 重启网络，并启动 landscape-router
 systemctl restart networking && systemctl start landscape-router.service
 ```
 通过端口，检查landsape 检查是是否成功启动，寻找6300、6400端口，   
-```
+```shell
 ss -nutlp
 ```
 
@@ -229,12 +234,12 @@ ss -nutlp
 
 ## 修改apache80端口到8080, 以免后续与其他反代软件冲突   
 
-```
+```shell
 nano /etc/apache2/ports.conf
 ```
    
  listen 80 改到 8080   
-```
+```shell
 systemctl restart apache2
 ```
 
@@ -243,13 +248,13 @@ systemctl restart apache2
    
 ## 如何升级 landscape   ？
 
-```
+```shell
 # 关闭服务
 systemctl stop landscape-router.service
 ```
 替换 staic目录（解压、注意嵌套目录）   
 替换 landscape文件，并赋权   
-```
+```shell
 # 启动服务，建议重启系统，避免出现奇奇怪怪的问题
 systemctl start landscape-router.service
 ```
@@ -257,7 +262,7 @@ systemctl start landscape-router.service
 ## 在显示器/终端中 启动/关闭 landscape-router   
 
 需要对landscape 先赋予执行权限   
-```
+```shell
 # 启动服务
 systemctl start landscape-router.service
 # 重启服务
@@ -288,20 +293,18 @@ dpanel 集成 dockercompose 应用商店，便于一键部署容器应用。
 
 ### 创建docker tcp    
 
-```
+```shell
 systemctl edit docker
 ```
 添加下面几行  
-```
+```shell
 [Service]
 ExecStart=
 ExecStart=/usr/bin/dockerd -H tcp://0.0.0.0:2375 -H fd:// --containerd=/run/containerd/containerd.sock
 ```
-重启docker服务   
-```
+```shell
+#重启docker服务   
 systemctl daemon-reload && systemctl restart docker
-```
-```
 #验证是否生效，输出有红框内容为正常
 systemctl status docker
 ```
@@ -319,13 +322,13 @@ systemctl status docker
 ArozOS 少量路由器相关功能建议不开启    
 [ArozOS项目仓库](https://github.com/ArozOS/ArozOS)|[ArozOS官网](https://os.aroz.org/)
 
-```
+```shell
 # 使用脚本在主机中安装（非docker版）
 wget -O install.sh https://raw.githubusercontent.com/tobychui/arozos/master/installer/install.sh && bash install.sh
 ```
 ## 集客AC-dockercompose
 
-```
+```yaml
 name: gecoosac
 services:
     gecoosac:
@@ -347,7 +350,7 @@ services:
 ```
 
 ## ddns-go dockercompose
-```
+```yaml
 services:
   ddns-go:
     container_name: ddns-go
@@ -360,4 +363,6 @@ services:
       - /yourdir/data:/root
       #修改左边的目录为ddns-go的data目录
     image: jeessy/ddns-go:latest
+
+```
 
