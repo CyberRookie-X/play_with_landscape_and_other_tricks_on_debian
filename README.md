@@ -1,4 +1,4 @@
-# Playing with landscape and other tricks on Debian
+# Play with landscape and other tricks on Debian
 玩转landscape和其他花活，在dabian里。    
 debian版本：12    
 用户：root，非root用户请自行添加sudo
