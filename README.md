@@ -333,11 +333,13 @@ services:
         privileged: true
         volumes:
             - /home/gecoosac:/data
+            #修改左边的/home/gecoosac为实际存放数据的目录
         environment:
             - UID=0
             - GID=0
             - GIDLIST=0
             - passwd=yourpassword
+            #修改右边密码
             - webport=20275
         restart: always
         container_name: gecoosac
@@ -353,8 +355,9 @@ services:
     network_mode: host
     ports:
       - 外部端口:9876
-      # 修改此处
+      # 修改左边的端口为ddns-go的web端口
     volumes:
-      - ./data:/root
+      - /yourdir/data:/root
+      #修改左边的目录为ddns-go的data目录
     image: jeessy/ddns-go:latest
 
