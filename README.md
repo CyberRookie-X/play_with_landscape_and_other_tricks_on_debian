@@ -23,6 +23,7 @@ debian版本：12
   - [修改apache80端口到8080, 以免后续与其他反代软件冲突](#修改apache80端口到8080-以免后续与其他反代软件冲突)
   - [如何升级 landscape](#如何升级-landscape)
   - [在显示器/终端中 启动/关闭 landscape-router](#在显示器终端中-启动关闭-landscape-router)
+- [landscape 使用](#landscape-使用)
 - [dpanel 安装、配置](#dpanel-安装配置)
   - [使用 dpanel 的必要性](#使用-dpanel-的必要性)
   - [dpanel 与 dpanel lite](#dpanel-与-dpanel-lite)
@@ -31,11 +32,10 @@ debian版本：12
   - [在其他机器上使用 dpanel管理本机docker](#在其他机器上使用-dpanel管理本机docker)
     - [创建docker tcp](#创建docker-tcp)
     - [docker tcp 开启 TLS加密(略)](#docker-tcp-开启-tls加密略)
-- [landscape 配置](#landscape-配置)
-- [常见应用、compose 安装](#常见应用compose-安装)
+- [常见网络应用、compose 安装](#常见网络应用compose-安装)
   - [ArozOS NAS 网页桌面操作系统](#arozos-nas-网页桌面操作系统)
   - [集客AC-dockercompose](#集客ac-dockercompose)
-
+  - [ddns-go dockercompose](#ddns-go-dockercompose)
 # debian 安装
 
 ## debian 安装   
@@ -270,6 +270,8 @@ systemctl enable landscape-router.service
 # 开机启动服务 ( 确认没有问题之后执行 )
 systemctl disable landscape-router.service
 ```
+# landscape 使用
+太多了懒写
 
 # 用 dpanel 部署 dockercompose
 
@@ -311,10 +313,9 @@ systemctl status docker
 
 [DPanel 可视化 Docker 管理面板](https://dpanel.cc/#/zh-cn/manual/system/remote?id=%e4%bd%bf%e7%94%a8-https-%ef%bc%88%e5%bc%80%e5%90%af-tls-%ef%bc%89)    
 
-# landscape 配置
-太多了懒写
 
-# 常见应用、compose 安装
+
+# 常见网络应用、compose 安装
 ## ArozOS NAS 网页桌面操作系统
 也许应当不启用 ArozOS 少部分网络功能    
 [ArozOS项目仓库](https://github.com/ArozOS/ArozOS)|[ArozOS官网](https://os.aroz.org/)
@@ -324,3 +325,37 @@ systemctl status docker
 wget -O install.sh https://raw.githubusercontent.com/tobychui/arozos/master/installer/install.sh && bash install.sh
 ```
 ## 集客AC-dockercompose
+
+```
+name: gecoosac
+services:
+    gecoosac:
+        network_mode: host
+        privileged: true
+        volumes:
+            - /home/gecoosac:/data
+        environment:
+            - UID=0
+            - GID=0
+            - GIDLIST=0
+            - passwd=yourpassword
+            - webport=20275
+        restart: always
+        container_name: gecoosac
+        image: tearsful/gecoosac:latest
+```
+
+## ddns-go dockercompose
+```
+services:
+  ddns-go:
+    container_name: ddns-go
+    restart: always
+    network_mode: host
+    ports:
+      - 外部端口:9876
+      # 修改此处
+    volumes:
+      - ./data:/root
+    image: jeessy/ddns-go:latest
+
