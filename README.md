@@ -348,7 +348,7 @@ while true; do
     echo "启动 审计程序..."
     /app/server/audit -d /app/server/config
 	# 前一个为审计程序二进制文件 后一个为审计程序配置文件目录
-    echo "审计程序 启动失败，等待1秒后重新重启..."
+    echo "审计程序 异常退出，等待1秒后重新重启..."
     sleep 1
     # 检查 审计程序 是否正常退出（可选，但推荐）
     if [[ $? -ne 0 ]]; then
