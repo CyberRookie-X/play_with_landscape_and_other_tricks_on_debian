@@ -1,11 +1,11 @@
-# Play with landscape and other tricks on Debian
-玩转landscape和其他花活，在dabian里。    
+# Play with Landscape and other tricks on Debian
+在dabian里，玩转Landscape和其他花活。    
 debian版本：12    
-用户：root，非root用户请自行添加sudo
-
+用户：root，非root用户请自行添加sudo    
+[Landscape 文档网站](https://landscape.whileaway.dev/introduction.html) | [Landscape github](https://github.com/ThisSeanZhang/landscape)
 # 目录
 - [debian 安装](#debian-安装)
-  - [debian安装](#debian安装)
+  - [debian安装](#debian-安装)
   - [时区修改到上海](#时区修改到上海)
   - [开启 root ssh](#开启-root-ssh)
   - [关闭 swap](#关闭-swap)
@@ -317,11 +317,11 @@ systemctl status docker
 
 # 常见网络应用、compose 安装
 ## ArozOS NAS 网页桌面操作系统
-也许应当不启用 ArozOS 少部分网络功能    
+ArozOS 少量路由器相关功能建议不开启    
 [ArozOS项目仓库](https://github.com/ArozOS/ArozOS)|[ArozOS官网](https://os.aroz.org/)
 
 ```
-# 脚本安装
+# 使用脚本在主机中安装（非docker版）
 wget -O install.sh https://raw.githubusercontent.com/tobychui/arozos/master/installer/install.sh && bash install.sh
 ```
 ## 集客AC-dockercompose
