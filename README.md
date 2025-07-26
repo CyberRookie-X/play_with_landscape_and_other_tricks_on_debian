@@ -41,7 +41,7 @@ debian版本：12
 安装过程省略。   
 建议：   
 1、语言选择英文，避免中文路径与某些软件不兼容。   
-2、安装 webserver 、sshserver、标准配置。         
+2、仅需 安装 webserver 、sshserver、标准配置。         
 ![image](./images/1.png)   
 ## 时区修改到上海   
 
