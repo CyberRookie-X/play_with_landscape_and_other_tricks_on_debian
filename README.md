@@ -248,8 +248,8 @@ systemctl restart apache2
 # 关闭服务
 systemctl stop landscape-router.service
 ```
-替换 staic文件（解压、注意嵌套目录）   
-landscape文件，并赋权   
+替换 staic目录（解压、注意嵌套目录）   
+替换 landscape文件，并赋权   
 ```
 # 启动服务，建议重启系统，避免出现奇奇怪怪的问题
 systemctl start landscape-router.service
