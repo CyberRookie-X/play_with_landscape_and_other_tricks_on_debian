@@ -2,6 +2,9 @@
 debian版本：12    
 用户：root，非root用户请自行添加sudo    
 [Landscape 文档网站](https://landscape.whileaway.dev/introduction.html) | [Landscape github](https://github.com/ThisSeanZhang/landscape)
+
+# 本教程适用于 debian、ubuntu 及其部分衍生版本，例如 PVE、FnOS
+
 # 目录
 - [debian 安装](#debian-安装)
   - [debian 安装](#debian-安装-1)
@@ -200,7 +203,7 @@ chmod -R 755 /root/.landscape-router
 将 LAN 网卡全设置为 manual 后, 将 WAN 的网卡额外在配置文件中设置一个静态 IP, 方便即使路由程序出现故障时, 使用另外一台机器设置静态 IP 后也能进行访问。 使用另外一台主机设置为 192.168.22.0/24 网段的任意地址 (比如: 192.168.22.2/24) , 直连这个网口, 就能连上路由器。   
 ```shell
 # 获取网卡名
-ip addr
+ip a
 ```
 
 ```shell
