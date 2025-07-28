@@ -1,9 +1,9 @@
 # 在debian里，玩转Landscape和其他花活（持续更新中...）
-debian版本：12    
+
 用户：root，非root用户请自行添加sudo    
 [Landscape 文档网站](https://landscape.whileaway.dev/introduction.html) | [Landscape github](https://github.com/ThisSeanZhang/landscape)
 
-# 本教程适用于 debian、ubuntu 及其部分衍生版本，例如 PVE、fnOS
+# 本教程适用于 debian、ubuntu 及其部分衍生版本
 
 # 目录
 - [debian 安装](#debian-安装)
