@@ -3,7 +3,7 @@
 用户：root，非root用户请自行添加sudo    
 [Landscape 文档网站](https://landscape.whileaway.dev/introduction.html) | [Landscape github](https://github.com/ThisSeanZhang/landscape)
 
-# 本教程适用于 debian、ubuntu 及其部分衍生版本
+# 本教程适用于 debian、ubuntu 及其部分衍生版本，例如 PVE 8.2+
 
 # 目录
 - [debian 安装](#debian-安装)
