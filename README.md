@@ -416,7 +416,7 @@ docker run -d \
   -v /home/audit/audit-1/run.sh:/app/server/run.sh \ # 修改左边挂载审计程序1启动脚本
   -v /home/audit/audit-1/config:/app/server/config \ # 修改左边挂载审计程序1配置文件
   -v /home/audit/audit-1/audit:/app/server/audit \ # 修改左边挂载审计程序1二进制文件
-  ghcr.io/thisseanzhang/landscape-edge:amd64-xx
+  ghcr.io/thisseanzhang/landscape-edge:amd64-xx # 需修改容器标签
 
 ```
 
@@ -449,7 +449,7 @@ services:
       - /home/audit/audit-1/config:/app/server/config # 修改左边挂载审计程序1配置文件
       - /home/audit/audit-1/audit:/app/server/audit # 修改左边挂载审计程序1二进制文件
   audit-2:
-    image: ghcr.io/thisseanzhang/landscape-edge:amd64-xx #需修改容器标签
+    image: ghcr.io/thisseanzhang/landscape-edge:amd64-xx # 需修改容器标签
     sysctls:
       - net.ipv4.conf.lo.accept_local=1
     cap_add:
@@ -485,7 +485,7 @@ networks:
           gateway: 172.100.0.254
 services:
   service-1:
-    image: ghcr.io/thisseanzhang/landscape-edge:amd64-xx #需修改容器标签
+    image: ghcr.io/thisseanzhang/landscape-edge:amd64-xx # 需修改容器标签
     sysctls:
       - net.ipv4.conf.lo.accept_local=1
     cap_add:
@@ -511,7 +511,7 @@ services:
       - /home/audit/audit-1/config:/app/server/config # 挂载审计程序1配置文件
       - /home/audit/audit-1/audit:/app/server/audit # 挂载审计程序1二进制文件
   service-2:
-    image: ghcr.io/thisseanzhang/landscape-edge:amd64-xx #需修改容器标签
+    image: ghcr.io/thisseanzhang/landscape-edge:amd64-xx # 需修改容器标签
     sysctls:
       - net.ipv4.conf.lo.accept_local=1
     cap_add:
