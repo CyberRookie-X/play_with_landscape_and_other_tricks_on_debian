@@ -61,10 +61,11 @@ ldd --version
   - [直接安装 dpanel](#直接安装-dpanel)
   - [容器安装 dpanel](#容器安装-dpanel)
   - [在其他机器上使用 dpanel管理本机docker](#在其他机器上使用-dpanel管理本机docker)
-- [用 docker compose 部署"接应容器"](#用-docker-compose-部署接应容器)
+- [重定向至容器（接应容器）部署](#重定向至容器接应容器部署)
   - [接应容器概述](#接应容器概述)
   - [下面以审计程序为例，介绍接应容器部署](#下面以审计程序为例介绍接应容器部署)
   - [创建审计程序启动脚本](#创建审计程序启动脚本)
+  - [容器方式 部署审计容器-docker](#容器方式-部署审计容器-docker)
   - [端口映射方式 部署审计容器-compose](#端口映射方式-部署审计容器-compose)
   - [独立网桥方式 部署审计容器-compose](#独立网桥方式-部署审计容器-compose)
 - [常见网络应用、compose 安装](#常见网络应用compose-安装)
@@ -361,7 +362,7 @@ systemctl status docker
 [DPanel 可视化 Docker 管理面板](https://dpanel.cc/#/zh-cn/manual/system/remote?id=%e4%bd%bf%e7%94%a8-https-%ef%bc%88%e5%bc%80%e5%90%af-tls-%ef%bc%89)    
 
 
-# 用 docker compose 部署“接应容器”
+#  重定向至容器（接应容器）部署
 
 ## 接应容器概述
 1、接应容器内可挂载任意具有tproxy入口的程序，如流量镜像审计程序、流量统计程序、防火墙、蜜罐等。
@@ -400,6 +401,25 @@ while true; do
     fi
 done
 ```
+## 容器方式 部署审计容器-docker
+
+```shell
+docker run -d \
+  --name audit-1 \
+  --sysctl net.ipv4.conf.lo.accept_local=1 \
+  --cap-add=NET_ADMIN \
+  --cap-add=BPF \
+  --cap-add=PERFMON \
+  --privileged \
+  -p 外部端口:内部端口 \
+  -v /root/.landscape-router/unix_link/:/ld_unix_link/:ro \
+  -v /home/audit/audit-1/run.sh:/app/server/run.sh \ # 修改左边挂载审计程序1启动脚本
+  -v /home/audit/audit-1/config:/app/server/config \ # 修改左边挂载审计程序1配置文件
+  -v /home/audit/audit-1/audit:/app/server/audit \ # 修改左边挂载审计程序1二进制文件
+  ghcr.io/thisseanzhang/landscape-edge:amd64-xx
+
+```
+
 ## 端口映射方式 部署审计容器-compose
 ```yaml
 services:
