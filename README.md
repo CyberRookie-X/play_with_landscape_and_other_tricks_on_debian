@@ -18,8 +18,8 @@
 | OMV | ✅ | 8+ | 低版本需更新内核至6.9+| 
 | Armbian | 🟢 |  | 需内核版本6.9+|  
 | FnOS | ❌ |  | 内核不支持 |  
-| OpenWRT | ❌ |  | 非GCC无法兼容 |  
-| Alpine | ❌ |  | 非GCC无法兼容 |  
+| OpenWRT | ❌ |  | 非GLIBC无法兼容 |  
+| Alpine | ❌ |  | 非GLIBC无法兼容 |  
 <!--⚠️ 调整后可兼容-->
 <!--🟡 未知  -->
 ``` shell
