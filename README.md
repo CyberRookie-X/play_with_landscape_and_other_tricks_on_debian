@@ -142,6 +142,12 @@ deb-src https://mirrors.ustc.edu.cn/debian-security/ bookworm-security main cont
 ```
 ## 升级内核，到 6.9以上   
 
+``` shell
+# 查看内核版本，大于6.9则无需升级内核
+uname -r
+
+```
+
 ```shell
 apt update
 apt search linux-image-6.12
