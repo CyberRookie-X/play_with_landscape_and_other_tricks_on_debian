@@ -72,6 +72,7 @@ ldd --version
   - [ArozOS NAS 网页桌面操作系统](#arozos-nas-网页桌面操作系统)
   - [集客AC dockercompose](#集客ac-dockercompose)
   - [ddns-go dockercompose](#ddns-go-dockercompose)
+  - [FRP 客户端（FRPC）](#FRP-客户端FRPC)
 
 # debian 安装配置
 
@@ -589,3 +590,9 @@ services:
 
 ```
 
+### FRP 客户端（FRPC）
+#### 本机安装
+[官方文档](https://gofrp.org/zh-cn/docs/setup/systemd/)
+#### docker 方式安装安装
+
+[基于 Docker 搭建 FRP 内网穿透开源项目（很简单哒）](https://www.cnblogs.com/hanzhe/p/18773973)
