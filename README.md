@@ -255,14 +255,14 @@ nano /etc/network/interfaces
 ```
 ```shell
 # pppoe 后生成一个pppoe网卡，与此网卡不冲突
-# 假定 1 网卡作为 WAN 网卡
+# 假定 1 网卡用于 WAN 网卡
 auto <第 1 张网卡名> 
 iface <第 1 张网卡名> inet static
     address 192.168.22.1
     netmask 255.255.255.0
 
 # 后续可在 Landscape UI 中创建 Land 网桥
-# 假定 2~3 网卡为 LAN 网卡
+# 假定 2~3 网卡用于 LAN 网卡
 auto <第 2 张网卡名>
 iface <第 2 张网卡名> inet manual
 
