@@ -72,7 +72,7 @@ ldd --version
   - [集客AC dockercompose](#集客ac-dockercompose)
   - [ddns-go dockercompose](#ddns-go-dockercompose)
   - [FRP 客户端（FRPC）](#frp-客户端frpc)
-  - [FakeSIP](#fakesip)
+  - [FakeSIP、FakeHTTP](#fakesipfakehttp)
 
 # debian 安装配置
 
@@ -603,13 +603,21 @@ services:
 
 [基于 Docker 搭建 FRP 内网穿透开源项目（很简单哒）](https://www.cnblogs.com/hanzhe/p/18773973)
 
-## FakeSIP
+## FakeSIP、FakeHTTP
 
 ### 如何在 landscape-router 使用
 * Landcsape-router 主机中，开启 eBPF 路由后，该功能可能不生效
 * 在客户主机中安装任能生效，如 pt/bt 所在主机
 ### 简介
-[官方github](https://github.com/MikeWang000000/FakeSIP/wiki)  
+[FakeHTTP](https://github.com/MikeWang000000/FakeHTTP/wiki)  
+FakeHTTP 可以将你的所有 TCP 连接伪装为 HTTP 等协议以规避深度包检测 (DPI)，是一个基于 nftables / iptables 与 Netfilter Queue (NFQUEUE) 的网络工具。
+
+* 双方 TCP 通信时，您仅需在其中一端运行 FakeHTTP。
+* 用于伪装的 TCP 报文会在传输的路途中被丢弃。
+* FakeHTTP 不是网络隧道，它仅在 TCP 握手时工作。
+
+
+[FakeSIP](https://github.com/MikeWang000000/FakeSIP/wiki)  
 FakeSIP 可以将你的所有 UDP 流量伪装为 SIP 等协议以规避深度包检测 (DPI)，是一个基于 nftables / iptables 与 Netfilter Queue (NFQUEUE) 的网络工具。  
 
 * 双方 UDP 通信时，您仅需在其中一端运行 FakeSIP。  
@@ -617,7 +625,7 @@ FakeSIP 可以将你的所有 UDP 流量伪装为 SIP 等协议以规避深度�
 * FakeSIP 不是网络隧道，它仅在 UDP 通信前期工作。  
 
 ```shell
-# docker 安装，在主机中生效（还有其他安装方式，参靠其官方github）
+# docker 安装FakeHTTP，在主机中生效（还有其他安装方式，参靠其官方github）
 docker run --rm \
     --net=host \
     --cap-add CAP_NET_ADMIN \
