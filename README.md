@@ -41,7 +41,7 @@ ldd --version
   - [修改软件源（可选）](#修改软件源可选)
   - [升级内核，到 6.9以上](#升级内核到-69以上)
   - [重启系统生效](#重启系统生效)
-- [docker、docker compose 安装](#dockerdocker-compose-安装)
+- [docker、docker compose 安装（可选）](#dockerdocker-compose-安装可选)
 - [landscape 安装](#landscape-安装)
   - [安装 pppd](#安装-pppd)
   - [创建 landscape systemd 服务文件](#创建-landscape-systemd-服务文件)
@@ -51,6 +51,7 @@ ldd --version
   - [重启网络，并启动 landscape-router](#重启网络并启动-landscape-router)
   - [登录 landscape 账号 root 密码 root，https://IP:6443](#登录-landscape-账号-root-密码-roothttpsip6443)
   - [至此可以在 landscape-router web 中进行配置](#至此可以在-landscape-router-web-中进行配置)
+  - [应用 Landscape-Router 开机启动](#应用-landscape-router-开机启动)
   - [修改apache80端口到8080, 以免后续与其他反代软件冲突](#修改apache80端口到8080-以免后续与其他反代软件冲突)
   - [如何升级 landscape](#如何升级-landscape)
   - [在显示器/终端中 启动/关闭 landscape-router](#在显示器终端中-启动关闭-landscape-router)
@@ -168,7 +169,7 @@ update-grub
 # 重启系统生效
 reboot
 ```
-# docker、docker compose 安装
+# docker、docker compose 安装（可选）
 
 注释掉原有所有行，换掉下面的源。如已选择合适的源则可跳过。   
 ```shell
@@ -194,6 +195,7 @@ curl -fsSL https://get.docker.com | bash -s docker --mirror AzureChinaCloud
 
 ## 安装 pppd
 ```shell
+# 用于 pppoe 拨号
 apt install ppp -y
 pppd -version
 
@@ -223,7 +225,7 @@ WantedBy=multi-user.target
 ## 下载并上传 landscape-router  
 
 [Releases · ThisSeanZhang/landscape](https://github.com/ThisSeanZhang/landscape/releases/)    
-下载 x86 和 static，放到下面创建的目录 。   
+下载 x86 和 static，放到下面创建的目录。（注意 static 可能存在嵌套，需要调整，参考下图）   
 ![image](./images/3.png)   
 ![image](./images/4.png)   
 ```shell
@@ -267,10 +269,7 @@ systemctl disable systemd-resolved
 systemctl mask systemd-resolved
 ```
 ## 重启网络，并启动 landscape-router    
-```shell
-# landscape-router 开机启动
-systemctl enable landscape-router.service
-```
+
 ```shell
 # 重启网络，并启动 landscape-router
 systemctl restart networking && systemctl start landscape-router.service
@@ -283,7 +282,13 @@ ss -nutlp
    
 ## 登录 landscape 账号 root 密码 root，https://IP:6443   
 ## 至此可以在 landscape-router web 中进行配置   
-   
+
+## 应用 Landscape-Router 开机启动   
+
+```shell
+# 配置无误后，应用landscape-router 开机启动
+systemctl enable landscape-router.service
+```
 
 ## 修改apache80端口到8080, 以免后续与其他反代软件冲突   
 
