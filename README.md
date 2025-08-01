@@ -49,7 +49,7 @@ ldd --version
   - [修改网卡配置](#修改网卡配置)
   - [关闭本机 DNS 服务](#关闭本机-dns-服务)
   - [重启网络，并启动 landscape-router](#重启网络并启动-landscape-router)
-  - [登录 landscape 账号 root 密码 root，https://IP:6443](#登录-landscape-账号-root-密码-roothttpsip6443)
+  - [登录 landscape 账号 root 密码 root，https://192.168.22.1:6443](#登录-landscape-账号-root-密码-roothttps1921682216443)
   - [至此可以在 landscape-router web 中进行配置](#至此可以在-landscape-router-web-中进行配置)
   - [应用 Landscape-Router 开机启动](#应用-landscape-router-开机启动)
   - [修改apache80端口到8080, 以免后续与其他反代软件冲突](#修改apache80端口到8080-以免后续与其他反代软件冲突)
@@ -280,7 +280,7 @@ ss -nutlp
 ```
 
    
-## 登录 landscape 账号 root 密码 root，https://IP:6443   
+## 登录 landscape 账号 root 密码 root，https://192.168.22.1:6443   
 
 ## 应用 Landscape-Router 开机启动   
 
