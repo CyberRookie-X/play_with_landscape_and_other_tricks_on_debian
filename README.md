@@ -71,7 +71,8 @@ ldd --version
   - [ArozOS NAS 网页桌面操作系统](#arozos-nas-网页桌面操作系统)
   - [集客AC dockercompose](#集客ac-dockercompose)
   - [ddns-go dockercompose](#ddns-go-dockercompose)
-  - [FRP 客户端（FRPC）](#FRP-客户端FRPC)
+  - [FRP 客户端（FRPC）](#frp-客户端frpc)
+  - [FakeSIP（与landscape 不兼容）](#fakesip与landscape-不兼容)
 
 # debian 安装配置
 
@@ -595,9 +596,31 @@ services:
 
 ```
 
-### FRP 客户端（FRPC）
-#### 本机安装
+## FRP 客户端（FRPC）
+### 本机安装
 [官方文档](https://gofrp.org/zh-cn/docs/setup/systemd/)
-#### docker 方式安装安装
+### docker 方式安装安装
 
 [基于 Docker 搭建 FRP 内网穿透开源项目（很简单哒）](https://www.cnblogs.com/hanzhe/p/18773973)
+
+## FakeSIP（与landscape 不兼容）
+
+### 简介
+[官方github](https://github.com/MikeWang000000/FakeSIP/wiki)  
+FakeSIP 可以将你的所有 UDP 流量伪装为 SIP 等协议以规避深度包检测 (DPI)，是一个基于 nftables / iptables 与 Netfilter Queue (NFQUEUE) 的网络工具。  
+
+* 双方 UDP 通信时，您仅需在其中一端运行 FakeSIP。  
+* 用于伪装的 UDP 报文会在传输的路途中被丢弃。  
+* FakeSIP 不是网络隧道，它仅在 UDP 通信前期工作。  
+
+```shell
+# docker 安装，在主机中生效
+docker run --rm \
+    --net=host \
+    --cap-add CAP_NET_ADMIN \
+    --cap-add CAP_NET_RAW \
+    --cap-add CAP_SYS_MODULE \
+    --cap-add CAP_SYS_NICE \
+    nattertool/fakehttp -z -h www.example.com -i eth0
+
+```
