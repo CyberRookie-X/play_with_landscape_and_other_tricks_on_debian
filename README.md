@@ -55,7 +55,7 @@ ldd --version
   - [修改apache80端口到8080, 以免后续与其他反代软件冲突](#修改apache80端口到8080-以免后续与其他反代软件冲突)
   - [如何升级 landscape](#如何升级-landscape)
   - [在显示器/终端中 启动/关闭 landscape-router](#在显示器终端中-启动关闭-landscape-router)
-- [landscape 使用](#landscape-使用)
+- [Landscape 使用](#landscape-使用)
 - [用 dpanel 部署 dockercompose](#用-dpanel-部署-dockercompose)
   - [使用 dpanel 的必要性](#使用-dpanel-的必要性)
   - [dpanel标准版 与 dpanel lite](#dpanel标准版-与-dpanel-lite)
@@ -281,7 +281,6 @@ ss -nutlp
 
    
 ## 登录 landscape 账号 root 密码 root，https://IP:6443   
-## 至此可以在 landscape-router web 中进行配置   
 
 ## 应用 Landscape-Router 开机启动   
 
@@ -289,6 +288,11 @@ ss -nutlp
 # 配置无误后，应用landscape-router 开机启动
 systemctl enable landscape-router.service
 ```
+
+## 至此可以在 landscape-router web 中进行配置   
+
+**[详细设置参考官方文档](https://landscape.whileaway.dev/feature/flow.html)**
+
 
 ## 修改apache80端口到8080, 以免后续与其他反代软件冲突   
 
@@ -332,8 +336,9 @@ systemctl enable landscape-router.service
 # 开机启动服务 ( 确认没有问题之后执行 )
 systemctl disable landscape-router.service
 ```
-# landscape 使用
-太多了懒写
+# Landscape 使用
+
+**[详细设置参考官方文档](https://landscape.whileaway.dev/feature/flow.html)**
 
 # 用 dpanel 部署 dockercompose
 
