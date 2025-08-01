@@ -72,7 +72,7 @@ ldd --version
   - [集客AC dockercompose](#集客ac-dockercompose)
   - [ddns-go dockercompose](#ddns-go-dockercompose)
   - [FRP 客户端（FRPC）](#frp-客户端frpc)
-  - [FakeSIP（与landscape 不兼容）](#fakesip与landscape-不兼容)
+  - [FakeSIP](#fakesip)
 
 # debian 安装配置
 
