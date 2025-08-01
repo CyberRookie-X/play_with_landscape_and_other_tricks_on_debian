@@ -223,7 +223,9 @@ WantedBy=multi-user.target
 ## 下载并上传 landscape-router  
 
 [Releases · ThisSeanZhang/landscape](https://github.com/ThisSeanZhang/landscape/releases/)    
-下载 x86 和 static，放到下面创建的目录 。
+下载 x86 和 static，放到下面创建的目录 。   
+![image](./images/3.png)   
+![image](./images/4.png)   
 ```shell
 #创建landscape-router目录。   
 cd /root
@@ -273,7 +275,7 @@ systemctl enable landscape-router.service
 # 重启网络，并启动 landscape-router
 systemctl restart networking && systemctl start landscape-router.service
 ```
-通过端口，检查landsape 检查是是否成功启动，寻找6300、6400端口，   
+通过端口，检查landsape 检查是是否成功启动，寻找6300、6443端口，   
 ```shell
 ss -nutlp
 ```
