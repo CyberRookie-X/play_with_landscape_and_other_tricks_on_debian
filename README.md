@@ -603,8 +603,11 @@ services:
 
 [基于 Docker 搭建 FRP 内网穿透开源项目（很简单哒）](https://www.cnblogs.com/hanzhe/p/18773973)
 
-## FakeSIP（与landscape 不兼容）
+## FakeSIP
 
+### 如何在 landscape-router 使用
+* Landcsape-router 主机中，开启 eBPF 路由后，该功能可能不生效
+* 在客户主机中安装任能生效，如 pt/bt 所在主机
 ### 简介
 [官方github](https://github.com/MikeWang000000/FakeSIP/wiki)  
 FakeSIP 可以将你的所有 UDP 流量伪装为 SIP 等协议以规避深度包检测 (DPI)，是一个基于 nftables / iptables 与 Netfilter Queue (NFQUEUE) 的网络工具。  
@@ -614,7 +617,7 @@ FakeSIP 可以将你的所有 UDP 流量伪装为 SIP 等协议以规避深度�
 * FakeSIP 不是网络隧道，它仅在 UDP 通信前期工作。  
 
 ```shell
-# docker 安装，在主机中生效
+# docker 安装，在主机中生效（还有其他安装方式，参靠其官方github）
 docker run --rm \
     --net=host \
     --cap-add CAP_NET_ADMIN \
@@ -622,5 +625,6 @@ docker run --rm \
     --cap-add CAP_SYS_MODULE \
     --cap-add CAP_SYS_NICE \
     nattertool/fakehttp -z -h www.example.com -i eth0
+    # 需要增加一些域名
 
 ```
