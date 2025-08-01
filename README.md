@@ -240,7 +240,11 @@ chmod -R 755 /root/.landscape-router
 ```
 ## 修改网卡配置   
 
-将 LAN 网卡全设置为 manual 后, 将 WAN 的网卡额外在配置文件中设置一个静态 IP, 方便即使路由程序出现故障时, 使用另外一台机器设置静态 IP 后也能进行访问。 使用另外一台主机设置为 192.168.22.0/24 网段的任意地址 (比如: 192.168.22.2/24) , 直连这个网口, 就能连上路由器。   
+将 LAN 网卡全设置为 manual 后, 暂时无法通过lan访问这个dabian。需要至少一个网卡拥有静态IP，以访问 landscape webui。  
+有2种方式：  
+1、（不推荐）将一个lan网卡设为 static 其他网卡设备配置为 manual，之后可在web中可将这张网卡加入网桥，但需配置为manual。   
+2、（推荐）对于pppoe用户，将 WAN 的网卡额外在配置文件中设置一个静态 IP, pppoe 拨号会自动生成一个虚拟网卡，与该配置不冲突。   
+建议采用方式2，即使路由程序出现故障时, 可将电脑/手机设置为静态IP，访问landscape ui。 例如 wan 设置为 192.168.22.1/24时，另一台电脑/手机将IP设为192.168.22.2 ~ 192.168.22.255之一，连接wan口后，即可访问 landscape ui 。   
 ```shell
 # 获取网卡名
 ip a
@@ -250,16 +254,20 @@ ip a
 nano /etc/network/interfaces
 ```
 ```shell
-auto <第一张网卡名> <- 比如设置为 WAN
-iface <第一张网卡名> inet static
+# pppoe 后生成一个pppoe网卡，与此网卡不冲突
+# 假定 1 网卡作为 WAN 网卡
+auto <第 1 张网卡名> 
+iface <第 1 张网卡名> inet static
     address 192.168.22.1
     netmask 255.255.255.0
 
-auto <第二张网卡名> <- 以下都是 LAN
-iface <第二张网卡名> inet manual
+# 后续可在 Landscape UI 中创建 Land 网桥
+# 假定 2~3 网卡为 LAN 网卡
+auto <第 2 张网卡名>
+iface <第 2 张网卡名> inet manual
 
-auto <第三张网卡名>
-iface <第三张网卡名> inet manual
+auto <第 3 张网卡名>
+iface <第 3 张网卡名> inet manual
 ```
 ## 关闭本机 DNS 服务   
 
@@ -280,7 +288,7 @@ ss -nutlp
 ```
 
    
-## 登录 landscape 账号 root 密码 root，https://192.168.22.1:6443   
+## 登录 landscape 账号 root 密码 root，通过wan网卡静态IP访问，https://192.168.22.1:6443   
 
 ## 应用 Landscape-Router 开机启动   
 
