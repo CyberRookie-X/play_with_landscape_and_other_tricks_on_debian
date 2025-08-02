@@ -594,12 +594,13 @@ services:
             - GIDLIST=0
             - passwd=yourpassword
             #修改右边密码
-            - webport=20275
+            - webport=8080
+            # 管理端口默认8080，可修改之
         restart: always
         container_name: gecoosac
         image: tearsful/gecoosac:latest
 ```
-
+**登录管理面板 http://192.168.22.1:8080**
 ## ddns-go dockercompose
 ```yaml
 services:
@@ -659,7 +660,8 @@ docker run --rm \
 ```
 
 ## netdata（性能、网络监控面板/仪表盘）
-![image](./images/5.png)   
+![image](./images/5.png)  
+**登录 http://192.168.22.1:19999**
 ```yaml
 services:
   netdata:
@@ -687,3 +689,7 @@ services:
       - /var/log:/host/var/log:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
 ```
+
+
+**登录 http://192.168.22.1:19999**
+![image](./images/6.png)  
