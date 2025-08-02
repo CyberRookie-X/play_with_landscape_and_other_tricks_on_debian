@@ -74,6 +74,7 @@ ldd --version
   - [ddns-go dockercompose](#ddns-go-dockercompose)
   - [FRP 客户端（FRPC）](#frp-客户端frpc)
   - [FakeSIP、FakeHTTP](#fakesipfakehttp)
+  - [netdata（性能、网络监控面板/仪表盘）](#netdata性能网络监控面板仪表盘)
 
 # debian 安装配置
 
@@ -655,4 +656,34 @@ docker run --rm \
     nattertool/fakehttp -z -h www.example.com -i eth0
     # 需要增加一些域名
 
+```
+
+## netdata（性能、网络监控面板/仪表盘）
+![image](./images/5.png)   
+```yaml
+services:
+  netdata:
+    image: netdata/netdata
+    container_name: netdata
+    pid: host
+    network_mode: host
+    restart: unless-stopped
+    cap_add:
+      - SYS_PTRACE
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - /home/netdata/netdataconfig:/etc/netdata #左边可修改
+      - /home/netdata/netdatalib:/var/lib/netdata #左边可修改
+      - /home/netdata/netdatacache:/var/cache/netdata #左边可修改
+      - /:/host/root:ro,rslave
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /etc/localtime:/etc/localtime:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc/os-release:/host/etc/os-release:ro
+      - /var/log:/host/var/log:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
 ```
