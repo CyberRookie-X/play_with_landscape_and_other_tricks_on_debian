@@ -224,17 +224,18 @@ WantedBy=multi-user.target
 ```
 
 ## 下载并上传 landscape-router  
-
-[Releases · ThisSeanZhang/landscape](https://github.com/ThisSeanZhang/landscape/releases/)    
-下载 x86 和 static，放到下面创建的目录。（注意 static 可能存在嵌套，需要调整，参考下图）   
-![image](./images/3.png)   
-![image](./images/4.png)   
 ```shell
 #创建landscape-router目录。   
 cd /root
 mkdir /root/.landscape-router
 cd /root/.landscape-router
 ```
+[下载 landscape-webserver-x86_64、static.zip 文件](https://github.com/ThisSeanZhang/landscape/releases/)   
+![image](./images/7.png)       
+放到下面创建的目录。（注意 static 可能存在嵌套，需要调整，参考下图）   
+![image](./images/3.png)   
+![image](./images/4.png)   
+
 ```shell
 #上传文件后，赋权
 chmod -R 755 /root/.landscape-router
