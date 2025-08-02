@@ -284,9 +284,10 @@ systemctl mask systemd-resolved
 # 重启网络，并启动 landscape-router
 systemctl restart networking && systemctl start landscape-router.service
 ```
-通过端口，检查landsape 检查是是否成功启动，寻找6300、6443端口，   
+通过端口，检查landsape 检查是是否成功启动，检查 6443 、 6300 端口是否为landscape   
 ```shell
-ss -nutlp
+ss -tulnp | grep -E ':6300|:6443'
+
 ```
 
    
