@@ -55,7 +55,8 @@ ldd --version
   - [修改apache80端口到8080, 以免后续与其他反代软件冲突](#修改apache80端口到8080-以免后续与其他反代软件冲突)
   - [如何升级 landscape](#如何升级-landscape)
   - [在显示器/终端中 启动/关闭 landscape-router](#在显示器终端中-启动关闭-landscape-router)
-- [Landscape 使用](#landscape-使用)
+- [Landscape 实战案例](#landscape-实战案例)
+  - [基于 vlan/ssid（WiFi） 的分流实现（暂不能实现）](#基于-vlanssidwifi-的分流实现暂不能实现)
 - [用 dpanel 部署 dockercompose](#用-dpanel-部署-dockercompose)
   - [使用 dpanel 的必要性](#使用-dpanel-的必要性)
   - [dpanel标准版 与 dpanel lite](#dpanel标准版-与-dpanel-lite)
@@ -347,9 +348,16 @@ systemctl enable landscape-router.service
 # 开机启动服务 ( 确认没有问题之后执行 )
 systemctl disable landscape-router.service
 ```
-# Landscape 使用
+# Landscape 实战案例
 
-**[详细设置参考官方文档](https://landscape.whileaway.dev/feature/flow.html)**
+## [详细设置参考官方文档](https://landscape.whileaway.dev/feature/flow.html)
+
+## 基于 vlan/ssid（WiFi） 的分流实现（暂不能实现）
+### 概述
+* 在 SSH 中，创建多个 vlan 网卡，设为 manual
+* flow 入口 设置为规则设置为 vlan
+* 在 AC 中配置 ssid vlan
+
 
 # 用 dpanel 部署 dockercompose
 
