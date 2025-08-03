@@ -392,7 +392,7 @@ iface eth0.20 inet manual
 ### AC 中配置
 
 为 ssid 添加 vlan 10、20   
-[在 ikuai AC 中为 ssid 添加 vlan ](https://www.ikuai8.com/support/cjwt/ap/ap-ssid-vlan.html)
+[在 ikuai AC 中为 ssid 添加 vlan，参考官方文档 1、2 两节，dhcp已在landscape中配置无需在ikuai中配置 ](https://www.ikuai8.com/support/cjwt/ap/ap-ssid-vlan.html)
 
 # 用 dpanel 部署 dockercompose
 
