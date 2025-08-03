@@ -357,7 +357,41 @@ systemctl disable landscape-router.service
 * 在 SSH 中，创建多个 vlan 网卡，设为 manual
 * flow 入口 设置为规则设置为 vlan
 * 在 AC 中配置 ssid vlan
+### landscape 中配置
+```bash
+# 检查网卡 
+ip a
 
+```
+
+
+```bash
+# 添加 vlan 网卡
+sudo nano /etc/network/interfaces
+
+```
+
+```bash
+auto eth0
+iface eth0 inet manual
+
+# 创建 vlan id 为 10 的网卡，绑定到 eth0
+auto eth0.10
+iface eth0.10 inet manual
+    vlan-raw-device eth0       # 绑定物理接口
+
+# 创建 vlan id 为 20 的网卡，绑定到 eth0
+auto eth0.20
+iface eth0.20 inet manual
+    vlan-raw-device eth0       # 绑定物理接口
+
+```
+在landscape webui 中，配置为lan，开启dhcp
+
+### AC 中配置
+
+为 ssid 添加 vlan 10、20   
+[在 ikuai AC 中为 ssid 添加 vlan ](https://www.ikuai8.com/support/cjwt/ap/ap-ssid-vlan.html)
 
 # 用 dpanel 部署 dockercompose
 
