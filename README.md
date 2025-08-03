@@ -375,18 +375,19 @@ sudo nano /etc/network/interfaces
 auto eth0
 iface eth0 inet manual
 
-# 创建 vlan id 为 10 的网卡，绑定到 eth0
+# 创建 vlan id 为 10 的网卡，绑定到 物理接口 eth0
 auto eth0.10
 iface eth0.10 inet manual
     vlan-raw-device eth0       # 绑定物理接口
 
-# 创建 vlan id 为 20 的网卡，绑定到 eth0
+# 创建 vlan id 为 20 的网卡，绑定到 物理接口 eth0
 auto eth0.20
 iface eth0.20 inet manual
     vlan-raw-device eth0       # 绑定物理接口
 
 ```
-在landscape webui 中，配置为lan，开启dhcp
+* 在landscape webui 中，配置为lan，开启dhcp
+* `分流设置`中添加新的流，配置入口规则为 vlan 所设置 子网
 
 ### AC 中配置
 
