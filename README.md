@@ -369,7 +369,7 @@ ip a
 
 ```bash
 # 添加 vlan 网卡
-sudo nano /etc/network/interfaces
+nano /etc/network/interfaces
 
 ```
 
