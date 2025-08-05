@@ -70,7 +70,7 @@ ldd --version
   - [端口映射方式 部署审计容器-compose](#端口映射方式-部署审计容器-compose)
   - [独立网桥方式 部署审计容器-compose](#独立网桥方式-部署审计容器-compose)
 - [常见网络应用、compose 安装](#常见网络应用compose-安装)
-  - [filebrowser（管理配置文件，建议安装）](#filebrowser管理配置文件建议安装)
+  - [filebrowser（文件管理）](#filebrowser文件管理)
   - [tabby （网页ssh）](#tabby-网页ssh)
   - [ArozOS NAS 网页桌面操作系统](#arozos-nas-网页桌面操作系统)
   - [集客AC dockercompose](#集客ac-dockercompose)
@@ -618,7 +618,7 @@ services:
 
 # 常见网络应用、compose 安装
 
-## filebrowser（管理配置文件，建议安装）
+## filebrowser（文件管理）
  TODO
 ## tabby （网页ssh）
  TODO
