@@ -4,6 +4,14 @@
 [Landscape 文档网站](https://landscape.whileaway.dev/introduction.html) | [Landscape github](https://github.com/ThisSeanZhang/landscape)
 
 **debian用户：root，非 root 用户请自行添加 sudo**    
+
+## 核心特性
+* 分流控制（SIP、QoS(dscp)、DIP、域名 匹配规则）  
+* eBPF 路由（性能优于iptable）   
+* 每个流 Flow 独立dns配置以及缓存（避免dns污染、泄露）  
+* 流量导入docker容器 
+* Geo 管理  
+
 ## 内核版本兼容的 常见 Linux 发行版  
 ✅ 内核版本兼容  
 🟢 部分版本的内核版本兼容  
