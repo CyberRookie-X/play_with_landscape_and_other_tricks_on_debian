@@ -62,7 +62,7 @@ ldd --version
   - [dpanel标准版 与 dpanel lite](#dpanel标准版-与-dpanel-lite)
   - [安装 dpanel](#安装-dpanel)
   - [在其他机器上使用 dpanel管理本机docker](#在其他机器上使用-dpanel管理本机docker)
-- [重定向至容器（接应容器）部署](#重定向至容器接应容器部署)
+- [Docker容器作为分流出口（接应容器部署）](#docker容器作为分流出口接应容器部署)
   - [接应容器概述](#接应容器概述)
   - [下面以审计程序为例，介绍接应容器部署](#下面以审计程序为例介绍接应容器部署)
   - [创建审计程序启动脚本](#创建审计程序启动脚本)
@@ -438,14 +438,15 @@ systemctl status docker
 [DPanel 可视化 Docker 管理面板](https://dpanel.cc/#/zh-cn/manual/system/remote?id=%e4%bd%bf%e7%94%a8-https-%ef%bc%88%e5%bc%80%e5%90%af-tls-%ef%bc%89)    
 
 
-#  重定向至容器（接应容器）部署
+# Docker容器作为分流出口（接应容器部署）
 
 ## 接应容器概述
-1、接应容器内可挂载任意具有tproxy入口的程序，如流量镜像审计程序、流量统计程序、防火墙、蜜罐等。
-2、接应容器内，通过 run.sh 脚本启动 特定程序。
-3、landscape 中重定向流量至容器。
-4、接应程序将流量转发至特定程序tproxy端口，交由特定程序处理。
-4、landscape 0.6.8 版本接应容器出口默认为flow 0出口。
+* 只有由 [landscape-edge](https://github.com/ThisSeanZhang/landscape/pkgs/container/landscape-edge) 镜像启动的Docker容器，才能作为分流出口
+* 接应容器内可挂载任意具有tproxy入口的程序，如流量镜像审计程序、流量统计程序、防火墙、蜜罐等  
+* 接应容器内，通过 run.sh 脚本启动 特定程序  
+* landscape 中重定向流量至容器  
+* 接应程序将流量转发至特定程序tproxy端口（默认12345），交由特定程序处理  
+* landscape 0.6.7 版本接应容器出口默认为 flow 0 出口  
 
 ## 接应程序配置
 默认设置下， 容器有一个[演示程序](https://github.com/ThisSeanZhang/landscape/blob/main/landscape-ebpf/src/bin/redirect_demo_server.rs) 放置在 `/app/server` 监听 `12345` 端口。
