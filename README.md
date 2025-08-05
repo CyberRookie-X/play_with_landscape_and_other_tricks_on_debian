@@ -517,7 +517,7 @@ services:
       resources:
         limits:
           cpus: '4.0'
-          memory: 128M
+          memory: 512M
     ports:
       - "外部端口号:内部端口号"        # 静态映射，主要用于映射web端口
     volumes:
@@ -542,7 +542,7 @@ services:
       resources:
         limits:
           cpus: '4.0'
-          memory: 128M
+          memory: 512M
     ports:
       - "外部端口号:内部端口号"        # 静态映射，主要用于映射web端口
     volumes:
@@ -578,7 +578,7 @@ services:
       resources:
         limits:
           cpus: '4.0'
-          memory: 128M
+          memory: 512M
     networks:
       audit-br:
         ipv4_address: 172.100.0.1
@@ -604,7 +604,7 @@ services:
       resources:
         limits:
           cpus: '4.0'
-          memory: 128M
+          memory: 512M
     networks:
       audit-br:
         ipv4_address: 172.100.0.2
