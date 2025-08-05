@@ -441,7 +441,7 @@ systemctl status docker
 # Docker容器作为分流出口（接应容器部署）
 
 ## 接应容器概述
-* 只有由 [landscape-edge](https://github.com/ThisSeanZhang/landscape/pkgs/container/landscape-edge) 镜像启动的Docker容器，才能作为分流出口
+* 只有由 [landscape-edge](https://github.com/ThisSeanZhang/landscape/pkgs/container/landscape-edge) 镜像启动的Docker容器，才能作为分流出口Docker容器
 * 接应容器内可挂载任意具有tproxy入口的程序，如流量镜像审计程序、流量统计程序、防火墙、蜜罐等  
 * 接应容器内，通过 run.sh 脚本启动 特定程序  
 * landscape 中重定向流量至容器  
