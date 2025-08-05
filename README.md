@@ -49,7 +49,6 @@ ldd --version
   - [关闭 swap](#关闭-swap)
   - [修改软件源（可选）](#修改软件源可选)
   - [升级内核，到 6.9以上](#升级内核到-69以上)
-  - [重启系统生效](#重启系统生效)
 - [docker、docker compose 安装（可选）](#dockerdocker-compose-安装可选)
 - [landscape 安装](#landscape-安装)
   - [安装 pppd](#安装-pppd)
@@ -103,6 +102,7 @@ ldd --version
 timedatectl set-timezone Asia/Shanghai
 #查看时区
 timedatectl
+
 ```
    
 ## 允许root用户使用密码登录ssh    
@@ -112,6 +112,7 @@ echo "PermitRootLogin yes" >>/etc/ssh/sshd_config
 
 #重启 ssh   
 systemctl restart ssh
+
 ```
 
 ## 关闭 swap
@@ -122,6 +123,7 @@ Swap 是内存的"应急备份"，用磁盘空间换取系统稳定性，但过�
 ### 注释或删除 Swap 挂载项
 ```shell
 nano /etc/fstab
+
 ```
 找到包含 swap 的行（通常类似 /swapfile 或 /dev/mapper/...-swap），在行首添加 # 注释掉，例如：
 ```diff
@@ -135,11 +137,13 @@ systemctl --type swap
 
 # 禁用所有 Swap 单元（替换 UNIT_NAME 为实际名称）
 systemctl mask UNIT_NAME.swap
+
 ```
 ## 修改软件源（可选）
 ```shell
 # 若软件源非为国内源，可以考虑修改软件源为国内源，例如ustc源
 nano /etc/apt/sources.list
+
 ```
 ```shell
 # ustc源
@@ -166,6 +170,7 @@ uname -r
 ```shell
 apt update
 apt search linux-image-6.12
+
 ```
 
 ```shell
@@ -181,6 +186,7 @@ update-grub
 
 # 重启系统生效
 reboot
+
 ```
 # docker、docker compose 安装（可选）
 
@@ -218,6 +224,7 @@ pppd -version
 
 ```shell
 nano /etc/systemd/system/landscape-router.service
+
 ```
 
 ```shell
@@ -241,6 +248,7 @@ WantedBy=multi-user.target
 cd /root
 mkdir /root/.landscape-router
 cd /root/.landscape-router
+
 ```
 [下载 landscape-webserver-x86_64、static.zip 文件](https://github.com/ThisSeanZhang/landscape/releases/)   
 ![image](./images/7.png)       
@@ -251,6 +259,7 @@ cd /root/.landscape-router
 ```shell
 #上传文件后，赋权
 chmod -R 755 /root/.landscape-router
+
 ```
 ## 修改网卡配置   
 
@@ -262,10 +271,12 @@ chmod -R 755 /root/.landscape-router
 ```shell
 # 获取网卡名
 ip a
+
 ```
 
 ```shell
 nano /etc/network/interfaces
+
 ```
 ```shell
 # pppoe 后生成一个pppoe网卡，与此网卡不冲突
@@ -289,6 +300,7 @@ iface <第 3 张网卡名> inet manual
 systemctl stop systemd-resolved
 systemctl disable systemd-resolved
 systemctl mask systemd-resolved
+
 ```
 ## 重启网络，并启动 landscape-router    
 
@@ -310,6 +322,7 @@ ss -tulnp | grep -E ':6300|:6443'
 ```shell
 # 配置无误后，应用landscape-router 开机启动
 systemctl enable landscape-router.service
+
 ```
 
 ## 至此可以在 landscape-router web 中进行配置   
@@ -321,11 +334,13 @@ systemctl enable landscape-router.service
 
 ```shell
 nano /etc/apache2/ports.conf
+
 ```
    
 listen 由 80 改到 8080   
 ```shell
 systemctl restart apache2
+
 ```
 
 
@@ -336,12 +351,14 @@ systemctl restart apache2
 ```shell
 # 关闭服务
 systemctl stop landscape-router.service
+
 ```
 替换 staic目录（解压、注意嵌套目录）   
 替换 landscape文件，并赋权   
 ```shell
 # 启动服务，建议重启系统，避免出现奇奇怪怪的问题
 systemctl start landscape-router.service
+
 ```
    
 ## 在显示器/终端中 启动/关闭 landscape-router   
@@ -426,6 +443,7 @@ dpanel 集成 dockercompose 应用商店，便于一键部署容器应用。
 
 ```shell
 systemctl edit docker
+
 ```
 添加下面几行  
 ```shell
@@ -438,6 +456,7 @@ ExecStart=/usr/bin/dockerd -H tcp://0.0.0.0:2375 -H fd:// --containerd=/run/cont
 systemctl daemon-reload && systemctl restart docker
 #验证是否生效，输出有红框内容为正常
 systemctl status docker
+
 ```
 
 
@@ -559,6 +578,7 @@ services:
       - /home/audit/audit-2/run.sh:/app/server/run.sh # 挂载审计程序2启动脚本
       - /home/audit/audit-2/config:/app/server/config # 挂载审计程序2配置文件
       - /home/audit/audit-2/audit:/app/server/audit # 挂载审计程序2二进制文件
+
 ```
 ## 独立网桥方式 部署审计容器-compose
 ```yaml
@@ -639,6 +659,7 @@ ArozOS 少量路由器相关功能建议不开启
 ```shell
 # 使用脚本在主机中安装（非docker版）
 wget -O install.sh https://raw.githubusercontent.com/tobychui/arozos/master/installer/install.sh && bash install.sh
+
 ```
 ## 集客AC dockercompose
 
@@ -662,6 +683,7 @@ services:
         restart: always
         container_name: gecoosac
         image: tearsful/gecoosac:latest
+
 ```
 **登录管理面板 http://192.168.22.1:8080**
 ## ddns-go dockercompose
@@ -751,6 +773,7 @@ services:
       - /etc/os-release:/host/etc/os-release:ro
       - /var/log:/host/var/log:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
+
 ```
 **登录 http://192.168.22.1:19999**
 ![image](./images/6.png)  
