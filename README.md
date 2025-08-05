@@ -1,9 +1,9 @@
 # 在debian里，玩转Landscape和其他花活（持续更新中...）
 
 **本文可自由转载，无需标注出处**  
-用户：root，非root用户请自行添加sudo    
 [Landscape 文档网站](https://landscape.whileaway.dev/introduction.html) | [Landscape github](https://github.com/ThisSeanZhang/landscape)
 
+**debian用户：root，非 root 用户请自行添加 sudo**    
 ## 内核版本兼容的 常见 Linux 发行版  
 ✅ 内核版本兼容  
 🟢 部分版本的内核版本兼容  
