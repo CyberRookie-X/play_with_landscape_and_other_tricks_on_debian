@@ -130,7 +130,7 @@ nano /etc/fstab
 - /swapfile none swap sw 0 0
 + #/swapfile none swap sw 0 0
 ```
-### 禁用 systemd 管理的 Swap 单元（若有）
+### 禁用 systemd 管理的 Swap 单元（若有/非必须）
 ```shell
 # 检查激活的 Swap 单元
 systemctl --type swap
