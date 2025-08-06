@@ -468,13 +468,15 @@ systemctl status docker
 
 # Docker容器作为分流出口（接应容器部署）
 
-## 接应容器概述
-* 只有由 [landscape-edge](https://github.com/ThisSeanZhang/landscape/pkgs/container/landscape-edge) 镜像启动的Docker容器，才能作为分流出口Docker容器
-* 接应容器内可挂载任意具有tproxy入口的程序，如流量镜像审计程序、流量统计程序、防火墙、蜜罐等  
-* 接应容器内，通过 run.sh 脚本启动 特定程序  
-* landscape 中重定向流量至容器  
-* 接应程序将流量转发至特定程序tproxy端口（默认12345），交由特定程序处理  
-* landscape 0.6.7 版本接应容器出口默认为 flow 0 出口  
+## 接应容器概述  
+
+* 仅有由[装有 **接应程序** 的镜像](https://github.com/ThisSeanZhang/landscape/pkgs/container/landscape-edge)启动的容器，可作为有效的流出口容器  
+* 可挂载任意程序在`/app/server` 目录下作为 **工作程序**，如流量镜像审计程序、流量统计程序、防火墙、蜜罐等
+* 可挂载 `/app/server/run.sh` 脚本用于启动 **工作程序**  
+* **工作程序** 需监听 `12345` 端口作为tproxy入口  
+* **接应程序** 将待处理流量转发到 **工作程序** 的tproxy入口 
+* 通过环境变量 `LAND_PROXY_SERVER_PORT` 可修改 **接应程序** 之目的端口（默认 `12345` ）
+* landscape 0.6.7+ 版本容器出口默认为 Flow 0 出口  
 
 ## 接应程序配置
 默认设置下， 容器有一个[演示程序](https://github.com/ThisSeanZhang/landscape/blob/main/landscape-ebpf/src/bin/redirect_demo_server.rs) 放置在 `/app/server` 监听 `12345` 端口。
@@ -519,7 +521,7 @@ docker run -d \
   --cap-add=PERFMON \
   --privileged \
   -p 外部端口:内部端口 \
-  -v /root/.landscape-router/unix_link/:/ld_unix_link/:ro \
+  -v /root/.landscape-router/unix_link/:/ld_unix_link/:ro \ # 必要映射
   -v /home/audit/audit-1/run.sh:/app/server/run.sh \ # 修改左边挂载审计程序1启动脚本
   -v /home/audit/audit-1/config:/app/server/config \ # 修改左边挂载审计程序1配置文件
   -v /home/audit/audit-1/audit:/app/server/audit \ # 修改左边挂载审计程序1二进制文件
