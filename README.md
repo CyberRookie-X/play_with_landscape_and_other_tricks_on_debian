@@ -488,9 +488,6 @@ systemctl status docker
 ```bash
 #!/bin/bash
 
-ip rule add fwmark 0x1/0x1 lookup 100
-ip route add local default dev lo table 100
-
 # 启动审计程序守护进程
 while true; do
     echo "启动 审计程序..."
