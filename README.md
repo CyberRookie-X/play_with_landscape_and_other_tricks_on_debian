@@ -488,6 +488,11 @@ systemctl status docker
 ```bash
 #!/bin/bash
 
+# 设置资源限制（也可在compose限制，不了解者可跳过这里）
+# ulimit -n 1000000
+# ulimit -u 500
+# echo "设置资源限制成功"
+
 # 启动审计程序守护进程
 while true; do
     echo "启动 审计程序..."
