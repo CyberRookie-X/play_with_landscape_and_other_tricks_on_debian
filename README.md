@@ -487,6 +487,12 @@ systemctl status docker
 
 ## 下面以审计程序为例，介绍接应容器部署
 ## 创建审计程序启动脚本
+
+```shell
+# 在 debina audit 目录中创建 audit 工作程序启动脚本
+nano /home/audit/run.sh
+
+···
 ```bash
 #!/bin/bash
 
