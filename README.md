@@ -48,7 +48,7 @@ ldd --version
   - [允许root用户使用密码登录ssh](#允许root用户使用密码登录ssh)
   - [关闭 swap](#关闭-swap)
   - [修改软件源（可选）](#修改软件源可选)
-  - [升级内核，到 6.9以上](#升级内核到-69以上)
+  - [升级内核，到 6.9以上（debian 13 无需升级内核）](#升级内核到-69以上debian-13-无需升级内核)
 - [docker、docker compose 安装（可选）](#dockerdocker-compose-安装可选)
 - [landscape 安装](#landscape-安装)
   - [安装 pppd](#安装-pppd)
@@ -161,7 +161,7 @@ deb-src https://mirrors.ustc.edu.cn/debian-security/ bookworm-security main cont
 ```
 **编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**   
 
-## 升级内核，到 6.9以上   
+## 升级内核，到 6.9以上（debian 13 无需升级内核）   
 
 ``` shell
 # 查看内核版本，大于6.9则无需升级内核
