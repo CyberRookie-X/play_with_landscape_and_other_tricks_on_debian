@@ -159,6 +159,8 @@ deb-src https://mirrors.ustc.edu.cn/debian/ bookworm-backports main contrib non-
 deb https://mirrors.ustc.edu.cn/debian-security/ bookworm-security main contrib non-free non-free-firmware
 deb-src https://mirrors.ustc.edu.cn/debian-security/ bookworm-security main contrib non-free non-free-firmware
 ```
+**编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**   
+
 ## 升级内核，到 6.9以上   
 
 ``` shell
@@ -241,6 +243,7 @@ LimitMEMLOCK=infinity
 [Install]
 WantedBy=multi-user.target
 ```
+**编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**   
 
 ## 下载并上传 landscape-router  
 ```shell
@@ -294,6 +297,8 @@ iface <第 2 张网卡名> inet manual
 auto <第 3 张网卡名>
 iface <第 3 张网卡名> inet manual
 ```
+**编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**   
+
 ## 关闭本机 DNS 服务   
 
 ```shell
@@ -337,7 +342,9 @@ nano /etc/apache2/ports.conf
 
 ```
    
-listen 由 80 改到 8080   
+listen 由 80 改到 8080  
+**编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**      
+
 ```shell
 systemctl restart apache2
 
@@ -414,6 +421,8 @@ iface eth0.20 inet manual
     vlan-raw-device eth0       # 绑定物理接口
 
 ```
+**编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**   
+
 * 在landscape webui 中，配置为lan，开启dhcp
 * `分流设置`中添加新的流，配置入口规则为 vlan 所设置 子网
 
@@ -492,7 +501,7 @@ systemctl status docker
 # 在 debina audit 目录中创建 audit 工作程序启动脚本
 nano /home/audit/run.sh
 
-···
+```
 ```bash
 #!/bin/bash
 
@@ -516,6 +525,8 @@ while true; do
     fi
 done
 ```
+**编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**   
+
 ## 容器方式 部署审计容器-docker
 
 ```shell
