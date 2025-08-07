@@ -6,7 +6,7 @@
 **debian用户：root，非 root 用户请自行添加 sudo**    
 
 ## 核心特性
-* 分流控制（SIP、Qos(dscp)、DIP、域名、Geo 匹配规则）
+* 分流控制（SIP、QoS(dscp)、DIP、域名、Geo 匹配规则）
 * eBPF 路由
 * 每个流 Flow 独立 dns 配置以及缓存（避免 dns 污染、泄露）
 * 流量导入 Docker 容器
@@ -89,14 +89,21 @@ ldd --version
 
 # debian 安装配置
 
-## 安装 debian   
+## 下载必要软件
+安装U盘制作工具（二选一即可）: [balena etcher](https://etcher.balena.io/) | [Ventoy](https://www.ventoy.net/cn/download.html)   
+Debian 12: [官方下载](https://www.debian.org/download.zh-cn.html) | [兰州大学镜像](http://mirror.lzu.edu.cn/debian-cd/) | [163镜像](http://mirrors.163.com/debian-cd/)    
+Debian 13: [官方下载](https://www.debian.org/releases/) | [兰州大学镜像](http://mirror.lzu.edu.cn/debian-cd/) | [163镜像](http://mirrors.163.com/debian-cd/)   
+PVE 9: [官方下载](https://www.proxmox.com/en/downloads)    
+
+## 安装 debian
 安装过程省略。   
+**debian用户：root，非 root 用户请自行添加 sudo**   
 建议：   
 1、语言选择 us/english，避免中文路径与某些软件不兼容,（后面再调整时区到上海）。   
 2、仅需 安装 webserver 、sshserver、标准配置。         
 ![image](./images/1.png)   
 ## 时区修改到上海   
-
+**debian用户：root，非 root 用户请自行添加 sudo**   
 ```shell
 #设置时区为上海
 timedatectl set-timezone Asia/Shanghai
@@ -106,7 +113,7 @@ timedatectl
 ```
    
 ## 允许root用户使用密码登录ssh    
-
+**debian用户：root，非 root 用户请自行添加 sudo**   
 ```shell
 echo "PermitRootLogin yes" >>/etc/ssh/sshd_config
 
@@ -313,7 +320,7 @@ systemctl mask systemd-resolved
 # 重启网络，并启动 landscape-router
 systemctl restart networking && systemctl start landscape-router.service
 ```
-通过端口，检查landsape 检查是是否成功启动，检查 6443 、 6300 端口是否为landscape   
+通过端口，检查 landsape 是否成功启动，检查 6443 、 6300 端口是否为landscape   
 ```shell
 ss -tulnp | grep -E ':6300|:6443'
 
