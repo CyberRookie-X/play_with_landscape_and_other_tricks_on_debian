@@ -684,6 +684,8 @@ wget -O install.sh https://raw.githubusercontent.com/tobychui/arozos/master/inst
 ```
 ## 集客AC dockercompose
 
+[集客ap最新固件下载（官网）](http://file.cnrouter.com/index.php/Index/apbeta.html#) | [集客ap固件历史版本下载](https://github.com/openwrt-fork/gecoos-firmware)
+
 ```yaml
 name: gecoosac
 services:
