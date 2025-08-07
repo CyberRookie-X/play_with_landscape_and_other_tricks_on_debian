@@ -7,7 +7,7 @@
 
 ## 核心特性
 * 分流控制（SIP、Qos(dscp)、DIP、域名、Geo 匹配规则）
-* eBPF 路由（性能优于 iptable）
+* eBPF 路由
 * 每个流 Flow 独立 dns 配置以及缓存（避免 dns 污染、泄露）
 * 流量导入 Docker 容器
 * Geo 管理
@@ -479,12 +479,10 @@ systemctl status docker
 
 ## 接应容器概述  
 
-* 仅有由[装有 **接应程序** 的镜像](https://github.com/ThisSeanZhang/landscape/pkgs/container/landscape-edge)启动的容器，可作为有效的流出口容器  
-* 可挂载任意程序在`/app/server` 目录下作为 **工作程序**，如流量镜像审计程序、流量统计程序、防火墙、蜜罐等
-* 可挂载 `/app/server/run.sh` 脚本用于启动 **工作程序**  
-* **工作程序** 需监听 `12345` 端口作为tproxy入口  
-* **接应程序** 将待处理流量转发到 **工作程序** 的tproxy入口 
-* 通过环境变量 `LAND_PROXY_SERVER_PORT` 可修改 **接应程序** 之目的端口（默认 `12345` ）
+* 仅搭配 [**接应程序**](https://github.com/ThisSeanZhang/landscape/blob/main/landscape-ebpf/src/bin/redirect_pkg_handler.rs) 进行打包的容器，可作为有效的流 **出口容器**  
+* 可挂载任意程序在 `/app/server` 目录下作为 **工作程序**, 需要自行编写 `/app/server/run.sh` 脚本用于启动
+* **工作程序** 需监听 `12345` 端口作为 tproxy 入口, 其他端口需要通过环境变量 `LAND_PROXY_SERVER_PORT` 修改 **接应程序** 默认监听端口
+* **接应程序** 会将待处理流量转发到 **工作程序** 的 tproxy 入口 
 * landscape 0.6.7+ 版本容器出口默认为 Flow 0 出口  
 
 ## 接应程序配置
