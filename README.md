@@ -576,6 +576,9 @@ docker run -d \
 ```
 
 ## 端口映射方式 部署审计容器-compose
+
+**这种方式有问题，待修改。下一种网桥方式可用**
+
 ```yaml
 services:
   audit-1:
@@ -635,6 +638,7 @@ services:
 networks:
   audit-br:
     driver: bridge
+    enable_ipv6: true # 开启ipv6，自动配置
     ipam:
       config:
         - subnet: 172.100.0.0/16
