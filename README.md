@@ -75,9 +75,8 @@ ldd --version
   - [接应容器概述](#接应容器概述)
   - [下面以审计程序为例，介绍接应容器部署](#下面以审计程序为例介绍接应容器部署)
   - [创建审计程序启动脚本](#创建审计程序启动脚本)
-  - [容器方式 部署审计容器-docker](#容器方式-部署审计容器-docker)
-  - [端口映射方式 部署审计容器-compose](#端口映射方式-部署审计容器-compose)
-  - [独立网桥方式 部署审计容器-compose](#独立网桥方式-部署审计容器-compose)
+  - [Docker 部署 单个 审计容器](#docker-部署-单个-审计容器)
+  - [Compose 部署 多个 审计容器](#compose-部署-多个-审计容器)
 - [常见网络应用、compose 安装](#常见网络应用compose-安装)
   - [filebrowser（文件管理）](#filebrowser文件管理)
   - [tabby （网页ssh）](#tabby-网页ssh)
@@ -556,7 +555,7 @@ done
 ```
 **编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**   
 
-## 容器方式 部署审计容器-docker
+## Docker 部署 单个 审计容器
 
 ```shell
 docker run -d \
@@ -575,65 +574,7 @@ docker run -d \
 
 ```
 
-## 端口映射方式 部署审计容器-compose
-
-**这种方式有问题，待修改。下一种网桥方式可用**
-
-```yaml
-services:
-  audit-1:
-    image: ghcr.io/thisseanzhang/landscape-edge:amd64-xx #需修改容器标签
-    sysctls:
-      - net.ipv4.conf.lo.accept_local=1
-    cap_add:
-      - NET_ADMIN
-      - BPF
-      - PERFMON
-    privileged: true
-    restart: unless-stopped
-    logging:
-      options:
-        max-size: "10m"
-    deploy:
-      resources:
-        limits:
-          cpus: '4.0'
-          memory: 512M
-    ports:
-      - "外部端口号:内部端口号"        # 静态映射，主要用于映射web端口
-    volumes:
-      - /root/.landscape-router/unix_link/:/ld_unix_link/:ro # 必要映射
-      - /home/audit/audit-1/run.sh:/app/server/run.sh # 修改左边挂载审计程序1启动脚本
-      - /home/audit/audit-1/config:/app/server/config # 修改左边挂载审计程序1配置文件
-      - /home/audit/audit-1/audit:/app/server/audit # 修改左边挂载审计程序1二进制文件
-  audit-2:
-    image: ghcr.io/thisseanzhang/landscape-edge:amd64-xx # 需修改容器标签
-    sysctls:
-      - net.ipv4.conf.lo.accept_local=1
-    cap_add:
-      - NET_ADMIN
-      - BPF
-      - PERFMON
-    privileged: true
-    restart: unless-stopped
-    logging:
-      options:
-        max-size: "10m"
-    deploy:
-      resources:
-        limits:
-          cpus: '4.0'
-          memory: 512M
-    ports:
-      - "外部端口号:内部端口号"        # 静态映射，主要用于映射web端口
-    volumes:
-      - /root/.landscape-router/unix_link/:/ld_unix_link/:ro # 必要映射
-      - /home/audit/audit-2/run.sh:/app/server/run.sh # 挂载审计程序2启动脚本
-      - /home/audit/audit-2/config:/app/server/config # 挂载审计程序2配置文件
-      - /home/audit/audit-2/audit:/app/server/audit # 挂载审计程序2二进制文件
-
-```
-## 独立网桥方式 部署审计容器-compose
+## Compose 部署 多个 审计容器
 ```yaml
 networks:
   audit-br:
@@ -662,6 +603,10 @@ services:
         limits:
           cpus: '4.0'
           memory: 512M
+    # 为启用 ports 配置时，使用容器ip:端口 即可在主机内访问容器web界面，主机外访问时需使用反代 或 端口映射到主机端口
+    #ports: # 可选配置  # 静态映射，主要用于映射web端口
+    #  - "0.0.0.0:外部端口号:内部端口号"        # 映射到主机v4端口
+    #  - "[::]:外部端口号:内部端口号"        # 映射到主机v6端口
     networks:
       audit-br:
         ipv4_address: 172.100.0.1
