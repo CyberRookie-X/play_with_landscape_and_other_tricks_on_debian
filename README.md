@@ -553,8 +553,27 @@ while true; do
     fi
 done
 ```
-**编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**   
+**编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**  
 
+## Docker 启用 ipv6
+**本节启用v6配置，未经验证！**
+```shell
+# 创建 配置文件，这个文件是
+cat <<EOF > /etc/docker/daemon.json
+{
+  "ipv6": true,
+  "fixed-cidr-v6": "fd00::/80"  
+}
+EOF
+
+```
+使用 Docker 推荐的默认 ULA 范围
+
+```shell
+# 重启docker
+systemctl restart docker
+
+```
 ## Docker 部署 单个 审计容器
 
 ```shell
@@ -579,7 +598,7 @@ docker run -d \
 networks:
   audit-br:
     driver: bridge
-    enable_ipv6: true # 开启ipv6，自动配置
+    enable_ipv6: true # 开启ipv6，容器自动获取ivp6配置
     ipam:
       config:
         - subnet: 172.100.0.0/16
