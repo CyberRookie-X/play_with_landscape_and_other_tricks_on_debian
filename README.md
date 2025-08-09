@@ -64,6 +64,7 @@ ldd --version
   - [如何升级 landscape](#如何升级-landscape)
   - [在显示器/终端中 启动/关闭 landscape-router](#在显示器终端中-启动关闭-landscape-router)
 - [Landscape 实战案例](#landscape-实战案例)
+  - [域名/IP 分流实践](#域名ip-分流实践)
   - [基于 vlan/ssid（WiFi） 的分流实现（暂不能实现）](#基于-vlanssidwifi-的分流实现暂不能实现)
 - [用 dpanel 部署 dockercompose](#用-dpanel-部署-dockercompose)
   - [使用 dpanel 的必要性](#使用-dpanel-的必要性)
@@ -394,6 +395,28 @@ systemctl disable landscape-router.service
 # Landscape 实战案例
 
 ## [详细设置参考官方文档](https://landscape.whileaway.dev/feature/flow.html)
+
+## 域名/IP 分流实践   
+
+* 只会匹配中一条规则，匹配中即发送至出口，后续规则不再匹配 
+* 以下是一种推荐分流布局，已域名分流为主，没有域名的连接由IP规则补充   
+* 可使用 Geo 文件辅助分流   
+* 域名初次访问时，域名分流 优先级 会影响 域名初次访问查询速度，越靠前匹配中，越快被查询
+* 域名再次访问时，域名被解析后，基于 IP map，时间复杂度为 O(1)，再次访问的域名之匹配时间 = IP匹配时间 = O(1) 
+
+| 优先级序号 | 用途 | 类别 |
+|---|---|---|
+| 1~999  | 局域网设备 域名重定向 | 域名分流|
+| 1000 | 速查域名的 GeoSite 集合 | 域名分流 |
+| 1001~2000 | （少量）域名/网站集合  | 域名分流|
+| 2001~2999 | （大量）地区/ISP 集合   | 域名分流|
+| 3000 | 整个 GeoSite 集合（GeoSite 兜底）  | 域名分流 |
+| 10000 | 空规则（域名规则兜底） | dns 服务器配置|
+|---|---|---|
+| 11000~12000 | （少量）特定 IP 集合  | IP 分流 |
+| 12000~13000 | （大量）地区/ISP 集合  | IP 分流 |        
+| 20000 | 0.0.0.0/0 兜底 IP 规则 | IP 分流 |
+
 
 ## 基于 vlan/ssid（WiFi） 的分流实现（暂不能实现）
 ### 概述
