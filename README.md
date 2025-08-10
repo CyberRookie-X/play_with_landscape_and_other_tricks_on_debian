@@ -522,7 +522,7 @@ ExecStart=
 ExecStart=/usr/bin/dockerd -H tcp://0.0.0.0:2375 -H fd:// --containerd=/run/containerd/containerd.sock
 ```
 ```shell
-# 重启docker服务   
+# 重启docker服务，需等待数十秒   
 systemctl daemon-reload && systemctl restart docker
 # 验证是否生效，输出有红框内容为正常
 systemctl status docker
@@ -602,8 +602,9 @@ EOF
 使用 Docker 默认 ULA 范围，则需要开启 nat6 ，**此处教程待补充**   
 
 ```shell
-# 重启docker
-systemctl restart docker
+# 重启docker，需等待数十秒
+systemctl daemon-reload && systemctl restart docker
+systemctl restart landscape-router.service
 
 ```
 ## Docker 部署 单个 接应容器
