@@ -387,12 +387,18 @@ systemctl restart apache2
 
    
 ## 如何升级 landscape   ？
+[下载 landscape-webserver-x86_64、static.zip 文件](https://github.com/ThisSeanZhang/landscape/releases/)   
+![image](./images/7.png)       
+
 
 ```shell
 # 关闭服务
 systemctl stop landscape-router.service
 
 ```
+放到下面创建的目录。（注意 static 可能存在嵌套，需要调整，参考下图）   
+![image](./images/3.png)   
+![image](./images/4.png)   
 替换 staic目录（解压、注意嵌套目录）   
 替换 landscape文件，并赋权   
 ```shell
