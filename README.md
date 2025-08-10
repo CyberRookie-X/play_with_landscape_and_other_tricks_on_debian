@@ -104,18 +104,20 @@ PVE 9: [官方下载](https://www.proxmox.com/en/downloads)
 
 **debian用户：root，非 root 用户请自行添加 sudo**   
 ### 注意❗：   
-**1、语言选择 us/english，避免中文路径与某些软件不兼容,（后面再调整时区到上海）。**     
-**2、❗❗❗启用网络镜像站点，选择 中国  ❗❗❗**    
-**3、仅需 安装 webserver 、sshserver、标准配置，3个选项勾选即可**    
+**1、语言选择 us/english，避免中文路径与某些软件不兼容,（debian12后面再调整时区到上海）。**   
+**2、时区选择上海 Asia/Shanghai**  
+**3、❗❗❗启用网络镜像站点，选择 中国  ❗❗❗**    
+**4、仅需 安装 webserver 、sshserver、标准配置，3个选项勾选即可**    
 [详细安装过程参考，建议在安装过程中选择 ❗❗❗**中国网络镜像站点**❗❗❗](https://246859.github.io/posts/code/linux/debian12_install.html)        
 
 ![image](./images/1.png)   
 ## 时区修改到上海   
 **debian用户：root，非 root 用户请自行添加 sudo**   
+**debian13 安装过程中配置时区后，无需重复配置时区**    
 ```shell
-#设置时区为上海
+# 设置时区为上海
 timedatectl set-timezone Asia/Shanghai
-#查看时区
+ # 验证配置是否生效
 timedatectl
 
 ```
@@ -125,7 +127,7 @@ timedatectl
 ```shell
 echo "PermitRootLogin yes" >>/etc/ssh/sshd_config
 
-#重启 ssh   
+# 重启 ssh   
 systemctl restart ssh
 
 ```
@@ -145,6 +147,7 @@ nano /etc/fstab
 - /swapfile none swap sw 0 0
 + #/swapfile none swap sw 0 0
 ```
+**编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**  
 ### 禁用 systemd 管理的 Swap 单元（若有/非必须）
 ```shell
 # 检查激活的 Swap 单元
@@ -156,17 +159,16 @@ systemctl mask UNIT_NAME.swap
 ```
 ## 修改软件源（可选）
 **安装时网络镜像站点已选择中国源，可跳过换源**  
-❗ debian13 可能不适用，建议在安装时选择国内源，
 ```shell
 # 若软件源非为国内源，可以考虑修改软件源为国内源，例如ustc源
 # 备份源
 cp /etc/apt/sources.list /etc/apt/sources.list.bak
-# 修改源
-nano /etc/apt/sources.list
 
 ```
+**debian12源 适用于debian12**
 ```shell
-# ustc源
+# ustc源 适用于debian12
+cat <<EOF > /etc/apt/sources.list
 deb https://mirrors.ustc.edu.cn/debian/ bookworm main contrib non-free non-free-firmware
 deb-src https://mirrors.ustc.edu.cn/debian/ bookworm main contrib non-free non-free-firmware
 
@@ -178,8 +180,19 @@ deb-src https://mirrors.ustc.edu.cn/debian/ bookworm-backports main contrib non-
 
 deb https://mirrors.ustc.edu.cn/debian-security/ bookworm-security main contrib non-free non-free-firmware
 deb-src https://mirrors.ustc.edu.cn/debian-security/ bookworm-security main contrib non-free non-free-firmware
+EOF
 ```
-**编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**   
+
+**debian13源 适用于debian13**
+```shell
+# ustc源 适用于debian13
+cat <<EOF > /etc/apt/sources.list
+deb https://mirrors.ustc.edu.cn/debian/ trixie main contrib non-free non-free-firmware
+deb https://mirrors.ustc.edu.cn/debian/ trixie-updates main contrib non-free non-free-firmware
+deb https://mirrors.ustc.edu.cn/debian/ trixie-backports main contrib non-free non-free-firmware
+deb https://mirrors.ustc.edu.cn/debian-security/ trixie-security main contrib non-free non-free-firmware
+EOF
+```
 
 ## 升级内核，到 6.9以上（debian 13 无需升级内核）   
 
@@ -214,7 +227,7 @@ reboot
 
 注释掉原有所有行，换掉下面的源。如已选择合适的源则可跳过。   
 ```shell
-#安装curl   
+# 安装curl   
 apt update
 apt install curl -y
 curl --version
@@ -267,7 +280,7 @@ WantedBy=multi-user.target
 
 ## 下载并上传 landscape-router  
 ```shell
-#创建landscape-router目录。   
+# 创建landscape-router目录。   
 cd /root
 mkdir /root/.landscape-router
 cd /root/.landscape-router
@@ -280,7 +293,7 @@ cd /root/.landscape-router
 ![image](./images/4.png)   
 
 ```shell
-#上传文件后，赋权
+# 上传文件后，赋权
 chmod -R 755 /root/.landscape-router
 
 ```
@@ -398,9 +411,9 @@ systemctl start landscape-router.service
 systemctl restart landscape-router.service
 # 停止服务
 systemctl stop landscape-router.service
-# 开机启动服务 ( 确认没有问题之后执行 )
+# 启用 开机启动服务 ( 确认没有问题之后执行 )
 systemctl enable landscape-router.service
-# 开机启动服务 ( 确认没有问题之后执行 )
+# 禁用 开机启动服务 ( 确认没有问题之后执行 )
 systemctl disable landscape-router.service
 ```
 # Landscape 实战案例
@@ -503,9 +516,9 @@ ExecStart=
 ExecStart=/usr/bin/dockerd -H tcp://0.0.0.0:2375 -H fd:// --containerd=/run/containerd/containerd.sock
 ```
 ```shell
-#重启docker服务   
+# 重启docker服务   
 systemctl daemon-reload && systemctl restart docker
-#验证是否生效，输出有红框内容为正常
+# 验证是否生效，输出有红框内容为正常
 systemctl status docker
 
 ```
@@ -709,13 +722,13 @@ services:
         privileged: true
         volumes:
             - /home/gecoosac:/data
-            #修改左边的/home/gecoosac为实际存放数据的目录
+            # 修改左边的/home/gecoosac为实际存放数据的目录
         environment:
             - UID=0
             - GID=0
             - GIDLIST=0
             - passwd=yourpassword
-            #修改右边密码
+            # 修改右边密码
             - webport=8080
             # 管理端口默认8080，可修改之
         restart: always
@@ -736,7 +749,7 @@ services:
       # 修改左边的端口为ddns-go的web端口
     volumes:
       - /yourdir/data:/root
-      #修改左边的目录为ddns-go的data目录
+      # 修改左边的目录为ddns-go的data目录
     image: jeessy/ddns-go:latest
 
 ```
