@@ -587,7 +587,8 @@ done
 **编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**  
 
 ## Docker 启用 ipv6
-**本节启用v6配置，经验证 容器出口 无法连接ipv6网络，可能是 landscape bug❗其他ipv6网络正常**
+**启用ipv6教程无误，但landsape暂无支持，需配置iptable才能生效，等待官方支持。**
+**仅容器出口 无法连接ipv6网络，不影响ipv6流量分流到容器**
 ```shell
 # 创建 配置文件，这个文件是
 cat <<EOF > /etc/docker/daemon.json
