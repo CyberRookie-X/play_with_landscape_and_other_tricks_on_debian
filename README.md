@@ -587,7 +587,7 @@ done
 **编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**  
 
 ## Docker 启用 ipv6
-**本节启用v6配置，未经验证！**
+**本节启用v6配置，经验证 容器出口 无法连接ipv6网络，待调整❗其他ipv6网络正常**
 ```shell
 # 创建 配置文件，这个文件是
 cat <<EOF > /etc/docker/daemon.json
@@ -630,13 +630,13 @@ docker run -d \
 
 ## Compose 部署 多个 接应容器
 
-**worker_program 可替换为任意 工作程序**
-
+**worker_program 可替换为任意 工作程序**  
+**[enable_ipv6: true 时，docker配置中必须启用ipv6，否则会报错](#docker-启用-ipv6)**  
 ```yaml
 networks:
   worker_program-br:
     driver: bridge
-    enable_ipv6: true # 开启ipv6，容器自动获取ivp6配置
+    # enable_ipv6: true # 开启ipv6，容器自动获取ivp6配置（启用此项，docker配置中必须启用ipv6，否则会报错 /etc/docker/daemon.json）
     ipam:
       config:
         - subnet: 172.100.0.0/16
