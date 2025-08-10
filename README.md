@@ -580,7 +580,7 @@ EOF
 
 ```
 `fixed-cidr-v6` 需要填入正确的前缀   
-使用 Docker 默认 ULA 范围，则需要开启 nat6 ，此处教程待补充 
+使用 Docker 默认 ULA 范围，则需要开启 nat6 ，**此处教程待补充**   
 
 ```shell
 # 重启docker
