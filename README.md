@@ -76,10 +76,9 @@ ldd --version
   - [在其他机器上使用 dpanel管理本机docker](#在其他机器上使用-dpanel管理本机docker)
 - [Docker容器作为分流出口（接应容器部署）](#docker容器作为分流出口接应容器部署)
   - [接应容器概述](#接应容器概述)
-  - [下面以审计程序为例，介绍接应容器部署](#下面以审计程序为例介绍接应容器部署)
-  - [创建审计程序启动脚本](#创建审计程序启动脚本)
-  - [Docker 部署 单个 审计容器](#docker-部署-单个-审计容器)
-  - [Compose 部署 多个 审计容器](#compose-部署-多个-审计容器)
+  - [创建 worker_program 工作程序 启动脚本](#创建-worker_program-工作程序-启动脚本)
+  - [Docker 部署 单个 接应容器](#docker-部署-单个-接应容器)
+  - [Compose 部署 多个 接应容器](#compose-部署-多个-接应容器)
 - [常见网络应用、compose 安装](#常见网络应用compose-安装)
   - [filebrowser（文件管理）](#filebrowser文件管理)
   - [tabby （网页ssh）](#tabby-网页ssh)
@@ -535,12 +534,12 @@ systemctl status docker
 
 可将需要的 **工作程序** 挂载在 `/app/server` 目录下以替换 **演示工作程序**，将 **工作程序** 启动脚本挂载为 `/app/server/run.sh` ， `/app/start.sh` 默认会去执行`/app/server/run.sh`以启动 **工作程序** 或 **演示工作程序** 。
 
-## 下面以审计程序为例，介绍接应容器部署
-## 创建审计程序启动脚本
 
+## 创建 worker_program 工作程序 启动脚本
+**worker_program 可替换为任意 工作程序**
 ```shell
-# 在 debina audit 目录中创建 audit 工作程序启动脚本
-nano /home/audit/run.sh
+# 在 debina worker_program 目录中创建 worker_program 工作程序启动脚本
+nano /home/worker_program/run.sh
 
 ```
 ```bash
@@ -553,14 +552,14 @@ nano /home/audit/run.sh
 
 # 启动审计程序守护进程
 while true; do
-    echo "启动 审计程序..."
-    /app/server/audit -d /app/server/config
-	# 前一个为审计程序二进制文件 后一个为审计程序配置文件目录
-    echo "审计程序 异常退出，等待1秒后重新重启..."
+    echo "启动 worker_program 工作程序..."
+    /app/server/worker_program -d /app/server/config
+	# 前一个为 worker_program 工作程序 二进制文件 后一个为 worker_program 工作程序 配置文件目录
+    echo "worker_program 工作程序 异常退出，等待1秒后重新重启..."
     sleep 1
-    # 检查 审计程序 是否正常退出（可选，但推荐）
+    # 下面检查 worker_program 工作程序 是否正常退出（可选，但推荐）
     if [[ $? -ne 0 ]]; then
-        echo "审计程序 进程异常退出，检查日志..."
+        echo "worker_program 工作程序 进程异常退出，检查日志..."
         # 在这里添加日志检查或其他错误处理
         sleep 5
     fi
@@ -587,11 +586,13 @@ EOF
 systemctl restart docker
 
 ```
-## Docker 部署 单个 审计容器
+## Docker 部署 单个 接应容器
+
+**worker_program 可替换为任意 工作程序**
 
 ```shell
 docker run -d \
-  --name audit-1 \
+  --name worker_program-1 \
   --sysctl net.ipv4.conf.lo.accept_local=1 \
   --cap-add=NET_ADMIN \
   --cap-add=BPF \
@@ -599,17 +600,20 @@ docker run -d \
   --privileged \
   -p 外部端口:内部端口 \
   -v /root/.landscape-router/unix_link/:/ld_unix_link/:ro \ # 必要映射
-  -v /home/audit/audit-1/run.sh:/app/server/run.sh \ # 修改左边挂载审计程序1启动脚本
-  -v /home/audit/audit-1/config:/app/server/config \ # 修改左边挂载审计程序1配置文件
-  -v /home/audit/audit-1/audit:/app/server/audit \ # 修改左边挂载审计程序1二进制文件
+  -v /home/worker_program/worker_program-1/run.sh:/app/server/run.sh \ # 修改左边挂载审计程序1启动脚本
+  -v /home/worker_program/worker_program-1/config:/app/server/config \ # 修改左边挂载审计程序1配置文件
+  -v /home/worker_program/worker_program-1/worker_program:/app/server/worker_program \ # 修改左边挂载审计程序1二进制文件
   ghcr.io/thisseanzhang/landscape-edge:amd64-xx # 需修改容器标签
 
 ```
 
-## Compose 部署 多个 审计容器
+## Compose 部署 多个 接应容器
+
+**worker_program 可替换为任意 工作程序**
+
 ```yaml
 networks:
-  audit-br:
+  worker_program-br:
     driver: bridge
     enable_ipv6: true # 开启ipv6，容器自动获取ivp6配置
     ipam:
@@ -640,13 +644,13 @@ services:
     #  - "0.0.0.0:外部端口号:内部端口号"        # 映射到主机v4端口
     #  - "[::]:外部端口号:内部端口号"        # 映射到主机v6端口
     networks:
-      audit-br:
+      worker_program-br:
         ipv4_address: 172.100.0.1
     volumes:
       - /root/.landscape-router/unix_link/:/ld_unix_link/:ro # 必要映射
-      - /home/audit/audit-1/run.sh:/app/server/run.sh # 挂载审计程序1启动脚本
-      - /home/audit/audit-1/config:/app/server/config # 挂载审计程序1配置文件
-      - /home/audit/audit-1/audit:/app/server/audit # 挂载审计程序1二进制文件
+      - /home/worker_program/worker_program-1/run.sh:/app/server/run.sh # 挂载审计程序1启动脚本
+      - /home/worker_program/worker_program-1/config:/app/server/config # 挂载审计程序1配置文件
+      - /home/worker_program/worker_program-1/worker_program:/app/server/worker_program # 挂载审计程序1二进制文件
   service-2:
     image: ghcr.io/thisseanzhang/landscape-edge:amd64-xx # 需修改容器标签
     sysctls:
@@ -666,13 +670,13 @@ services:
           cpus: '4.0'
           memory: 512M
     networks:
-      audit-br:
+      worker_program-br:
         ipv4_address: 172.100.0.2
     volumes:
       - /root/.landscape-router/unix_link/:/ld_unix_link/:ro # 必要映射
-      - /home/audit/audit-2/run.sh:/app/server/run.sh # 挂载审计程序2启动脚本
-      - /home/audit/audit-2/config:/app/server/config # 挂载审计程序2配置文件
-      - /home/audit/audit-2/audit:/app/server/audit # 挂载审计程序2二进制文件
+      - /home/worker_program/worker_program-2/run.sh:/app/server/run.sh # 挂载审计程序2启动脚本
+      - /home/worker_program/worker_program-2/config:/app/server/config # 挂载审计程序2配置文件
+      - /home/worker_program/worker_program-2/worker_program:/app/server/worker_program # 挂载审计程序2二进制文件
 
 ```
 
