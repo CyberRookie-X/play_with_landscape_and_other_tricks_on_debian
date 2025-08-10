@@ -43,6 +43,7 @@ ldd --version
 ```
 # 目录
 - [debian 安装配置](#debian-安装配置)
+  - [下载 debian  ISO 镜像](#下载必要软件)
   - [安装 debian](#安装-debian)
   - [时区修改到上海](#时区修改到上海)
   - [允许root用户使用密码登录ssh](#允许root用户使用密码登录ssh)
@@ -92,6 +93,8 @@ ldd --version
 ## 下载必要软件
 SSH工具 (安装一个即可)：[MobaXterm（仅有win版本）](https://mobaxterm.mobatek.net/download.html) | [Tabby](https://github.com/Eugeny/tabby/releases/tag/v1.0.224)  
 安装U盘制作工具（安装一个即可）: [balena etcher](https://etcher.balena.io/) | [Ventoy](https://www.ventoy.net/cn/download.html)   
+
+以下三种系统，选一个即可，建议 Debian 13   
 Debian 12 iso 安装镜像: [官方下载](https://www.debian.org/releases/bookworm/) | [兰州大学镜像](http://mirror.lzu.edu.cn/debian-cd/) | [163镜像](http://mirrors.163.com/debian-cd/)    
 Debian 13 iso 安装镜像: [官方下载](https://www.debian.org/releases/) | [兰州大学镜像](http://mirror.lzu.edu.cn/debian-cd/) | [163镜像](http://mirrors.163.com/debian-cd/)   
 PVE 9: [官方下载](https://www.proxmox.com/en/downloads)    
