@@ -545,6 +545,7 @@ systemctl status docker
 * **工作程序** 需监听 `12345` 端口作为 tproxy 入口, 其他端口需要通过环境变量 `LAND_PROXY_SERVER_PORT` 修改 **接应程序** 默认监听端口
 * **接应程序** 会将待处理流量转发到 **工作程序** 的 tproxy 入口 
 * landscape 0.6.7+ 版本容器出口默认为 Flow 0 出口  
+* tproxy 不改变数据包 源地址、目的地址等，**工作程序** 仍可获取数据包的局域网IP信息
 
 ## 接应程序配置
 默认设置下， 容器有一个[**演示工作程序** ](https://github.com/ThisSeanZhang/landscape/blob/main/landscape-ebpf/src/bin/redirect_demo_server.rs) 放置在 `/app/server` 监听 `12345` 端口作为tproxy入口。
@@ -587,8 +588,11 @@ done
 **编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**  
 
 ## Docker 启用 ipv6
-**启用ipv6配置无误，但landsape暂无支持，需配置iptable才能生效，暂不做iptable配置，等待官方eBPF路由支持，**  
-**仅容器出口 无法连接ipv6网络，不影响ipv6流量分流到容器**
+
+* 0.6.7- 版本可能 docker ipv6 启用不生效,需要执行这条命令`sysctl -w net.ipv6.conf.<换成你的ppp网卡>.accept_ra=2`  
+* `<换成你的ppp网卡>` 需要换成你的ppp网卡名称，例如`ppp-enp6s19-hjkv`   
+* 之后的版本landscape已兼容docker启用ipv6，无需手动执行那条命令
+
 ```shell
 # 创建 配置文件，这个文件是
 cat <<EOF > /etc/docker/daemon.json
@@ -598,9 +602,7 @@ cat <<EOF > /etc/docker/daemon.json
 }
 EOF
 
-```
-`fixed-cidr-v6` 需要填入正确的前缀   
-使用 Docker 默认 ULA 范围，则需要开启 nat6 ，**此处教程待补充**   
+``` 
 
 ```shell
 # 重启docker，需等待数十秒
