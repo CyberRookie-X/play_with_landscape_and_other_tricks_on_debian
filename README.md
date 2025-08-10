@@ -90,18 +90,19 @@ ldd --version
 # debian 安装配置
 
 ## 下载必要软件
-SSH工具(安装一个即可)：[MobaXterm（仅有win版本）](https://mobaxterm.mobatek.net/download.html) | [Tabby](https://github.com/Eugeny/tabby/releases/tag/v1.0.224)  
+SSH工具 (安装一个即可)：[MobaXterm（仅有win版本）](https://mobaxterm.mobatek.net/download.html) | [Tabby](https://github.com/Eugeny/tabby/releases/tag/v1.0.224)  
 安装U盘制作工具（安装一个即可）: [balena etcher](https://etcher.balena.io/) | [Ventoy](https://www.ventoy.net/cn/download.html)   
-Debian 12: [官方下载](https://www.debian.org/download.zh-cn.html) | [兰州大学镜像](http://mirror.lzu.edu.cn/debian-cd/) | [163镜像](http://mirrors.163.com/debian-cd/)    
-Debian 13: [官方下载](https://www.debian.org/releases/) | [兰州大学镜像](http://mirror.lzu.edu.cn/debian-cd/) | [163镜像](http://mirrors.163.com/debian-cd/)   
+Debian 12 iso 安装镜像: [官方下载](https://www.debian.org/releases/bookworm/) | [兰州大学镜像](http://mirror.lzu.edu.cn/debian-cd/) | [163镜像](http://mirrors.163.com/debian-cd/)    
+Debian 13 iso 安装镜像: [官方下载](https://www.debian.org/releases/) | [兰州大学镜像](http://mirror.lzu.edu.cn/debian-cd/) | [163镜像](http://mirrors.163.com/debian-cd/)   
 PVE 9: [官方下载](https://www.proxmox.com/en/downloads)    
 
 ## 安装 debian
-安装过程省略。   
+[详细安装过程参考，本人建议在安装过程中选择 ❗❗❗**中国网络镜像站点**❗❗❗](https://246859.github.io/posts/code/linux/debian12_install.html)   
 **debian用户：root，非 root 用户请自行添加 sudo**   
 建议：   
-1、语言选择 us/english，避免中文路径与某些软件不兼容,（后面再调整时区到上海）。   
-2、仅需 安装 webserver 、sshserver、标准配置。         
+1、语言选择 us/english，避免中文路径与某些软件不兼容,（后面再调整时区到上海）。     
+2、**❗❗❗启用网络镜像站点，选择 中国  ❗❗❗**    
+3、仅需 安装 webserver 、sshserver、标准配置。         
 ![image](./images/1.png)   
 ## 时区修改到上海   
 **debian用户：root，非 root 用户请自行添加 sudo**   
@@ -148,8 +149,13 @@ systemctl mask UNIT_NAME.swap
 
 ```
 ## 修改软件源（可选）
+**安装时网络镜像站点已选择中国源，可跳过换源**  
+❗ debian13 可能不适用，建议在安装时选择国内源，
 ```shell
 # 若软件源非为国内源，可以考虑修改软件源为国内源，例如ustc源
+# 备份源
+cp /etc/apt/sources.list /etc/apt/sources.list.bak
+# 修改源
 nano /etc/apt/sources.list
 
 ```
