@@ -97,12 +97,14 @@ Debian 13 iso 安装镜像: [官方下载](https://www.debian.org/releases/) | [
 PVE 9: [官方下载](https://www.proxmox.com/en/downloads)    
 
 ## 安装 debian
-[详细安装过程参考，本人建议在安装过程中选择 ❗❗❗**中国网络镜像站点**❗❗❗](https://246859.github.io/posts/code/linux/debian12_install.html)   
+
 **debian用户：root，非 root 用户请自行添加 sudo**   
-建议：   
-1、语言选择 us/english，避免中文路径与某些软件不兼容,（后面再调整时区到上海）。     
-2、**❗❗❗启用网络镜像站点，选择 中国  ❗❗❗**    
-3、仅需 安装 webserver 、sshserver、标准配置。         
+### 注意❗：   
+**1、语言选择 us/english，避免中文路径与某些软件不兼容,（后面再调整时区到上海）。**     
+**2、❗❗❗启用网络镜像站点，选择 中国  ❗❗❗**    
+**3、仅需 安装 webserver 、sshserver、标准配置，3个选项勾选即可**    
+[详细安装过程参考，建议在安装过程中选择 ❗❗❗**中国网络镜像站点**❗❗❗](https://246859.github.io/posts/code/linux/debian12_install.html)        
+
 ![image](./images/1.png)   
 ## 时区修改到上海   
 **debian用户：root，非 root 用户请自行添加 sudo**   
