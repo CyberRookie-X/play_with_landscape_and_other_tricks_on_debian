@@ -744,12 +744,27 @@ services:
 [Homebox 官方仓库](https://github.com/XGHeaven/homebox)   
 ![image](./images/9.png)   
 ```shel
-# docker 部署
+# docker 部署，host网络（性能更好）
+docker run -d --network=host --name homebox xgheaven/homebox
+
+```
+```shel
+# docker 部署，端口映射方式
 docker run -d -p 3300:3300 --name homebox xgheaven/homebox
 
 ```
 ```yaml
-# compose 部署
+# compose 部署，host网络（性能更好）
+name: homebox
+services:
+    homebox:
+        network_mode: host
+        container_name: homebox
+        image: xgheaven/homebox
+
+```
+```yaml
+# compose 部署,端口映射方式
 name: homebox
 services:
     homebox:
@@ -759,7 +774,8 @@ services:
         image: xgheaven/homebox
 
 ```
-安装并启动 xgheaven/homebox 镜像，默认情况下暴露的端口是 3300。 然后在浏览器中输入 http://your.server.ip:3300 即可。
+安装并启动 xgheaven/homebox 镜像，默认情况下暴露的端口是 3300。 然后在浏览器中输入 http://your.server.ip:3300 即可。   
+
 ## ArozOS NAS 网页桌面操作系统
 ArozOS 少量路由器相关功能建议不开启    
 [ArozOS官网](https://os.aroz.org/)|[ArozOS项目仓库](https://github.com/tobychui/arozos)
