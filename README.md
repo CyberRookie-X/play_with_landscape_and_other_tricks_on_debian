@@ -52,7 +52,7 @@ ldd --version
   - [关闭 swap](#关闭-swap)
   - [修改软件源（可选）](#修改软件源可选)
   - [升级内核，到 6.9以上（debian 13 无需升级内核）](#升级内核到-69以上debian-13-无需升级内核)
-- [docker、docker compose 安装（可选）](#dockerdocker-compose-安装可选)
+- [安装 docker、docker compose ](#安装-dockerdocker-compose)
 - [landscape 安装](#landscape-安装)
   - [安装 pppd](#安装-pppd)
   - [创建 landscape systemd 服务文件](#创建-landscape-systemd-服务文件)
@@ -97,7 +97,7 @@ SSH工具 (安装一个即可)：[MobaXterm（仅有win版本）](https://mobaxt
 
 以下三种系统，选一个即可，建议 Debian 13   
 Debian 12 iso 安装镜像: [官方下载](https://www.debian.org/releases/bookworm/) | [兰州大学镜像](http://mirror.lzu.edu.cn/debian-cd/) | [163镜像](http://mirrors.163.com/debian-cd/)    
-Debian 13 iso 安装镜像: [官方下载](https://www.debian.org/releases/) | [兰州大学镜像](http://mirror.lzu.edu.cn/debian-cd/) | [163镜像](http://mirrors.163.com/debian-cd/)   
+Debian 13 iso 安装镜像: [官方下载](https://www.debian.org/download.zh-cn.html) | [兰州大学镜像](http://mirror.lzu.edu.cn/debian-cd/) | [163镜像](http://mirrors.163.com/debian-cd/)   
 PVE 9: [官方下载](https://www.proxmox.com/en/downloads)    
 
 ## 安装 debian
@@ -111,6 +111,7 @@ PVE 9: [官方下载](https://www.proxmox.com/en/downloads)
 [详细安装过程参考，建议在安装过程中选择 ❗❗❗**中国网络镜像站点**❗❗❗](https://246859.github.io/posts/code/linux/debian12_install.html)        
 
 ![image](./images/1.png)   
+![image](./images/8.png) 
 ## 时区修改到上海   
 **debian用户：root，非 root 用户请自行添加 sudo**   
 **debian13 安装过程中配置时区后，无需重复配置时区**    
@@ -125,8 +126,18 @@ timedatectl
 ## 允许root用户使用密码登录ssh    
 **debian用户：root，非 root 用户请自行添加 sudo**   
 ```shell
-echo "PermitRootLogin yes" >>/etc/ssh/sshd_config
+# 修改 sshd_config 文件
+nano /etc/ssh/sshd_config
 
+```
+
+```shell
+# 插入这一行
+PermitRootLogin yes
+```
+编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。
+
+```
 # 重启 ssh   
 systemctl restart ssh
 
@@ -143,12 +154,11 @@ nano /etc/fstab
 
 ```
 找到包含 swap 的行（通常类似 /swapfile 或 /dev/mapper/...-swap），在行首添加 # 注释掉，例如：
-```diff
-- /swapfile none swap sw 0 0
-+ #/swapfile none swap sw 0 0
+```shell
+# /swapfile none swap sw 0 0
 ```
 **编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**  
-### 禁用 systemd 管理的 Swap 单元（若有/非必须）
+### 禁用 systemd 管理的 Swap 单元（若有/非必须，此项可直接跳过）
 ```shell
 # 检查激活的 Swap 单元
 systemctl --type swap
@@ -223,7 +233,7 @@ update-grub
 reboot
 
 ```
-# docker、docker compose 安装（可选）
+# 安装 docker、docker compose  
 
 注释掉原有所有行，换掉下面的源。如已选择合适的源则可跳过。   
 ```shell
@@ -279,6 +289,12 @@ WantedBy=multi-user.target
 **编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**   
 
 ## 下载并上传 landscape-router  
+
+[下载 landscape-webserver-x86_64、static.zip 文件](https://github.com/ThisSeanZhang/landscape/releases/)   
+![image](./images/7.png)       
+放到下面创建的目录。（注意 static 可能存在嵌套，需要调整，参考下图）   
+![image](./images/3.png)   
+![image](./images/4.png)   
 ```shell
 # 创建landscape-router目录。   
 cd /root
@@ -286,12 +302,6 @@ mkdir /root/.landscape-router
 cd /root/.landscape-router
 
 ```
-[下载 landscape-webserver-x86_64、static.zip 文件](https://github.com/ThisSeanZhang/landscape/releases/)   
-![image](./images/7.png)       
-放到下面创建的目录。（注意 static 可能存在嵌套，需要调整，参考下图）   
-![image](./images/3.png)   
-![image](./images/4.png)   
-
 ```shell
 # 上传文件后，赋权
 chmod -R 755 /root/.landscape-router
@@ -353,7 +363,7 @@ ss -tulnp | grep -E ':6300|:6443'
 ```
 
    
-## 登录 landscape 账号 root 密码 root，通过wan网卡静态IP访问，https://192.168.22.1:6443   
+## 登录 landscape 账号 root 密码 root，通过wan网卡静态IP访问，https://192.168.22.1:6443   (安装过程并未结束)
 
 ## 应用 Landscape-Router 开机启动   
 
