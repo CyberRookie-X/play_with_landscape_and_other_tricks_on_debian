@@ -104,10 +104,9 @@ PVE 9: [官方下载](https://www.proxmox.com/en/downloads)
 
 **debian用户：root，非 root 用户请自行添加 sudo**   
 ### 注意❗：   
-**1、语言选择 us/english，避免中文路径与某些软件不兼容,（debian12后面再调整时区到上海）。**   
-**2、时区选择上海 Asia/Shanghai**  
-**3、❗❗❗启用网络镜像站点，选择 中国  ❗❗❗**    
-**4、仅需 安装 webserver 、sshserver、标准配置，3个选项勾选即可**    
+**1、语言选择 us/english，避免中文路径与某些软件不兼容,（后面会调整时区到上海）。**   
+**2、❗❗❗启用网络镜像站点，选择 中国  ❗❗❗**    
+**3、仅需 安装 webserver 、sshserver、标准配置，3个选项勾选即可**    
 [详细安装过程参考，建议在安装过程中选择 ❗❗❗**中国网络镜像站点**❗❗❗](https://246859.github.io/posts/code/linux/debian12_install.html)        
 
 ![image](./images/1.png)   
