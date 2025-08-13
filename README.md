@@ -324,6 +324,20 @@ nano /etc/network/interfaces
 
 ```
 ```shell
+# This file describes the network interfaces available on your system
+# and how to activate them. For more information, see interfaces(5).
+
+source /etc/network/interfaces.d/*
+
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+
+### 上面部分保持原样即可，不需要修改
+### 以下各部分 参照我这里的结构 修改
+
+
 # pppoe 后生成一个pppoe网卡，与此网卡不冲突
 # 假定 1 网卡用于 WAN 网卡
 auto <第 1 张网卡名> 
@@ -362,7 +376,9 @@ ss -tulnp | grep -E ':6300|:6443'
 ```
 
    
-## 登录 landscape 账号 root 密码 root，通过wan网卡静态IP访问，https://192.168.22.1:6443   (安装过程并未结束)
+## 登录 Landscape Router，验证软件是否正确安装
+## 账号 root 密码 root，通过wan网卡静态IP访问，https://192.168.22.1:6443   (安装过程并未结束)
+## 按需进行一些基本的网络配置后，继续进行后面的步骤
 
 ## 应用 Landscape-Router 开机启动   
 
@@ -372,7 +388,7 @@ systemctl enable landscape-router.service
 
 ```
 
-## 至此可以在 landscape-router web 中进行配置   
+## 至此可以在 Landscape-Router Web 中进行更多配置   
 
 **[详细设置参考官方文档](https://landscape.whileaway.dev/feature/flow.html)**
 
