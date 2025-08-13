@@ -82,6 +82,7 @@ ldd --version
 - [常见网络应用、compose 安装](#常见网络应用compose-安装)
   - [filebrowser（文件管理）](#filebrowser文件管理)
   - [tabby （网页ssh）](#tabby-网页ssh)
+  - [Homebox 局域网测速软件](#homebox-局域网测速软件)
   - [ArozOS NAS 网页桌面操作系统](#arozos-nas-网页桌面操作系统)
   - [集客AC dockercompose](#集客ac-dockercompose)
   - [ddns-go dockercompose](#ddns-go-dockercompose)
@@ -323,6 +324,7 @@ ip a
 nano /etc/network/interfaces
 
 ```
+**上半部分保持原样，仅修改下半部分**
 ```shell
 # This file describes the network interfaces available on your system
 # and how to activate them. For more information, see interfaces(5).
@@ -334,8 +336,9 @@ auto lo
 iface lo inet loopback
 
 
-### 上面部分保持原样即可，不需要修改
-### 以下各部分 参照我这里的结构 修改
+# 上面部分保持原样即可，不需要修改
+#---------------------------------------------------------------------
+# 以下各部分 参照我这里的结构 修改
 
 
 # pppoe 后生成一个pppoe网卡，与此网卡不冲突
@@ -735,6 +738,28 @@ services:
 ## tabby （网页ssh）
  TODO
 
+
+## Homebox 局域网测速软件
+
+[Homebox 官方仓库](https://github.com/XGHeaven/homebox)   
+![image](./images/9.png)   
+```shel
+# docker 部署
+docker run -d -p 3300:3300 --name homebox xgheaven/homebox
+
+```
+```yaml
+# compose 部署
+name: homebox
+services:
+    homebox:
+        ports:
+            - 3300:3300
+        container_name: homebox
+        image: xgheaven/homebox
+
+```
+
 ## ArozOS NAS 网页桌面操作系统
 ArozOS 少量路由器相关功能建议不开启    
 [ArozOS官网](https://os.aroz.org/)|[ArozOS项目仓库](https://github.com/tobychui/arozos)
@@ -744,6 +769,7 @@ ArozOS 少量路由器相关功能建议不开启
 wget -O install.sh https://raw.githubusercontent.com/tobychui/arozos/master/installer/install.sh && bash install.sh
 
 ```
+
 ## 集客AC dockercompose
 
 [集客ap最新固件下载（官网）](http://file.cnrouter.com/index.php/Index/apbeta.html#) | [集客ap固件历史版本下载](https://github.com/openwrt-fork/gecoos-firmware)
