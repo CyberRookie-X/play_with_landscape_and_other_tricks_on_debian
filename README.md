@@ -759,7 +759,7 @@ services:
         image: xgheaven/homebox
 
 ```
-
+安装并启动 xgheaven/homebox 镜像，默认情况下暴露的端口是 3300。 然后在浏览器中输入 http://your.server.ip:3300 即可。
 ## ArozOS NAS 网页桌面操作系统
 ArozOS 少量路由器相关功能建议不开启    
 [ArozOS官网](https://os.aroz.org/)|[ArozOS项目仓库](https://github.com/tobychui/arozos)
