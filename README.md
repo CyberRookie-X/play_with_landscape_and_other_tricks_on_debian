@@ -142,7 +142,7 @@ PermitRootLogin yes
 systemctl restart ssh
 
 ```
-
+**现在，可用root用户登录ssh进行后续操作**
 ## 关闭 swap
 Swap 是内存的"应急备份"，用磁盘空间换取系统稳定性，但过度依赖会拖慢速度。合理配置可平衡性能与安全。
 ### nano 用法简述
