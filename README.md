@@ -235,7 +235,6 @@ reboot
 ```
 # 安装 docker、docker compose  
 
-注释掉原有所有行，换掉下面的源。如已选择合适的源则可跳过。   
 ```shell
 # 安装curl   
 apt update
@@ -243,7 +242,8 @@ apt install curl -y
 curl --version
 
 ```
-   
+**以下三种方式，选择一种(已包含dockercompose)**
+
 ```shell
 # 三种方式，选择一种(已包含dockercompose)
 # 使用官方源安装（国内直接访问较慢）
@@ -291,17 +291,18 @@ WantedBy=multi-user.target
 ## 下载并上传 landscape-router  
 
 [下载 landscape-webserver-x86_64、static.zip 文件](https://github.com/ThisSeanZhang/landscape/releases/)   
-![image](./images/7.png)       
-放到下面创建的目录。（注意 static 可能存在嵌套，需要调整，参考下图）   
-![image](./images/3.png)   
-![image](./images/4.png)   
+![image](./images/7.png)   
 ```shell
 # 创建landscape-router目录。   
 cd /root
 mkdir /root/.landscape-router
 cd /root/.landscape-router
 
-```
+```    
+放到下面创建的目录。（注意 static 可能存在嵌套，需要调整，参考下图）   
+![image](./images/3.png)   
+![image](./images/4.png)   
+
 ```shell
 # 上传文件后，赋权
 chmod -R 755 /root/.landscape-router
@@ -321,6 +322,7 @@ ip a
 ```
 
 ```shell
+# 当前修改不会影响当前网络及ssh连接，后面会有重启network的步骤，那时才会生效
 nano /etc/network/interfaces
 
 ```
@@ -399,11 +401,12 @@ systemctl enable landscape-router.service
 ## 修改apache80端口到8080, 以免后续与其他反代软件冲突   
 
 ```shell
+# listen 由 80 改为 8080（任意端口）
 nano /etc/apache2/ports.conf
 
 ```
    
-listen 由 80 改到 8080  
+**listen 由 80 改到 8080（任意端口）**  
 **编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**      
 
 ```shell
@@ -434,6 +437,7 @@ systemctl stop landscape-router.service
 systemctl start landscape-router.service
 
 ```
+## 至此安装完成，请在浏览器中访问 https://192.168.22.1:6443 进一步配置 Landscape Router
    
 ## 在显示器/终端中 启动/关闭 landscape-router   
 
@@ -495,7 +499,24 @@ nano /etc/network/interfaces
 
 ```
 
-```bash
+**上半部分保持原样，仅修改下半部分**
+```shell
+# This file describes the network interfaces available on your system
+# and how to activate them. For more information, see interfaces(5).
+
+source /etc/network/interfaces.d/*
+
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+
+# 上面部分保持原样即可，不需要修改
+#---------------------------------------------------------------------
+# 以下各部分 参照我这里的结构 修改
+
+
+
 auto eth0
 iface eth0 inet manual
 
