@@ -293,7 +293,8 @@ WantedBy=multi-user.target
 [下载 landscape-webserver-x86_64、static.zip 文件](https://github.com/ThisSeanZhang/landscape/releases/)   
 ![image](./images/7.png)   
 ```shell
-# 创建landscape-router目录。   
+# 创建landscape-router目录。
+# 若自定义路径，则systemd服务文件路径也要修改。   
 cd /root
 mkdir /root/.landscape-router
 cd /root/.landscape-router
