@@ -1,4 +1,4 @@
-# 在 Debian 里，玩转 Landscape Router和其他花活（持续更新中...）
+# 在 Debian 里，玩转 Landscape Router 和其他花活（持续更新中...）
 
 **本文可自由转载，无需标注出处**  
 [Landscape 文档网站](https://landscape.whileaway.dev/introduction.html) | [Landscape github](https://github.com/ThisSeanZhang/landscape)
