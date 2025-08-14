@@ -77,6 +77,7 @@ ldd --version
 - [Docker容器作为分流出口（接应容器部署）](#docker容器作为分流出口接应容器部署)
   - [接应容器概述](#接应容器概述)
   - [创建 worker_program 工作程序 启动脚本](#创建-worker_program-工作程序-启动脚本)
+  - [为 Docker 容器启用 ipv6](#为docker-容器启用ipv6)
   - [Docker 部署 单个 接应容器](#docker-部署-单个-接应容器)
   - [Compose 部署 多个 接应容器](#compose-部署-多个-接应容器)
 - [常见网络应用、compose 安装](#常见网络应用compose-安装)
@@ -637,7 +638,7 @@ done
 ```
 **编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**  
 
-## Docker 启用 ipv6
+## 为 Docker 容器启用 ipv6
 
 **当前landscape 开启docker ipv6不会立即生效，没有主动发起 RS ，得等 上级 RA 的周期**  
 **后续某一版本会解决这一问题**
