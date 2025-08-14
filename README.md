@@ -1,7 +1,8 @@
 # 在 Debian 里，玩转 Landscape Router 和其他花活（持续更新中...）
 
 **本文可自由转载，无需标注出处**  
-[Landscape 文档网站](https://landscape.whileaway.dev/introduction.html) | [Landscape github](https://github.com/ThisSeanZhang/landscape)
+[Landscape Router 文档网站](https://landscape.whileaway.dev/introduction.html) | [Landscape Router github](https://github.com/ThisSeanZhang/landscape)
+
 
 **debian用户：root，非 root 用户请自行添加 sudo**    
 
