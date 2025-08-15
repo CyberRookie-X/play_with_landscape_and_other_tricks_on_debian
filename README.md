@@ -655,6 +655,7 @@ done
 ```shell
 # 新创建容器，未设置时区环境变量变量的，默认设置为 Asia/Shanghai，已创建容器需重新创建才会生效
 # 容器开启 ipv6 ，容器访问互联网为 nat66 方式
+# 已创建锅 daemon.json 文件，需用 nano /etc/docker/daemon.json 修改，不可使用以下 cat 写入
 cat <<EOF > /etc/docker/daemon.json
 {
   "default-env": ["TZ=Asia/Shanghai"],
@@ -665,8 +666,11 @@ EOF
 
 ``` 
 
+
 ```shell
-# 重启docker，需等待数十秒
+# 重启 Docker，需等待数十秒
+# 重启 Landscape Router
+# 重启系统亦可
 systemctl daemon-reload && systemctl restart docker
 systemctl restart landscape-router.service
 
