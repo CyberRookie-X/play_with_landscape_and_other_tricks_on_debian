@@ -79,7 +79,7 @@ ldd --version
 - [Docker容器作为分流出口（接应容器部署）](#docker容器作为分流出口接应容器部署)
   - [接应容器概述](#接应容器概述)
   - [创建 worker_program 工作程序 启动脚本](#创建-worker_program-工作程序-启动脚本)
-  - [为 Docker 容器启用 ipv6](#为docker-容器启用ipv6)
+  - [为 Docker 容器启用 ipv6、配置默认中国时区](#为-docker-容器启用-ipv6配置默认中国时区)
   - [Docker 部署 单个 接应容器](#docker-部署-单个-接应容器)
   - [Compose 部署 多个 接应容器](#compose-部署-多个-接应容器)
 - [常见网络应用、compose 安装](#常见网络应用compose-安装)
@@ -443,20 +443,27 @@ systemctl start landscape-router.service
 ```
 ## 至此安装完成，请在浏览器中访问 https://192.168.22.1:6443 进一步配置 Landscape Router
    
-## 在显示器/终端中 启动/关闭 landscape-router   
+## 在显示器/终端中 启动/关闭/查看 landscape-router   
 
 需要对landscape 先赋予执行权限   
 ```shell
 # 启动服务
 systemctl start landscape-router.service
+
 # 重启服务
 systemctl restart landscape-router.service
+
 # 停止服务
 systemctl stop landscape-router.service
+
 # 启用 开机启动服务 ( 确认没有问题之后执行 )
 systemctl enable landscape-router.service
+
 # 禁用 开机启动服务 ( 确认没有问题之后执行 )
 systemctl disable landscape-router.service
+
+# 查看 landscape-router 状态，如内存占用
+systemctl status landscape-router
 ```
 # Landscape 实战案例
 
@@ -640,17 +647,19 @@ done
 ```
 **编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**  
 
-## 为 Docker 容器启用 ipv6
+## 为 Docker 容器启用 ipv6、配置默认中国时区
 
 **当前landscape 开启docker ipv6不会立即生效，没有主动发起 RS ，得等 上级 RA 的周期**  
 **后续某一版本会解决这一问题**
 
 ```shell
-# 创建 配置文件，这个文件是
+# 新创建容器，未设置时区环境变量变量的，默认设置为 Asia/Shanghai，已创建容器需重新创建才会生效
+# 容器开启 ipv6 ，容器访问互联网为 nat66 方式
 cat <<EOF > /etc/docker/daemon.json
 {
+  "default-env": ["TZ=Asia/Shanghai"],
   "ipv6": true,
-  "fixed-cidr-v6": "fd00::/80"  
+  "fixed-cidr-v6": "fd00::/80"
 }
 EOF
 
