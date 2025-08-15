@@ -4,7 +4,8 @@
 [Landscape Router 文档网站](https://landscape.whileaway.dev/introduction.html) | [Landscape Router github](https://github.com/ThisSeanZhang/landscape)
 
 
-**debian用户：root，非 root 用户请自行添加 sudo**    
+**debian用户：root，非 root 用户请自行添加 sudo**   
+**机器能连中国网络即可** 
 
 ## 安装过程并不复杂，复制命令粘贴到SSH终端执行即可
 
@@ -45,7 +46,7 @@ ldd --version
 
 ```
 # 目录
-- [debian 安装配置](#debian-安装配置)
+- [Debian 安装配置（机器能连中国网络即可）](#debian-安装配置机器能连中国网络即可)
   - [下载 debian  ISO 镜像](#下载必要软件)
   - [安装 debian](#安装-debian)
   - [时区修改到上海](#时区修改到上海)
@@ -53,8 +54,8 @@ ldd --version
   - [关闭 swap](#关闭-swap)
   - [修改软件源（可选）](#修改软件源可选)
   - [升级内核，到 6.9以上（debian 13 无需升级内核）](#升级内核到-69以上debian-13-无需升级内核)
-- [安装 docker、docker compose ](#安装-dockerdocker-compose)
-- [landscape 安装](#landscape-安装)
+- [安装 docker、docker compose（机器能连中国网络即可） ](#安装-dockerdocker-compose机器能连中国网络即可)
+- [Landscape Router 安装（机器能连中国网络即可）](#landscape-安装机器能连中国网络即可)
   - [安装 pppd](#安装-pppd)
   - [创建 landscape systemd 服务文件](#创建-landscape-systemd-服务文件)
   - [下载并上传 landscape-router](#下载并上传-landscape-router)
@@ -92,7 +93,7 @@ ldd --version
   - [FakeSIP、FakeHTTP](#fakesipfakehttp)
   - [netdata（性能、网络监控面板/仪表盘）](#netdata性能网络监控面板仪表盘)
 
-# debian 安装配置
+# debian 安装配置（机器能连中国网络即可）
 
 ## 下载必要软件
 SSH工具 (安装一个即可)：[MobaXterm（仅有win版本）](https://mobaxterm.mobatek.net/download.html) | [Tabby](https://github.com/Eugeny/tabby/releases/tag/v1.0.224)  
@@ -235,7 +236,7 @@ update-grub
 reboot
 
 ```
-# 安装 docker、docker compose  
+# 安装 docker、docker compose（机器能连中国网络即可）  
 
 ```shell
 # 安装curl   
@@ -257,7 +258,7 @@ curl -fsSL https://get.docker.com | bash -s docker --mirror AzureChinaCloud
 ```
 返回docker版本信息即为成功   
    
-# landscape 安装
+# landscape 安装（机器能连中国网络即可）
 
 ## 安装 pppd
 ```shell
