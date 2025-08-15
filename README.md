@@ -79,7 +79,7 @@ ldd --version
 - [Docker容器作为分流出口（接应容器部署）](#docker容器作为分流出口接应容器部署)
   - [接应容器概述](#接应容器概述)
   - [创建 worker_program 工作程序 启动脚本](#创建-worker_program-工作程序-启动脚本)
-  - [为 Docker 容器启用 ipv6、配置默认中国时区](#为-docker-容器启用-ipv6配置默认中国时区)
+  - [为 Docker 容器启用 ipv6](#为-docker-容器启用-ipv6)
   - [Docker 部署 单个 接应容器](#docker-部署-单个-接应容器)
   - [Compose 部署 多个 接应容器](#compose-部署-多个-接应容器)
 - [常见网络应用、compose 安装](#常见网络应用compose-安装)
@@ -237,7 +237,7 @@ reboot
 
 ```
 # 安装 docker、docker compose（机器能连中国网络即可）  
-
+## 脚本方式安装（三种脚本选一种）
 ```shell
 # 安装curl   
 apt update
@@ -257,7 +257,24 @@ curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun
 curl -fsSL https://get.docker.com | bash -s docker --mirror AzureChinaCloud
 ```
 返回docker版本信息即为成功   
-   
+## 为 Docker 配置全局时区为上海
+**如需使用 其他机器如 nas 中部署的 Dpanel、portainer、dockge 等面板，可在此配置 docker tcp socket**
+```shell
+systemctl edit docker
+
+```
+**添加下面几行**  
+
+```shell
+[Service]
+# 上面这一行必须要有
+# 以下一行，配置全局时区为上海，新建容器自动配置，旧容器需重新创建容器。仍可在 docker run -e 环境变量中为容器指定其他时区 
+Environment="TZ=Asia/Shanghai"
+# 以下2行(可选)开启 dcoker tcp socket。（需注意 此处 未启用 tcl 加密，如需加密 参考 Dpanel 文档）
+ExecStart=
+ExecStart=/usr/bin/dockerd -H tcp://0.0.0.0:2375 -H fd:// --containerd=/run/containerd/containerd.sock
+```
+编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。
 # landscape 安装（机器能连中国网络即可）
 
 ## 安装 pppd
@@ -576,11 +593,17 @@ systemctl edit docker
 
 ```
 添加下面几行  
+
 ```shell
 [Service]
+# 上面这一行必须要有
+# 以下一行，配置全局时区为上海，新建容器自动配置，旧容器需重新创建容器。仍可在 docker run -e 环境变量中为容器指定其他时区 
+Environment="TZ=Asia/Shanghai"
+# 以下2行(可选)开启 dcoker tcp socket。（需注意 此处 未启用 tcl 加密，如需加密 参考 Dpanel 文档）
 ExecStart=
 ExecStart=/usr/bin/dockerd -H tcp://0.0.0.0:2375 -H fd:// --containerd=/run/containerd/containerd.sock
 ```
+编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。
 ```shell
 # 重启docker服务，需等待数十秒   
 systemctl daemon-reload && systemctl restart docker
@@ -647,18 +670,16 @@ done
 ```
 **编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**  
 
-## 为 Docker 容器启用 ipv6、配置默认中国时区
+## 为 Docker 容器启用 ipv6
 
 **当前landscape 开启docker ipv6不会立即生效，没有主动发起 RS ，得等 上级 RA 的周期**  
 **后续某一版本会解决这一问题**
 
 ```shell
-# 新创建容器，未设置时区环境变量变量的，默认设置为 Asia/Shanghai，已创建容器需重新创建才会生效
 # 容器开启 ipv6 ，容器访问互联网为 nat66 方式
-# 已创建锅 daemon.json 文件，需用 nano /etc/docker/daemon.json 修改，不可使用以下 cat 写入
+# 已创建过 daemon.json 文件的，需用 nano /etc/docker/daemon.json 修改，不可使用以下 cat 写入
 cat <<EOF > /etc/docker/daemon.json
 {
-  "default-env": ["TZ=Asia/Shanghai"],
   "ipv6": true,
   "fixed-cidr-v6": "fd00::/80"
 }
