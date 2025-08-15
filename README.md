@@ -402,16 +402,16 @@ ss -tulnp | grep -E ':6300|:6443'
 # 重启网络，并启动 landscape-router
 systemctl restart networking && systemctl start landscape-router.service && systemctl status landscape-router
 ```
-输出包含 ` active (running) ` 表示正常启动 
+输出包含 ` active (running) ` 表示 Landscape Router 已启动 
 
 ![](images/10.png)
-
+<!--
 （非必要步骤）亦可通过端口检查 landsape 是否成功启动，检查 6300、6443 端口是否为 `landscape-webse`   
 ```shell
 ss -tulnp | grep -E ':6300|:6443' 
 
 ```
-
+-->
    
 ## 登录 Landscape Router，验证软件是否正确安装
 ## 账号 root 密码 root，通过wan网卡静态IP访问，https://192.168.22.1:6443   (安装过程并未结束)
