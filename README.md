@@ -389,15 +389,26 @@ systemctl disable systemd-resolved
 systemctl mask systemd-resolved
 
 ```
+## 检查 6300、6443 端口是否被占用
+无输出，则 landscape 可以使用 6300、6443 端口  
+```shell
+ss -tulnp | grep -E ':6300|:6443' 
+
+```
+
 ## 重启网络，并启动 landscape-router    
 
 ```shell
 # 重启网络，并启动 landscape-router
-systemctl restart networking && systemctl start landscape-router.service
+systemctl restart networking && systemctl start landscape-router.service && systemctl status landscape-router
 ```
-通过端口，检查 landsape 是否成功启动，检查 6443 、 6300 端口是否为landscape   
+输出包含 ` active (running) ` 表示正常启动 
+
+![](images/10.png)
+
+（非必要步骤）亦可通过端口检查 landsape 是否成功启动，检查 6300、6443 端口是否为 `landscape-webse`   
 ```shell
-ss -tulnp | grep -E ':6300|:6443'
+ss -tulnp | grep -E ':6300|:6443' 
 
 ```
 
@@ -819,7 +830,7 @@ services:
     homebox:
         network_mode: host
         container_name: homebox
-        image: xgheaven/homebox
+        image: xgheaven/homebox:latest
 
 ```
 ```yaml
@@ -830,7 +841,7 @@ services:
         ports:
             - 3300:3300
         container_name: homebox
-        image: xgheaven/homebox
+        image: xgheaven/homebox:latest
 
 ```
 安装并启动 xgheaven/homebox 镜像，默认情况下暴露的端口是 3300。 然后在浏览器中输入 http://your.server.ip:3300 即可。   
@@ -936,7 +947,7 @@ docker run --rm \
 ```yaml
 services:
   netdata:
-    image: netdata/netdata
+    image: netdata/netdata:latest
     container_name: netdata
     pid: host
     network_mode: host
