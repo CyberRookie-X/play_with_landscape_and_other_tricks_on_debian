@@ -308,6 +308,11 @@ WantedBy=multi-user.target
 ```
 **编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**   
 
+```shell
+systemctl daemon-reload && systemctl restart docker
+
+```
+
 ## 下载并上传 landscape-router  
 
 [下载 landscape-webserver-x86_64、static.zip 文件](https://github.com/ThisSeanZhang/landscape/releases/)   
