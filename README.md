@@ -125,7 +125,7 @@ nano /etc/ssh/sshd_config
 ```
 
 ```shell
-# 插入这一行
+# 插入这一行，或者找到 PermitRootLogin 哪一行修改成下面这样亦可
 PermitRootLogin yes
 ```
 编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。
