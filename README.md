@@ -253,12 +253,15 @@ curl --version
 
 ```shell
 # 三种方式，选择一种(已包含dockercompose)
+
 # 使用官方源安装（国内直接访问较慢）
-curl -fsSL https://get.docker.com | bash
+curl -fsSL https://get.docker.com | bash && docker compose version
+
 # 使用阿里源安装
-curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun
+curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun && docker compose version
+
 # 使用中国区 Azure 源安装
-curl -fsSL https://get.docker.com | bash -s docker --mirror AzureChinaCloud
+curl -fsSL https://get.docker.com | bash -s docker --mirror AzureChinaCloud && docker compose version
 ```
 返回docker版本信息即为成功   
 ## 为 Docker 配置全局时区为上海
