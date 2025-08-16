@@ -163,6 +163,7 @@ nano /etc/fstab
 # /swapfile none swap sw 0 0
 ```
 **编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**  
+<!--
 ### 禁用 systemd 管理的 Swap 单元（若有/非必须，此项可直接跳过）
 ```shell
 # 检查激活的 Swap 单元
@@ -172,6 +173,7 @@ systemctl --type swap
 systemctl mask UNIT_NAME.swap
 
 ```
+-->
 ## 修改软件源（可选）
 **安装时网络镜像站点已选择中国源，可跳过换源**  
 ```shell
