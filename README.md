@@ -282,6 +282,23 @@ ExecStart=
 ExecStart=/usr/bin/dockerd -H tcp://0.0.0.0:2375 -H fd:// --containerd=/run/containerd/containerd.sock
 ```
 编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。
+
+## 为 Docker 容器启用 ipv6
+
+**当前landscape 开启docker ipv6不会立即生效，没有主动发起 RS ，得等 上级 RA 的周期**  
+**后续某一版本会解决这一问题**
+
+```shell
+# 容器开启 ipv6 ，容器访问互联网为 nat66 方式
+# 已创建过 daemon.json 文件的，需用 nano /etc/docker/daemon.json 修改，不可使用以下 cat 写入
+cat <<EOF > /etc/docker/daemon.json
+{
+  "ipv6": true,
+  "fixed-cidr-v6": "fd00::/80"
+}
+EOF
+
+``` 
 # landscape 安装（机器能连中国网络即可）
 
 ## 安装 pppd
@@ -692,7 +709,7 @@ while true; do
 done
 ```
 **编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**  
-
+<!--
 ## 为 Docker 容器启用 ipv6
 
 **当前landscape 开启docker ipv6不会立即生效，没有主动发起 RS ，得等 上级 RA 的周期**  
@@ -719,6 +736,7 @@ systemctl daemon-reload && systemctl restart docker
 systemctl restart landscape-router.service
 
 ```
+-->
 ## Docker 部署 单个 接应容器
 
 **worker_program 可替换为任意 工作程序**
