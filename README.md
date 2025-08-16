@@ -115,17 +115,7 @@ PVE 9: [官方下载](https://www.proxmox.com/en/downloads)
 
 ![image](./images/1.png)   
 ![image](./images/8.png) 
-## 时区修改到上海   
-**debian用户：root，非 root 用户请自行添加 sudo**   
-**debian13 安装过程中配置时区后，无需重复配置时区**    
-```shell
-# 设置时区为上海
-timedatectl set-timezone Asia/Shanghai
- # 验证配置是否生效
-timedatectl
 
-```
-   
 ## 允许root用户使用密码登录ssh    
 **debian用户：root，非 root 用户请自行添加 sudo**   
 ```shell
@@ -141,10 +131,22 @@ PermitRootLogin yes
 编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。
 
 ```
-# 重启 ssh   
+# 重启 ssh 或 重启系统  
 systemctl restart ssh
 
 ```
+## 时区修改到上海   
+**debian用户：root，非 root 用户请自行添加 sudo**   
+**debian13 安装过程中配置时区后，无需重复配置时区**    
+```shell
+# 设置时区为上海
+timedatectl set-timezone Asia/Shanghai
+ # 验证配置是否生效
+timedatectl
+
+```
+   
+
 **现在，可用root用户登录ssh进行后续操作**
 ## 关闭 swap
 Swap 是内存的"应急备份"，用磁盘空间换取系统稳定性，但过度依赖会拖慢速度。合理配置可平衡性能与安全。
