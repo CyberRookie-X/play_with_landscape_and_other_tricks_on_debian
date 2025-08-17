@@ -86,6 +86,7 @@ ldd --version
   - [filebrowser（文件管理）](#filebrowser文件管理)
   - [tabby （网页ssh）](#tabby-网页ssh)
   - [Homebox 局域网测速软件](#homebox-局域网测速软件)
+  - [Lukcy （软路由公网神器）](#lukcy-软路由公网神器)
   - [ArozOS NAS 网页桌面操作系统](#arozos-nas-网页桌面操作系统)
   - [集客AC dockercompose](#集客ac-dockercompose)
   - [ddns-go dockercompose](#ddns-go-dockercompose)
@@ -875,6 +876,30 @@ services:
 
 ```
 安装并启动 xgheaven/homebox 镜像，默认情况下暴露的端口是 3300。 然后在浏览器中输入 http://your.server.ip:3300 即可。   
+
+## Lukcy （软路由公网神器）
+
+[Lucky 官方网站](https://lucky666.cn/docs/intro) | [Lucky github](https://github.com/gdy666/lucky)  
+**需修改 -v 或 volumes 左边路径为宿主机配置文件路径**
+```shell
+# host模式, 同时支持IPv4/IPv6, Liunx系统推荐
+docker run -d --name lucky --restart=always --net=host -v /home/luckyconf:/goodluck gdy666/lucky
+
+# 桥接模式, 只支持IPv4, Mac/Windows推荐,windows 不推荐使用docker版本
+docker run -d --name lucky --restart=always -p 16601:16601 -v /home/luckyconf:/goodluck gdy666/lucky
+```
+
+```yaml
+name: lucky
+services:
+    lucky:
+        container_name: lucky
+        restart: unless-stopped
+        network_mode: host
+        volumes:
+            - /home/luckyconf:/goodluck
+        image: gdy666/lucky:latest
+```
 
 ## ArozOS NAS 网页桌面操作系统
 ArozOS 少量路由器相关功能建议不开启    
