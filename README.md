@@ -136,6 +136,13 @@ PermitRootLogin yes
 systemctl restart ssh
 
 ```
+## 后续操作可在 ssh 工具里进行
+```shell
+# 查看 主机 IP
+ip a
+
+```
+![image](./images/11.png) 
 ## 时区修改到上海   
 **debian用户：root，非 root 用户请自行添加 sudo**   
 **debian13 安装过程中配置时区后，无需重复配置时区**    
