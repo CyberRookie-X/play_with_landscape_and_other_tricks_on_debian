@@ -12,6 +12,9 @@
   - [Docker 部署 单个 接应容器](./docs/landscape-edge.md/#docker-部署-单个-接应容器)
   - [Compose 部署 多个 接应容器](./docs/landscape-edge.md//#compose-部署-多个-接应容器)
 
+# **debian用户：root，非 root 用户请自行添加 sudo**   
+**本教程已适配中国大陆网络** 
+
 # 用 dpanel 部署 dockercompose
 
 ## 使用 dpanel 的必要性

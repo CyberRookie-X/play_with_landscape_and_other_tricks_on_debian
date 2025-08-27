@@ -4,8 +4,7 @@
 [Landscape Router 文档网站](https://landscape.whileaway.dev/introduction.html) | [Landscape Router github](https://github.com/ThisSeanZhang/landscape)
 
 
-**debian用户：root，非 root 用户请自行添加 sudo**   
-**机器能连中国网络即可** 
+**本教程已适配中国大陆网络** 
 
 ## 安装过程并不复杂，复制命令粘贴到SSH终端执行即可
 
