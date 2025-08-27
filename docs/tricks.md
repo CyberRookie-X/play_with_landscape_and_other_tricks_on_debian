@@ -1,7 +1,28 @@
 # 用 dpanel 部署 dockercompose
 
-
-
+# 目录
+- [用 dpanel 部署 dockercompose](./docs/tricks.md/#用-dpanel-部署-dockercompose)
+  - [使用 dpanel 的必要性](./docs/tricks.md/#使用-dpanel-的必要性)
+  - [dpanel标准版 与 dpanel lite](./docs/tricks.md/#dpanel标准版-与-dpanel-lite)
+  - [安装 dpanel](./docs/tricks.md/#安装-dpanel)
+  - [在其他机器上使用 dpanel管理本机docker](./docs/tricks.md/#在其他机器上使用-dpanel管理本机docker)
+- [Docker容器作为分流出口（接应容器部署）](./docs/tricks.md/#docker容器作为分流出口接应容器部署)
+  - [接应容器概述](./docs/tricks.md/#接应容器概述)
+  - [创建 worker_program 工作程序 启动脚本](./docs/tricks.md/#创建-worker_program-工作程序-启动脚本)
+  - [为 Docker 容器启用 ipv6](./docs/tricks.md/#为-docker-容器启用-ipv6)
+  - [Docker 部署 单个 接应容器](./docs/tricks.md/#docker-部署-单个-接应容器)
+  - [Compose 部署 多个 接应容器](./docs/tricks.md/#compose-部署-多个-接应容器)
+- [常见网络应用、compose 安装](./docs/tricks.md/#常见网络应用compose-安装)
+  - [filebrowser（文件管理）](./docs/tricks.md/#filebrowser文件管理)
+  - [tabby （网页ssh）](./docs/tricks.md/#tabby-网页ssh)
+  - [Homebox 局域网测速软件](./docs/tricks.md/#homebox-局域网测速软件)
+  - [Lukcy （软路由公网神器）](./docs/tricks.md/#lukcy-软路由公网神器)
+  - [ArozOS NAS 网页桌面操作系统](./docs/tricks.md/#arozos-nas-网页桌面操作系统)
+  - [集客AC dockercompose](./docs/tricks.md/#集客ac-dockercompose)
+  - [ddns-go dockercompose](./docs/tricks.md/#ddns-go-dockercompose)
+  - [FRP 客户端（FRPC）](./docs/tricks.md/#frp-客户端frpc)
+  - [FakeSIP、FakeHTTP](./docs/tricks.md/#fakesipfakehttp)
+  - [netdata（性能、网络监控面板/仪表盘）](./docs/tricks.md/#netdata性能网络监控面板仪表盘)
 
 ## 使用 dpanel 的必要性
 dpanel 集成 dockercompose 应用商店，便于一键部署容器应用。    
