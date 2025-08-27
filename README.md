@@ -45,11 +45,11 @@ uname -r
 ldd --version
 
 ```
-# 手工安装指南[文档](./docs/install-manul.md)
+# 手工安装指南 [文档](./docs/install-manul.md)
 
 # Docker容器作为分流出口（接应容器部署）[文档](.docs/landscape-edge.md)
 
-# 常见网络应用、compose 安装[文档](./docs/tricks.md)
+# 常见网络应用、compose 安装 [文档](./docs/tricks.md)
 
 # 文档目录
 - [Debian 安装配置（机器能连中国网络即可）](./docs/install-manul.md/#debian-安装配置机器能连中国网络即可)
