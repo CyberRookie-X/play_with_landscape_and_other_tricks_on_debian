@@ -1,0 +1,549 @@
+# 目录
+- [Debian 安装配置（机器能连中国网络即可）](#debian-安装配置机器能连中国网络即可)
+  - [下载 debian  ISO 镜像](#下载必要软件)
+  - [安装 debian](#安装-debian)
+  - [时区修改到上海](#时区修改到上海)
+  - [允许root用户使用密码登录ssh](#允许root用户使用密码登录ssh)
+  - [关闭 swap](#关闭-swap)
+  - [修改软件源（可选）](#修改软件源可选)
+  - [升级内核，到 6.9以上（debian 13 无需升级内核）](#升级内核到-69以上debian-13-无需升级内核)
+- [安装 docker、docker compose（机器能连中国网络即可） ](#安装-dockerdocker-compose机器能连中国网络即可)
+- [Landscape Router 安装（机器能连中国网络即可）](#landscape-安装机器能连中国网络即可)
+  - [安装 pppd](#安装-pppd)
+  - [创建 landscape systemd 服务文件](#创建-landscape-systemd-服务文件)
+  - [下载并上传 landscape-router](#下载并上传-landscape-router)
+  - [修改网卡配置](#修改网卡配置)
+  - [关闭本机 DNS 服务](#关闭本机-dns-服务)
+  - [重启网络，并启动 landscape-router](#重启网络并启动-landscape-router)
+  - [登录 landscape 账号 root 密码 root，https://192.168.22.1:6443](#登录-landscape-账号-root-密码-roothttps1921682216443)
+  - [至此可以在 landscape-router web 中进行配置](#至此可以在-landscape-router-web-中进行配置)
+  - [应用 Landscape-Router 开机启动](#应用-landscape-router-开机启动)
+  - [修改apache80端口到8080, 以免后续与其他反代软件冲突](#修改apache80端口到8080-以免后续与其他反代软件冲突)
+  - [如何升级 landscape](#如何升级-landscape)
+  - [在显示器/终端中 启动/关闭 landscape-router](#在显示器终端中-启动关闭-landscape-router)
+- [Landscape 实战案例](#landscape-实战案例)
+  - [域名/IP 分流实践](#域名ip-分流实践)
+  - [基于 vlan/ssid（WiFi） 的分流实现（暂不能实现）](#基于-vlanssidwifi-的分流实现暂不能实现)
+
+# debian 安装配置（机器能连中国网络即可）
+
+## 下载必要软件
+SSH工具 (安装一个即可)：[MobaXterm（仅有win版本）](https://mobaxterm.mobatek.net/download.html) | [Tabby](https://github.com/Eugeny/tabby/releases/tag/v1.0.224)  
+安装U盘制作工具（安装一个即可）: [balena etcher](https://etcher.balena.io/) | [Ventoy](https://www.ventoy.net/cn/download.html)   
+
+以下三种系统，选一个即可，建议 Debian 13   
+Debian 12 iso 安装镜像: [官方下载](https://www.debian.org/releases/bookworm/) | [兰州大学镜像](http://mirror.lzu.edu.cn/debian-cd/) | [163镜像](http://mirrors.163.com/debian-cd/)    
+Debian 13 iso 安装镜像: [官方下载](https://www.debian.org/download.zh-cn.html) | [兰州大学镜像](http://mirror.lzu.edu.cn/debian-cd/) | [163镜像](http://mirrors.163.com/debian-cd/)   
+PVE 9: [官方下载](https://www.proxmox.com/en/downloads)    
+
+## 安装 debian
+
+**debian用户：root，非 root 用户请自行添加 sudo**   
+### 注意❗：   
+**1、语言选择 us/english，避免中文路径与某些软件不兼容,（后面会调整时区到上海）。**   
+**2、❗❗❗启用网络镜像站点，选择 中国  ❗❗❗**    
+**3、仅需 安装 webserver 、sshserver、标准配置，3个选项勾选即可**    
+[详细安装过程参考，建议在安装过程中选择 ❗❗❗**中国网络镜像站点**❗❗❗](https://246859.github.io/posts/code/linux/debian12_install.html)        
+
+![image](./images/1.png)   
+![image](./images/8.png) 
+
+## 允许root用户使用密码登录ssh    
+**debian用户：root，非 root 用户请自行添加 sudo**   
+```shell
+# 修改 sshd_config 文件
+nano /etc/ssh/sshd_config
+
+```
+
+```shell
+# 插入这一行，或者找到 PermitRootLogin 哪一行修改成下面这样亦可
+PermitRootLogin yes
+```
+编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。
+
+```
+# 重启 ssh 或 重启系统  
+systemctl restart ssh
+
+```
+## 后续操作可在 ssh 工具里进行
+```shell
+# 查看 主机 IP
+ip a
+
+```
+![image](./images/11.png) 
+## 时区修改到上海   
+**debian用户：root，非 root 用户请自行添加 sudo**   
+**debian13 安装过程中配置时区后，无需重复配置时区**    
+```shell
+# 设置时区为上海
+timedatectl set-timezone Asia/Shanghai
+ # 验证配置是否生效
+timedatectl
+
+```
+   
+
+**现在，可用root用户登录ssh进行后续操作**
+## 关闭 swap
+Swap 是内存的"应急备份"，用磁盘空间换取系统稳定性，但过度依赖会拖慢速度。合理配置可平衡性能与安全。
+### nano 用法简述
+编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。
+
+### 注释或删除 Swap 挂载项
+```shell
+nano /etc/fstab
+
+```
+找到包含 swap 的行（通常类似 /swapfile 或 /dev/mapper/...-swap），在行首添加 # 注释掉，例如：
+```shell
+# /swapfile none swap sw 0 0
+```
+**编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**  
+<!--
+### 禁用 systemd 管理的 Swap 单元（若有/非必须，此项可直接跳过）
+```shell
+# 检查激活的 Swap 单元
+systemctl --type swap
+
+# 禁用所有 Swap 单元（替换 UNIT_NAME 为实际名称）
+systemctl mask UNIT_NAME.swap
+
+```
+-->
+## 修改软件源（可选）
+**安装时网络镜像站点已选择中国源，可跳过换源**  
+```shell
+# 若软件源非为国内源，可以考虑修改软件源为国内源，例如ustc源
+# 备份源
+cp /etc/apt/sources.list /etc/apt/sources.list.bak
+
+```
+**debian12源 适用于debian12**
+```shell
+# ustc源 适用于debian12
+cat <<EOF > /etc/apt/sources.list
+deb https://mirrors.ustc.edu.cn/debian/ bookworm main contrib non-free non-free-firmware
+deb-src https://mirrors.ustc.edu.cn/debian/ bookworm main contrib non-free non-free-firmware
+
+deb https://mirrors.ustc.edu.cn/debian/ bookworm-updates main contrib non-free non-free-firmware
+deb-src https://mirrors.ustc.edu.cn/debian/ bookworm-updates main contrib non-free non-free-firmware
+
+deb https://mirrors.ustc.edu.cn/debian/ bookworm-backports main contrib non-free non-free-firmware
+deb-src https://mirrors.ustc.edu.cn/debian/ bookworm-backports main contrib non-free non-free-firmware
+
+deb https://mirrors.ustc.edu.cn/debian-security/ bookworm-security main contrib non-free non-free-firmware
+deb-src https://mirrors.ustc.edu.cn/debian-security/ bookworm-security main contrib non-free non-free-firmware
+EOF
+```
+
+**debian13源 适用于debian13**
+```shell
+# ustc源 适用于debian13
+cat <<EOF > /etc/apt/sources.list
+deb https://mirrors.ustc.edu.cn/debian/ trixie main contrib non-free non-free-firmware
+deb https://mirrors.ustc.edu.cn/debian/ trixie-updates main contrib non-free non-free-firmware
+deb https://mirrors.ustc.edu.cn/debian/ trixie-backports main contrib non-free non-free-firmware
+deb https://mirrors.ustc.edu.cn/debian-security/ trixie-security main contrib non-free non-free-firmware
+EOF
+```
+
+## 升级内核，到 6.9以上（debian 13 无需升级内核）   
+
+``` shell
+# 查看内核版本，大于6.9则无需升级内核
+uname -r
+
+```
+
+```shell
+apt update
+apt search linux-image-6.12
+
+```
+
+```shell
+# 安装内核镜像及头文件（指定 Backports 源）
+apt install -t bookworm-backports \
+    linux-image-6.12.30+bpo-amd64 \
+    linux-headers-6.12.30+bpo-amd64
+
+# 安装失败就问AI，6.9以上即可。   
+
+# 更新 GRUB 引导配置
+update-grub
+
+# 重启系统生效
+reboot
+
+```
+# 安装 docker、docker compose（机器能连中国网络即可）  
+## 脚本方式安装（三种脚本选一种）
+```shell
+# 安装curl   
+apt update
+apt install curl -y
+curl --version
+
+```
+**以下三种方式，选择一种(已包含dockercompose)**
+
+```shell
+# 三种方式，选择一种(已包含dockercompose)
+
+# 使用官方源安装（国内直接访问较慢）
+curl -fsSL https://get.docker.com | bash && docker compose version
+
+# 使用阿里源安装
+curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun && docker compose version
+
+# 使用中国区 Azure 源安装
+curl -fsSL https://get.docker.com | bash -s docker --mirror AzureChinaCloud && docker compose version
+```
+返回docker版本信息即为成功   
+## 为 Docker 配置全局时区为上海
+**如需使用 其他机器如 nas 中部署的 Dpanel、portainer、dockge 等面板，可在此配置 docker tcp socket**
+```shell
+systemctl edit docker
+
+```
+**添加下面几行**  
+
+```shell
+[Service]
+# 上面这一行必须要有
+# 以下一行，配置全局时区为上海，新建容器自动配置，旧容器需重新创建容器。仍可在 docker run -e 环境变量中为容器指定其他时区 
+Environment="TZ=Asia/Shanghai"
+# 以下2行(可选)开启 dcoker tcp socket。（需注意 此处 未启用 tcl 加密，如需加密 参考 Dpanel 文档）
+ExecStart=
+ExecStart=/usr/bin/dockerd -H tcp://0.0.0.0:2375 -H fd:// --containerd=/run/containerd/containerd.sock
+```
+编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。
+
+## 为 Docker 容器启用 ipv6
+
+**当前landscape 开启docker ipv6不会立即生效，没有主动发起 RS ，得等 上级 RA 的周期**  
+**后续某一版本会解决这一问题**
+
+```shell
+# 容器开启 ipv6 ，容器访问互联网为 nat66 方式
+# 已创建过 daemon.json 文件的，需用 nano /etc/docker/daemon.json 修改，不可使用以下 cat 写入
+cat <<EOF > /etc/docker/daemon.json
+{
+  "ipv6": true,
+  "fixed-cidr-v6": "fd00::/80"
+}
+EOF
+
+``` 
+# landscape 安装（机器能连中国网络即可）
+
+## 安装 pppd
+```shell
+# 用于 pppoe 拨号
+apt install ppp -y
+pppd -version
+
+```
+
+## 创建 landscape systemd 服务文件   
+
+```shell
+nano /etc/systemd/system/landscape-router.service
+
+```
+
+```shell
+[Unit]
+Description=Landscape Router
+
+[Service]
+ExecStart=/root/.landscape-router/landscape-webserver-x86_64
+# 注意这个路径与下面创建的landscape-router目录相同。
+Restart=always
+User=root
+LimitMEMLOCK=infinity
+
+[Install]
+WantedBy=multi-user.target
+```
+**编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**   
+
+```shell
+systemctl daemon-reload && systemctl restart docker
+
+```
+
+## 下载并上传 landscape-router  
+
+[下载 landscape-webserver-x86_64、static.zip 文件](https://github.com/ThisSeanZhang/landscape/releases/)   
+![image](./images/7.png)   
+```shell
+# 创建landscape-router目录。
+# 若自定义路径，则systemd服务文件路径也要修改。   
+cd /root
+mkdir /root/.landscape-router
+cd /root/.landscape-router
+
+```    
+放到下面创建的目录。（注意 static 可能存在嵌套，需要调整，参考下图）   
+![image](./images/3.png)   
+![image](./images/4.png)   
+
+```shell
+# 上传文件后，赋权
+chmod -R 755 /root/.landscape-router
+
+```
+## 修改网卡配置   
+
+将 LAN 网卡全设置为 manual 后, 暂时无法通过lan访问这个dabian。需要至少一个网卡拥有静态IP，以访问 landscape webui。  
+有2种方式：  
+1、（不推荐）将一个lan网卡设为 static 其他网卡设备配置为 manual，之后可在web中可将这张网卡加入网桥，但需配置为manual。   
+2、（推荐）对于pppoe用户，将 WAN 的网卡额外在配置文件中设置一个静态 IP, pppoe 拨号会自动生成一个虚拟网卡，与该配置不冲突。   
+建议采用方式2，即使路由程序出现故障时, 可将电脑/手机设置为静态IP，访问landscape ui。 例如 wan 设置为 192.168.22.1/24时，另一台电脑/手机将IP设为192.168.22.2 ~ 192.168.22.255之一，连接wan口后，即可访问 landscape ui 。   
+```shell
+# 获取网卡名
+ip a
+
+```
+
+```shell
+# 当前修改不会影响当前网络及ssh连接，后面会有重启network的步骤，那时才会生效
+nano /etc/network/interfaces
+
+```
+**上半部分保持原样，仅修改下半部分**
+```shell
+# This file describes the network interfaces available on your system
+# and how to activate them. For more information, see interfaces(5).
+
+source /etc/network/interfaces.d/*
+
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+
+# 上面部分保持原样即可，不需要修改
+#---------------------------------------------------------------------
+# 以下各部分 参照我这里的结构 修改
+
+
+# pppoe 后生成一个pppoe网卡，与此网卡不冲突
+# 假定 1 网卡用于 WAN 网卡
+auto <第 1 张网卡名> 
+iface <第 1 张网卡名> inet static
+    address 192.168.22.1
+    netmask 255.255.255.0
+
+# 后续可在 Landscape UI 中创建 Land 网桥
+# 假定 2~3 网卡用于 LAN 网卡
+auto <第 2 张网卡名>
+iface <第 2 张网卡名> inet manual
+
+auto <第 3 张网卡名>
+iface <第 3 张网卡名> inet manual
+```
+**编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**   
+
+## 关闭本机 DNS 服务   
+
+```shell
+systemctl stop systemd-resolved
+systemctl disable systemd-resolved
+systemctl mask systemd-resolved
+
+```
+## 检查 6300、6443 端口是否被占用
+无输出，则 landscape 可以使用 6300、6443 端口  
+```shell
+ss -tulnp | grep -E ':6300|:6443' 
+
+```
+
+## 重启网络，并启动 landscape-router    
+
+```shell
+# 重启网络，并启动 landscape-router
+systemctl restart networking && systemctl start landscape-router.service && systemctl status landscape-router
+```
+输出包含 ` active (running) ` 表示 Landscape Router 已启动 
+
+![](images/10.png)
+<!--
+（非必要步骤）亦可通过端口检查 landsape 是否成功启动，检查 6300、6443 端口是否为 `landscape-webse`   
+```shell
+ss -tulnp | grep -E ':6300|:6443' 
+
+```
+-->
+   
+## 登录 Landscape Router，验证软件是否正确安装
+## 账号 root 密码 root，通过wan网卡静态IP访问，https://192.168.22.1:6443   (安装过程并未结束)
+## 按需进行一些基本的网络配置后，继续进行后面的步骤
+
+## 应用 Landscape-Router 开机启动   
+
+```shell
+# 配置无误后，应用landscape-router 开机启动
+systemctl enable landscape-router.service
+
+```
+
+## 至此可以在 Landscape-Router Web 中进行更多配置   
+
+**[详细设置参考官方文档](https://landscape.whileaway.dev/feature/flow.html)**
+
+
+## 修改apache80端口到8080, 以免后续与其他反代软件冲突   
+
+```shell
+# listen 由 80 改为 8080（任意端口）
+nano /etc/apache2/ports.conf
+
+```
+   
+**listen 由 80 改到 8080（任意端口）**  
+**编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**      
+
+```shell
+systemctl restart apache2
+
+```
+
+
+
+   
+## 如何升级 landscape   ？
+[下载 landscape-webserver-x86_64、static.zip 文件](https://github.com/ThisSeanZhang/landscape/releases/)   
+![image](./images/7.png)       
+
+
+```shell
+# 关闭服务
+systemctl stop landscape-router.service
+
+```
+放到下面创建的目录。（注意 static 可能存在嵌套，需要调整，参考下图）   
+![image](./images/3.png)   
+![image](./images/4.png)   
+替换 staic目录（解压、注意嵌套目录）   
+替换 landscape文件，并赋权   
+```shell
+# 启动服务，建议重启系统，避免出现奇奇怪怪的问题
+systemctl start landscape-router.service
+
+```
+## 至此安装完成，请在浏览器中访问 https://192.168.22.1:6443 进一步配置 Landscape Router
+   
+## 在显示器/终端中 启动/关闭/查看 landscape-router   
+
+需要对landscape 先赋予执行权限   
+```shell
+# 启动服务
+systemctl start landscape-router.service
+
+# 重启服务
+systemctl restart landscape-router.service
+
+# 停止服务
+systemctl stop landscape-router.service
+
+# 启用 开机启动服务 ( 确认没有问题之后执行 )
+systemctl enable landscape-router.service
+
+# 禁用 开机启动服务 ( 确认没有问题之后执行 )
+systemctl disable landscape-router.service
+
+# 查看 landscape-router 状态，如内存占用
+systemctl status landscape-router
+```
+# Landscape 实战案例
+
+## [详细设置参考官方文档](https://landscape.whileaway.dev/feature/flow.html)
+
+## 域名/IP 分流实践   
+
+* 只会匹配中一条规则，匹配中即发送至出口，后续规则不再匹配 
+* 以下是一种推荐分流布局，以域名分流为主，没有域名的连接由IP规则补充   
+* 可使用 Geo 文件辅助分流   
+* 域名初次访问时，域名分流 优先级 会影响 域名初次访问查询速度，越靠前匹配中，越快被查询
+* 域名再次访问时，域名被解析后，基于 IP map，时间复杂度为 O(1)，再次访问的域名之匹配时间 = IP匹配时间 = O(1) 
+
+| 优先级序号 | 用途 | 类别 |
+|---|---|---|
+| 1~999  | 局域网设备 域名重定向 | 域名分流|
+| 1000 | 速查域名的 GeoSite 集合 | 域名分流 |
+| 1001~2000 | （少量）域名/网站集合  | 域名分流|
+| 2001~2999 | （大量）地区/ISP 集合   | 域名分流|
+| 3000 | 整个 GeoSite 集合（GeoSite 兜底）  | 域名分流 |
+| 10000 | 空规则 仅配置 dns 服务器（域名规则兜底） | dns 服务器配置（必须❗）|
+|---|---|---|
+| 11000~12000 | （少量）特定 IP 集合  | IP 分流 |
+| 12000~13000 | （大量）地区/ISP 集合  | IP 分流 |        
+| 20000 | 0.0.0.0/0 兜底 IP 规则 | IP 分流 |
+
+
+## 基于 vlan/ssid（WiFi） 的分流实现（暂不能实现）
+### 概述
+* 在 SSH 中，创建多个 vlan 网卡，设为 manual
+* flow 入口 设置为规则设置为 vlan
+* 在 AC 中配置 ssid vlan
+### landscape 中配置
+```bash
+# 检查网卡 
+ip a
+
+```
+
+
+```bash
+# 添加 vlan 网卡
+nano /etc/network/interfaces
+
+```
+
+**上半部分保持原样，仅修改下半部分**
+```shell
+# This file describes the network interfaces available on your system
+# and how to activate them. For more information, see interfaces(5).
+
+source /etc/network/interfaces.d/*
+
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+
+# 上面部分保持原样即可，不需要修改
+#---------------------------------------------------------------------
+# 以下各部分 参照我这里的结构 修改
+
+
+
+auto eth0
+iface eth0 inet manual
+
+# 创建 vlan id 为 10 的网卡，绑定到 物理接口 eth0
+auto eth0.10
+iface eth0.10 inet manual
+    vlan-raw-device eth0       # 绑定物理接口
+
+# 创建 vlan id 为 20 的网卡，绑定到 物理接口 eth0
+auto eth0.20
+iface eth0.20 inet manual
+    vlan-raw-device eth0       # 绑定物理接口
+
+```
+**编辑结束后，先 `` ctrl + s `` 保存，再 `` ctrl + x `` 退出。**   
+
+* 在landscape webui 中，配置为lan，开启dhcp
+* `分流设置`中添加新的流，配置入口规则为 vlan 所设置 子网
+
+### AC 中配置
+
+为 ssid 添加 vlan 10、20   
+[在 ikuai AC 中为 ssid 添加 vlan，参考官方文档 1、2 两节，dhcp已在landscape中配置无需在ikuai中配置 ](https://www.ikuai8.com/support/cjwt/ap/ap-ssid-vlan.html)
