@@ -46,9 +46,9 @@ ldd --version
 ```
 # 手工安装指南 [文档](/docs/1-手工安装指南.md)
 
-# Docker容器作为分流出口（接应容器部署）[文档](.docs/landscape-edge.md)
+# Docker容器作为分流出口（接应容器部署）[文档](/docs/2-Docker容器作为分流出口-接应容器.md)
 
-# 常见网络应用、compose 安装 [文档](/docs/3-常见网络应用、compose 安装.md)
+# 常见网络应用、compose 安装 [文档](/docs/3-常见网络应用-compose安装.md)
 
 # 文档目录
 - [Debian 安装配置（机器能连中国网络即可）](/docs/1-手工安装指南.md/#debian-安装配置机器能连中国网络即可)
@@ -87,16 +87,16 @@ ldd --version
   - [为 Docker 容器启用 ipv6](/docs/2-Docker容器作为分流出口-接应容器.md/#为-docker-容器启用-ipv6)
   - [Docker 部署 单个 接应容器](/docs/2-Docker容器作为分流出口-接应容器.md/#docker-部署-单个-接应容器)
   - [Compose 部署 多个 接应容器](/docs/2-Docker容器作为分流出口-接应容器.md//#compose-部署-多个-接应容器)
-- [常见网络应用、compose 安装](/docs/3-常见网络应用、compose 安装.md/#常见网络应用compose-安装)
-  - [filebrowser（文件管理）](/docs/3-常见网络应用、compose 安装.md/#filebrowser文件管理)
-  - [tabby （网页ssh）](/docs/3-常见网络应用、compose 安装.md/#tabby-网页ssh)
-  - [Homebox 局域网测速软件](/docs/3-常见网络应用、compose 安装.md/#homebox-局域网测速软件)
-  - [Lukcy （软路由公网神器）](/docs/3-常见网络应用、compose 安装.md/#lukcy-软路由公网神器)
-  - [ArozOS NAS 网页桌面操作系统](/docs/3-常见网络应用、compose 安装.md/#arozos-nas-网页桌面操作系统)
-  - [集客AC dockercompose](/docs/3-常见网络应用、compose 安装.md/#集客ac-dockercompose)
-  - [ddns-go dockercompose](/docs/3-常见网络应用、compose 安装.md/#ddns-go-dockercompose)
-  - [FRP 客户端（FRPC）](/docs/3-常见网络应用、compose 安装.md/#frp-客户端frpc)
-  - [FakeSIP、FakeHTTP](/docs/3-常见网络应用、compose 安装.md/#fakesipfakehttp)
-  - [netdata（性能、网络监控面板/仪表盘）](/docs/3-常见网络应用、compose 安装.md/#netdata性能网络监控面板仪表盘)
+- [常见网络应用、compose 安装](/docs/3-常见网络应用-compose安装.md/#常见网络应用compose-安装)
+  - [filebrowser（文件管理）](/docs/3-常见网络应用-compose安装.md/#filebrowser文件管理)
+  - [tabby （网页ssh）](/docs/3-常见网络应用-compose安装.md/#tabby-网页ssh)
+  - [Homebox 局域网测速软件](/docs/3-常见网络应用-compose安装.md/#homebox-局域网测速软件)
+  - [Lukcy （软路由公网神器）](/docs/3-常见网络应用-compose安装.md/#lukcy-软路由公网神器)
+  - [ArozOS NAS 网页桌面操作系统](/docs/3-常见网络应用-compose安装.md/#arozos-nas-网页桌面操作系统)
+  - [集客AC dockercompose](/docs/3-常见网络应用-compose安装.md/#集客ac-dockercompose)
+  - [ddns-go dockercompose](/docs/3-常见网络应用-compose安装.md/#ddns-go-dockercompose)
+  - [FRP 客户端（FRPC）](/docs/3-常见网络应用-compose安装.md/#frp-客户端frpc)
+  - [FakeSIP、FakeHTTP](/docs/3-常见网络应用-compose安装.md/#fakesipfakehttp)
+  - [netdata（性能、网络监控面板/仪表盘）](/docs/3-常见网络应用-compose安装.md/#netdata性能网络监控面板仪表盘)
 
 
