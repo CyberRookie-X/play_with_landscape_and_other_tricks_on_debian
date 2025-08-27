@@ -1,16 +1,16 @@
 # 目录
 
-- [用 dpanel 部署 dockercompose](/docs/2-Docker容器作为分流出口-接应容器.md/#用-dpanel-部署-dockercompose)
-  - [使用 dpanel 的必要性](/docs/2-Docker容器作为分流出口-接应容器.md/#使用-dpanel-的必要性)
-  - [dpanel标准版 与 dpanel lite](/docs/2-Docker容器作为分流出口-接应容器.md/#dpanel标准版-与-dpanel-lite)
-  - [安装 dpanel](/docs/2-Docker容器作为分流出口-接应容器.md/#安装-dpanel)
-  - [在其他机器上使用 dpanel管理本机docker](/docs/2-Docker容器作为分流出口-接应容器.md//#在其他机器上使用-dpanel管理本机docker)
-- [Docker容器作为分流出口（接应容器部署）](/docs/2-Docker容器作为分流出口-接应容器.md/#docker容器作为分流出口接应容器部署)
-  - [接应容器概述](/docs/2-Docker容器作为分流出口-接应容器.md/#接应容器概述)
-  - [创建 worker_program 工作程序 启动脚本](/docs/2-Docker容器作为分流出口-接应容器.md/#创建-worker_program-工作程序-启动脚本)
-  - [为 Docker 容器启用 ipv6](/docs/2-Docker容器作为分流出口-接应容器.md/#为-docker-容器启用-ipv6)
-  - [Docker 部署 单个 接应容器](/docs/2-Docker容器作为分流出口-接应容器.md/#docker-部署-单个-接应容器)
-  - [Compose 部署 多个 接应容器](/docs/2-Docker容器作为分流出口-接应容器.md//#compose-部署-多个-接应容器)
+- [用 dpanel 部署 dockercompose](/docs/3-Docker容器作为分流出口-接应容器.md/#用-dpanel-部署-dockercompose)
+  - [使用 dpanel 的必要性](/docs/3-Docker容器作为分流出口-接应容器.md/#使用-dpanel-的必要性)
+  - [dpanel标准版 与 dpanel lite](/docs/3-Docker容器作为分流出口-接应容器.md/#dpanel标准版-与-dpanel-lite)
+  - [安装 dpanel](/docs/3-Docker容器作为分流出口-接应容器.md/#安装-dpanel)
+  - [在其他机器上使用 dpanel管理本机docker](/docs/3-Docker容器作为分流出口-接应容器.md//#在其他机器上使用-dpanel管理本机docker)
+- [Docker容器作为分流出口（接应容器部署）](/docs/3-Docker容器作为分流出口-接应容器.md/#docker容器作为分流出口接应容器部署)
+  - [接应容器概述](/docs/3-Docker容器作为分流出口-接应容器.md/#接应容器概述)
+  - [创建 worker_program 工作程序 启动脚本](/docs/3-Docker容器作为分流出口-接应容器.md/#创建-worker_program-工作程序-启动脚本)
+  - [为 Docker 容器启用 ipv6](/docs/3-Docker容器作为分流出口-接应容器.md/#为-docker-容器启用-ipv6)
+  - [Docker 部署 单个 接应容器](/docs/3-Docker容器作为分流出口-接应容器.md/#docker-部署-单个-接应容器)
+  - [Compose 部署 多个 接应容器](/docs/3-Docker容器作为分流出口-接应容器.md//#compose-部署-多个-接应容器)
 
 # **debian用户：root，非 root 用户请自行添加 sudo**   
 **本教程已适配中国大陆网络** 
