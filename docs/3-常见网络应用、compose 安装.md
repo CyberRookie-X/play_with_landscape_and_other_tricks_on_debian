@@ -1,16 +1,16 @@
 # 目录
 
-- [常见网络应用、compose 安装](/docs/tricks.md/#常见网络应用compose-安装)
-  - [filebrowser（文件管理）](/docs/tricks.md/#filebrowser文件管理)
-  - [tabby （网页ssh）](/docs/tricks.md/#tabby-网页ssh)
-  - [Homebox 局域网测速软件](/docs/tricks.md/#homebox-局域网测速软件)
-  - [Lukcy （软路由公网神器）](/docs/tricks.md/#lukcy-软路由公网神器)
-  - [ArozOS NAS 网页桌面操作系统](/docs/tricks.md/#arozos-nas-网页桌面操作系统)
-  - [集客AC dockercompose](/docs/tricks.md/#集客ac-dockercompose)
-  - [ddns-go dockercompose](/docs/tricks.md/#ddns-go-dockercompose)
-  - [FRP 客户端（FRPC）](/docs/tricks.md/#frp-客户端frpc)
-  - [FakeSIP、FakeHTTP](/docs/tricks.md/#fakesipfakehttp)
-  - [netdata（性能、网络监控面板/仪表盘）](/docs/tricks.md/#netdata性能网络监控面板仪表盘)
+- [常见网络应用、compose 安装](/docs/3-常见网络应用、compose 安装.md/#常见网络应用compose-安装)
+  - [filebrowser（文件管理）](/docs/3-常见网络应用、compose 安装.md/#filebrowser文件管理)
+  - [tabby （网页ssh）](/docs/3-常见网络应用、compose 安装.md/#tabby-网页ssh)
+  - [Homebox 局域网测速软件](/docs/3-常见网络应用、compose 安装.md/#homebox-局域网测速软件)
+  - [Lukcy （软路由公网神器）](/docs/3-常见网络应用、compose 安装.md/#lukcy-软路由公网神器)
+  - [ArozOS NAS 网页桌面操作系统](/docs/3-常见网络应用、compose 安装.md/#arozos-nas-网页桌面操作系统)
+  - [集客AC dockercompose](/docs/3-常见网络应用、compose 安装.md/#集客ac-dockercompose)
+  - [ddns-go dockercompose](/docs/3-常见网络应用、compose 安装.md/#ddns-go-dockercompose)
+  - [FRP 客户端（FRPC）](/docs/3-常见网络应用、compose 安装.md/#frp-客户端frpc)
+  - [FakeSIP、FakeHTTP](/docs/3-常见网络应用、compose 安装.md/#fakesipfakehttp)
+  - [netdata（性能、网络监控面板/仪表盘）](/docs/3-常见网络应用、compose 安装.md/#netdata性能网络监控面板仪表盘)
 
 
 # 常见网络应用、compose 安装
