@@ -1,0 +1,5 @@
+# 忽略下载的Landscape源码目录
+landscape/
+# 脚本
+install_landscape.sh
+upgrade_landscape.sh

@@ -807,9 +807,8 @@ services:
         ipv4_address: 172.100.0.1
     volumes:
       - /root/.landscape-router/unix_link/:/ld_unix_link/:ro # 必要映射
-      - /home/worker_program/worker_program-1/run.sh:/app/server/run.sh # 挂载审计程序1启动脚本
-      - /home/worker_program/worker_program-1/config:/app/server/config # 挂载审计程序1配置文件
-      - /home/worker_program/worker_program-1/worker_program:/app/server/worker_program # 挂载审计程序1二进制文件
+      - /home/worker_program/worker_program-1/:/app/server/
+      # /home/worker_program/worker_program-1/ 目录下有 run.sh 启动脚本，config 配置文件，worker_program-1 二进制文件
   service-2:
     image: ghcr.io/thisseanzhang/landscape-edge:amd64-xx # 需修改容器标签
     sysctls:
@@ -833,14 +832,59 @@ services:
         ipv4_address: 172.100.0.2
     volumes:
       - /root/.landscape-router/unix_link/:/ld_unix_link/:ro # 必要映射
-      - /home/worker_program/worker_program-2/run.sh:/app/server/run.sh # 挂载审计程序2启动脚本
-      - /home/worker_program/worker_program-2/config:/app/server/config # 挂载审计程序2配置文件
-      - /home/worker_program/worker_program-2/worker_program:/app/server/worker_program # 挂载审计程序2二进制文件
+      - /home/worker_program/worker_program-2/:/app/server/
+      # /home/worker_program/worker_program-2/ 目录下有 run.sh 启动脚本，config 配置文件，worker_program-2 二进制文件
 
 ```
 
 # 常见网络应用、compose 安装
+<!--
+## Mosdns 广告拦截
+[Mosdns-x github](https://github.com/pmkol/mosdns-x) | [Mosdns UI Github](https://github.com/Jimmyzxk/MosDNSUI)  |  [alickale/mosdnsui](https://hub.docker.com/r/alickale/mosdnsui)     
+Mosdns-x 改编自 Mosdns v4 ，是一个用 Go 编写的高性能 DNS 转发器，支持运行插件流水线，用户可以按需定制 DNS 处理逻辑。
+![alt text](images/mosdnsui1.png)
+![alt text](images/mosdnsui2.png)
+## 本教程配置细节
+更详细配置请查询[alickale/mosdnsui 镜像 文档](https://hub.docker.com/r/alickale/mosdnsui) | [Mosdns-x 配置文档](https://github.com/pmkol/mosdns-x/wiki)
+* 2路 dns 入站，
+* 每路 dns 入站，独立缓存
+* 第二路 dns ，通过 socks 代理 出站
+* 每路 dns 配置4个上游 DNS，阿里 DoQ、114 DoQ、阿里 DoH、114 DoH 
+* 每路 dns 配置 CN/全球 广告拦截
+* 仅映射 UI 端口，DNS 仅在本机使用不端口
+* 广告域名列表每9小时更新一次
 
+## 下载 Mosdns-x 二进制文件
+[Mosdns-x 下载](https://github.com/pmkol/mosdns-x/releases)
+
+
+### docker 部署 Mosdns
+```shell
+docker run -d \
+  --restart=unless-stopped \
+  --network=host \
+  --name=mosdnsui \
+  -e CRON_SCHEDULE="0 1,9,17 * * *" \
+  alickale/mosdnsui
+
+```
+### Compose 部署 Mosdns
+```yaml
+name: <your project name>
+services:
+    mosdnsui:
+        restart: unless-stopped
+        network_mode: host
+        container_name: mosdnsui
+        environment:
+            - CRON_SCHEDULE=0 1,9,17 * * *
+        image: alickale/mosdnsui
+```
+### docker 部署 Mosdns UI
+
+### Compose 部署 Mosdns UI
+
+-->
 ## filebrowser（文件管理）
  TODO
 ## tabby （网页ssh）
