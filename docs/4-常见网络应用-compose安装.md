@@ -12,6 +12,7 @@
   - [FakeSIP、FakeHTTP](/docs/4-常见网络应用-compose安装.md/#fakesipfakehttp)
   - [netdata（性能、网络监控面板/仪表盘）](/docs/4-常见网络应用-compose安装.md/#netdata性能网络监控面板仪表盘)
 
+![alt text](../images/13.png)
 
 # 常见网络应用、compose 安装
 <!--
