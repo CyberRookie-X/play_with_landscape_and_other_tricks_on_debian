@@ -93,6 +93,9 @@ systemctl status docker
 nano /home/worker_program/run.sh
 
 ```
+
+**⚠ 不同程序传参方式不同，工作程序启动命令需自行修改**
+
 ```bash
 #!/bin/bash
 
@@ -104,8 +107,9 @@ nano /home/worker_program/run.sh
 # 启动审计程序守护进程
 while true; do
     echo "启动 worker_program 工作程序..."
+    # ↓↓↓ 按需修改
     /app/server/worker_program -d /app/server/config
-    # 前一个为 worker_program 工作程序 二进制文件 后一个为 worker_program 工作程序 配置文件目录
+    # ↑↑↑ 此处按需修改，不同程序传参方式不同（前一个为 worker_program 工作程序 二进制文件 后一个为 worker_program 工作程序 配置文件目录）
     echo "worker_program 工作程序 异常退出，等待1秒后重新重启..."
     sleep 1
     # 下面检查 worker_program 工作程序 是否正常退出（可选，但推荐）
