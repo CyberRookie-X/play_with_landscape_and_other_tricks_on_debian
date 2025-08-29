@@ -1,3 +1,5 @@
+![](../images/13.png)
+
 # Landscape 分流实践
 
 # 目录
@@ -5,7 +7,6 @@
 - [基于 vlan/ssid（WiFi） 的分流实现（暂不能实现）](#基于-vlanssidwifi-的分流实现暂不能实现)
 
 # [详细设置参考官方文档](https://landscape.whileaway.dev/feature/flow.html)
-![alt text](./images/13.png)
 # 域名/IP 分流实践   
 
 * 只会匹配中一条规则，匹配中即发送至出口，后续规则不再匹配 
