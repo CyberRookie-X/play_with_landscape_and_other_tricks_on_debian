@@ -46,7 +46,7 @@ uname -r
 ldd --version
 
 ```
-# 一、安装/升级 指南 [文档](/docs/1-手工安装指南.md)
+# 一、安装/升级 指南 [文档](/docs/1-安装升级指南.md)
 
 # 二、Landscape 分流实践 [文档](/docs/2-Landscape分流实践.md)
 
