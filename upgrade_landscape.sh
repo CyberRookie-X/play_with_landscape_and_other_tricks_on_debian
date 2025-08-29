@@ -14,7 +14,7 @@ USE_CN_MIRROR=false
 SHOW_HELP=false
 AUTO_REBOOT=false
 
-# TODO 用户可能对于 二进制文件有不同的命名方式
+# TODO 用户可能对于 可执行文件有不同的命名方式
 # 获取 Landscape Router 安装路径
 get_landscape_dir() {
   local landscape_dir=""
@@ -190,10 +190,9 @@ get_github_release() {
   echo "$version"
 }
 
-# 模拟控制Landscape服务的函数（需要实际实现）
+# 控制Landscape服务的函数
 control_landscape_service() {
   local action="$1"
-  # 这里应该实现实际的服务控制逻辑
   case "$action" in
     "start")
       echo "正在启动 Landscape Router 服务..."
