@@ -12,7 +12,7 @@
   - [FakeSIP、FakeHTTP](/docs/4-常见网络应用-compose安装.md/#fakesipfakehttp)
   - [netdata（性能、网络监控面板/仪表盘）](/docs/4-常见网络应用-compose安装.md/#netdata性能网络监控面板仪表盘)
 
-![alt text](../images/13.png)
+![alt text](./images/13.png)
 
 # 常见网络应用、compose 安装
 <!--
@@ -71,7 +71,7 @@ services:
 ## Homebox 局域网测速软件
 
 [Homebox 官方仓库](https://github.com/XGHeaven/homebox)   
-![image](./images/9.png)   
+![image](/images/9.png)   
 ```shel
 # docker 部署，host网络（性能更好）
 docker run -d --network=host --name homebox xgheaven/homebox
@@ -132,7 +132,7 @@ services:
 
 **Landscape 自有 防火墙 管理 ，需禁用 lucky 自动操作防火墙功能，避免发生冲突**  
 **在 lucky里 `设置` -> `全局禁止操作防火墙` 拨到 绿色 Green**
-![image](./images/12.png) 
+![image](/images/12.png) 
 
 ## ArozOS NAS 网页桌面操作系统
 ArozOS 少量路由器相关功能建议不开启    
@@ -230,7 +230,7 @@ docker run --rm \
 ```
 
 ## netdata（性能、网络监控面板/仪表盘）
-![image](./images/5.png)  
+![image](/images/5.png)  
 **登录 http://192.168.22.1:19999**
 ```yaml
 services:
@@ -261,5 +261,5 @@ services:
 
 ```
 **登录 http://192.168.22.1:19999**
-![image](./images/6.png)  
+![image](/images/6.png)  
 

@@ -12,7 +12,7 @@
   - [Docker 部署 单个 接应容器](/docs/3-Docker容器作为分流出口-接应容器.md/#docker-部署-单个-接应容器)
   - [Compose 部署 多个 接应容器](/docs/3-Docker容器作为分流出口-接应容器.md//#compose-部署-多个-接应容器)
 
-![alt text](../images/13.png)
+![alt text](./images/13.png)
 
 # **debian用户：root，非 root 用户请自行添加 sudo**   
 **本教程已适配中国大陆网络** 
@@ -61,7 +61,7 @@ systemctl status docker
 ```
 
 
-![image](./images/2.png)    
+![image](/images/2.png)    
 ### docker tcp 开启 TLS加密(略)
 
 [DPanel 可视化 Docker 管理面板](https://dpanel.cc/#/zh-cn/manual/system/remote?id=%e4%bd%bf%e7%94%a8-https-%ef%bc%88%e5%bc%80%e5%90%af-tls-%ef%bc%89)    
