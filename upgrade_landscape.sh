@@ -74,13 +74,6 @@ get_download_info() {
         download_url="https://github.com/ThisSeanZhang/landscape/releases/download/$version/$filename"
       fi
       ;;
-    "alpha")
-      if [ "$USE_CN_MIRROR" = true ]; then
-        download_url="https://ghproxy.com/https://github.com/ThisSeanZhang/landscape/releases/download/$version/$filename"
-      else
-        download_url="https://github.com/ThisSeanZhang/landscape/releases/download/$version/$filename"
-      fi
-      ;;
   esac
   
   echo "$download_url|$filename"
@@ -93,6 +86,7 @@ get_static_download_url() {
   
   local download_url=""
   
+
   # 根据是否使用中国镜像设置下载URL
   case "$version_type" in
     "stable")
@@ -103,13 +97,6 @@ get_static_download_url() {
       fi
       ;;
     "beta")
-      if [ "$USE_CN_MIRROR" = true ]; then
-        download_url="https://ghproxy.com/https://github.com/ThisSeanZhang/landscape/releases/download/$version/static.zip"
-      else
-        download_url="https://github.com/ThisSeanZhang/landscape/releases/download/$version/static.zip"
-      fi
-      ;;
-    "alpha")
       if [ "$USE_CN_MIRROR" = true ]; then
         download_url="https://ghproxy.com/https://github.com/ThisSeanZhang/landscape/releases/download/$version/static.zip"
       else
