@@ -173,8 +173,8 @@ get_github_release() {
       version=$(curl -s "https://api.github.com/repos/$repo/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
       ;;
     "beta")
-      # 获取最新的预发布版本（Beta）
-      version=$(curl -s "https://api.github.com/repos/$repo/releases" | grep -m 1 '"prerelease"' | grep -B 5 '"prerelease": true' | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+      # 获取最新发布的版本（无论是否为预发布版本）
+      version=$(curl -s "https://api.github.com/repos/$repo/releases" | grep -m 1 '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
       ;;
     *)
       echo "错误: 不支持的版本类型 $version_type" >&2
@@ -308,12 +308,17 @@ upgrade_landscape_version() {
     # 设置可执行文件权限
     chmod 755 "$landscape_dir/landscape-webserver-$SYSTEM_ARCH"
     
-    # TODO 提醒用户，static 替换失败，但是 landscape 升级成功
     # 替换静态文件目录
-    echo "正在更新静态文件..."
+    echo "正在更新 UI 静态文件..."
     rm -rf "$landscape_dir/static"
     if ! cp -r "$static_source_dir" "$landscape_dir/static"; then
-      echo "静态文件替换失败"
+      echo "UI 静态文件替换失败"
+      echo "UI 可能仍为旧版本，或无法使用"
+      echo "后端升级失败，前端升级成功"
+      echo "建议您手动替换 UI 静态文件，并重启 Landscape Router"
+      echo "不使用 UI 时，Landscape Router 仍可正常工作"
+      echo "现尝试为您启动新版 Landscape Router..."
+      control_landscape_service "start"
       rm -rf "$temp_dir"
       exit 1
     fi
