@@ -15,6 +15,7 @@ SHOW_HELP=false
 AUTO_REBOOT=false
 
 # TODO 用户可能对于 可执行文件有不同的命名方式
+# TODO stable版，通过可执行文件检查当前版本
 # 获取 Landscape Router 安装路径
 get_landscape_dir() {
   local landscape_dir=""
