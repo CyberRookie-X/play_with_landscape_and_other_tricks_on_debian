@@ -8,14 +8,17 @@
 #   cn  - 使用中国镜像加速（可选）
 #   r   - 升级完成后自动重启（可选）
 
+# TODO
+# 用户可能对于 可执行文件有不同的命名方式
+# stable版，通过可执行文件检查当前版本
+# 旧版 完整 备份/回退
 
 # 全局变量
 USE_CN_MIRROR=false
 SHOW_HELP=false
 AUTO_REBOOT=false
 
-# TODO 用户可能对于 可执行文件有不同的命名方式
-# TODO stable版，通过可执行文件检查当前版本
+
 # 获取 Landscape Router 安装路径
 get_landscape_dir() {
   local landscape_dir=""
