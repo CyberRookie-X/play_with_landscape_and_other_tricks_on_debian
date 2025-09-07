@@ -1,4 +1,4 @@
-![](../images/13.png)
+![](/images/13.png)
 
 # Landscape 分流实践
 
