@@ -16,25 +16,66 @@
 
 
 
+
+
 # **debian用户：root，非 root 用户请自行添加 sudo**   
 **本教程已适配中国大陆网络** 
+
+# 流行 docker、dockercompose 管理工具
+
+## 管理面板
+[Dpanel（中国大陆用户推荐）](https://dpanel.cc/install/shell)  
+[Dockge](https://dockge.kuma.pet/)  
+[Dockerman](https://dockman.radn.dev/)  
+
+## docker run <=> compose.yaml
+
+[composerize](https://www.composerize.com/)
 
 # 用 dpanel 部署 dockercompose
 
 ## 使用 dpanel 的必要性
-dpanel 集成 dockercompose 应用商店，便于一键部署容器应用。    
+* 中国大陆作者开发，适应中国大陆用户使用习惯
+* 便捷的镜像加速配置，在 主路由中，便于拉取docker镜像
+
+* 图形界面管理 compose、image、容器  
+* dpanel 集成 dockercompose 应用商店，便于一键部署容器应用。    
 [dpanel 文档](https://dpanel.cc/#/zh-cn/install/docker) |
 [dpanel 演示站/demo](https://dpanel.park1991.com/dpanel/ui/user/login)
 ##  dpanel标准版 与 dpanel lite 
 
 标准版本中提供了域名绑定及证书功能，需要绑定 80 及 443 端口。Lite版与标准版只有镜像地址区别，除不再需要映射 80 及 443 端口外，其余配置均一致。  
-个人推荐 lite 版，标准版额外功能网页相对简陋，何不traefik？如需更丰富的配置可使用 [Nginx UI](https://nginxui.com/zh_CN/guide/about.html)、[Nginx Proxy Manager](https://nginxproxymanager.com/)、[OpenResty Manager](https://om.uusec.com/cn/) 等项目。
+个人推荐 lite 版，标准版额外功能网页相对简陋，何不traefik？如需更丰富的配置可使用 [lucky]()、[Nginx UI](https://nginxui.com/zh_CN/guide/about.html)、[Nginx Proxy Manager](https://nginxproxymanager.com/)、[OpenResty Manager](https://om.uusec.com/cn/) 等项目。
 
 ## 安装 dpanel
 
-[参看官方文档，三种方式任选一种（一键安装、docker、compose）](https://dpanel.cc/#/zh-cn/install/docker) 
+[参看官方文档，三种方式任选一种（一键安装、docker、compose）](https://dpanel.cc/install/docker) 
 
-## 在其他机器上使用 dpanel管理本机docker
+```shell
+# 通过 阿里云拉取 镜像
+docker pull registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:lite
+
+```
+![](/images/15.png)
+
+![](/images/16.png)
+
+**复制以下内容，按下图填入对应位置，以创建 dpanel 容器**
+```shell
+dpanel
+18080
+8080
+APP_NAME
+dpanel
+/var/run/docker.sock
+/var/run/docker.sock
+/home/dpanel
+/dpanel
+```
+![](/images/17.png)
+
+<!--
+## 在其他机器上使用 dpanel管理本机docker（不推荐）
 
 ### 创建docker tcp    
 
@@ -61,13 +102,44 @@ systemctl daemon-reload && systemctl restart docker
 systemctl status docker
 
 ```
-
-
 ![image](/images/2.png)    
+
 ### docker tcp 开启 TLS加密(略)
 
 [DPanel 可视化 Docker 管理面板](https://dpanel.cc/#/zh-cn/manual/system/remote?id=%e4%bd%bf%e7%94%a8-https-%ef%bc%88%e5%bc%80%e5%90%af-tls-%ef%bc%89)    
+-->
 
+# 配置 dpanel
+## 登录并创建管理员账号
+
+```shell
+http://192.168.22.1:18080
+```
+## 配置镜像加速
+* 常用 docker.io（docker hub） 镜像加速
+仓库地址 填这个 ↓
+```shell
+docker.io
+```
+加速地址 填这个 ↓
+```shell
+docker.m.daocloud.io
+docker.1panel.live
+docker.1ms.run
+```
+* 常用 ghcr.io（github） 镜像加速
+仓库地址 填这个 ↓
+```shell
+ghcr.io
+```
+加速地址 填这个 ↓
+```shell
+ghcr.m.daocloud.io
+ghcr.nju.edu.cn
+```
+
+
+![图片来自 dpanel 文档](/images/18.png)
 
 # Docker容器作为分流出口（接应容器部署）
 
