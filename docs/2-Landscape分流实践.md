@@ -3,11 +3,12 @@
 # Landscape 分流实践
 
 # 目录
-- [域名/IP 分流实践](#域名ip-分流实践)
-- [基于 vlan/ssid（WiFi） 的分流实现（暂不能实现）](#基于-vlanssidwifi-的分流实现暂不能实现)
+- [目的 域名/IP 分流实践](#目的-域名ip-分流实践)
+- [基于 子网/vlan/ssid（WiFi） 的分流实现](#基于-子网vlanssidwifi-的分流实现)
+- [对局域网 特定设备 中 特定应用(程序) 分流（通过 dscp 实现）](#对局域网-特定设备-中-特定应用程序-分流通过-dscp-实现)
 
 # [详细设置参考官方文档](https://landscape.whileaway.dev/feature/flow.html)
-# 域名/IP 分流实践   
+# 目的 域名/IP 分流实践   
 
 * 只会匹配中一条规则，匹配中即发送至出口，后续规则不再匹配 
 * 以下是一种推荐分流布局，以域名分流为主，没有域名的连接由IP规则补充   
@@ -29,10 +30,10 @@
 | 20000 | 0.0.0.0/0 兜底 IP 规则 | IP 分流 |
 
 
-# 基于 vlan/ssid（WiFi） 的分流实现（暂不能实现）
+# 基于 子网/vlan/ssid（WiFi） 的分流实现
 ## 概述
 * 在 SSH 中，创建多个 vlan 网卡，设为 manual
-* flow 入口 设置为规则设置为 vlan
+* flow 入口 设置为规则设置为 vlan 对应的 子网（CIDR）
 * 在 AC 中配置 ssid vlan
 ## landscape 中配置
 ```bash
@@ -89,3 +90,22 @@ iface eth0.20 inet manual
 
 为 ssid 添加 vlan 10、20   
 [在 ikuai AC 中为 ssid 添加 vlan，参考官方文档 1、2 两节，dhcp已在landscape中配置无需在ikuai中配置 ](https://www.ikuai8.com/support/cjwt/ap/ap-ssid-vlan.html)
+
+# 对局域网 特定设备 中 特定应用(程序) 分流（通过 dscp 实现）
+
+## Windos 中设置
+### 手动添加 dscp 
+```shell
+# 在 windows 终端中 为 特定程序的流量 加上 dscp 标签 
+New-NetQosPolicy -Name "<name>" -AppPathNameMatchCondition "C:\<Program>.exe" -DSCPAction <qos value>
+
+```
+### 用软件管理 dscp 标签
+
+[DSCPManager 仓库](https://github.com/rustcult/DSCPManager)
+
+![](/images/14.png)
+
+## landscape-router 对 dscp 分流
+
+在`分流设置` `分流入口匹配规则` 中，通过 QoS (dscp) + IP 分流
