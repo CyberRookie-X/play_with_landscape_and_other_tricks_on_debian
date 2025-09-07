@@ -40,24 +40,24 @@
 
 * 图形界面管理 compose、image、容器  
 * dpanel 集成 dockercompose 应用商店，便于一键部署容器应用。    
-[dpanel 文档](https://dpanel.cc/#/zh-cn/install/docker) |
+[dpanel 文档](https://dpanel.cc/install/docker) |
 [dpanel 演示站/demo](https://dpanel.park1991.com/dpanel/ui/user/login)
 ##  dpanel标准版 与 dpanel lite 
 
 标准版本中提供了域名绑定及证书功能，需要绑定 80 及 443 端口。Lite版与标准版只有镜像地址区别，除不再需要映射 80 及 443 端口外，其余配置均一致。  
-个人推荐 lite 版，标准版额外功能网页相对简陋，何不traefik？如需更丰富的配置可使用 [lucky]()、[Nginx UI](https://nginxui.com/zh_CN/guide/about.html)、[Nginx Proxy Manager](https://nginxproxymanager.com/)、[OpenResty Manager](https://om.uusec.com/cn/) 等项目。
+个人推荐 lite 版，标准版额外功能网页相对简陋，何不traefik？如需更丰富的配置可使用 [lucky](https://lucky666.cn/)、[Nginx UI](https://nginxui.com/zh_CN/guide/about.html)、[Nginx Proxy Manager](https://nginxproxymanager.com/)、[OpenResty Manager](https://om.uusec.com/cn/) 等项目。
 
 ## 安装 dpanel
 
-[参看官方文档，三种方式任选一种（一键安装、docker、compose）](https://dpanel.cc/install/docker) 
+
 
 ```shell
-# 通过 阿里云拉取 镜像
+# 通过 阿里云拉取 镜像，请勿使用 landscape UI 中的 拉取镜像 按钮
 docker pull registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:lite
 
 ```
 ![](/images/15.png)
-
+**⚠ 请勿使用 landscape UI 中的 `拉取镜像` 按钮**
 ![](/images/16.png)
 
 **复制以下内容，按下图填入对应位置，以创建 dpanel 容器**
