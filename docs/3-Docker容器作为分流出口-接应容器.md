@@ -226,7 +226,7 @@ systemctl restart landscape-router.service
 ```
 ## 在 Dpanel 中创建 compose
 
-### **参考 Dpanel 官方 [视频教程](https://www.bilibili.com/video/BV157RpYAE5e/)**
+### **参考 Dpanel 官方 [视频教程](https://www.bilibili.com/video/BV157RpYAE5e/?t=93)**
 
 ## Docker 部署 单个 接应容器
 
