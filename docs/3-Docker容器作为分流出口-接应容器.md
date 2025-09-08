@@ -111,28 +111,30 @@ systemctl status docker
 
 # 配置 dpanel
 ## 登录并创建管理员账号
-
 ```shell
 http://192.168.22.1:18080
 ```
 ## 配置镜像加速
-* 常用 docker.io（docker hub） 镜像加速
-仓库地址 填这个 ↓
+### **参考 Dpanel 官方 [视频教程](https://www.bilibili.com/video/BV1WDiFexEc6/?t=73)**
+### 常用 docker.io（docker hub） 镜像加速   
+
+* 仓库地址 填这个 ↓
 ```shell
 docker.io
 ```
-加速地址 填这个 ↓
+* 加速地址 填这个 ↓
 ```shell
 docker.m.daocloud.io
 docker.1panel.live
 docker.1ms.run
 ```
-* 常用 ghcr.io（github） 镜像加速
-仓库地址 填这个 ↓
+### 常用 ghcr.io（github） 镜像加速   
+
+* 仓库地址 填这个 ↓
 ```shell
 ghcr.io
 ```
-加速地址 填这个 ↓
+* 加速地址 填这个 ↓
 ```shell
 ghcr.m.daocloud.io
 ghcr.nju.edu.cn
@@ -222,6 +224,9 @@ systemctl daemon-reload && systemctl restart docker
 systemctl restart landscape-router.service
 
 ```
+## 在 Dpanel 中创建 compose
+
+### **参考 Dpanel 官方 [视频教程](https://www.bilibili.com/video/BV157RpYAE5e/)**
 
 ## Docker 部署 单个 接应容器
 
