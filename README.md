@@ -19,30 +19,36 @@
 ✅ 内核版本兼容  
 🟢 部分版本的内核版本兼容  
 ❌ 内核版本不兼容  
-⚠️ 调整后可兼容  
-**需要 GNU libc（GLIBC）标准库才能运行，内核版本6.9+才能使用全部功能（6.6可能也可以，未明确）**
+<!--⚠️ 调整后可兼容  -->
 
 
-| 发行版 | 兼容 | 版本要求 | 备注 |  
-|---|---|---|---|  
-| Debian  | ✅ | 13+ | 低版本需更新内核至6.9+ |  
-| Ubuntu | ✅ | 25.04+ | 低版本需更新内核至6.9+|  
-| PVE | ✅ | 9+ | 低版本需更新内核至6.9+|  
-| OMV | ✅ | 8+ | 低版本需更新内核至6.9+| 
-| Armbian | 🟢 |  | 需内核版本6.9+| 
-| Alpine | ⚠️ | 3.21 | 需安装GLIBC，且内核版本6.9+ | 
-| OpenWRT | ⚠️ |  | 编译时启用GLIBC，且内核版本6.9+ |   
-| FnOS | ❌ |  | 内核限制 |  
+
+
+| 发行版 | 兼容 | 发行版版本 |landscape 版本| 备注 |  
+|---|---|---|---|---|  
+| Debian  | ✅ | 13+ | glibc | 低版本需更新内核至6.9+ |  
+| Ubuntu | ✅ | 25.04+ | glibc |  低版本需更新内核至6.9+|  
+| PVE | ✅ | 9+ | glibc |  低版本需更新内核至6.9+|  
+| OMV | ✅ | 8+ | glibc |  低版本需更新内核至6.9+| 
+| Armbian | 🟢 |  |glibc |  需内核版本6.9+| 
+| Alpine | ✅ | 3.21 | musl |  需内核版本6.9+ | 
+| OpenWRT | ✅ |  | musl |  需内核版本6.9+ |   
+| FnOS | ❌ |  | |   内核限制 |  
 
 <!--⚠️ 调整后可兼容-->
 <!--🟡 未知  -->
+
+**landscape 分为普通版（Glibc），musl 版，下载landscape时，请选择对应的可执行文件安装**
+
 ``` shell
-# 查看内核版本
+# 检查内核版本，是否 6.9+
 uname -r
 
 ```
 ``` shell
-# 输出带有 GLIBC 或 GNU libc 支持，带有 musl libc 则不支持
+# 查看，glibc / musl 支持
+# 输出带有 GLIBC 或 GNU libc，下载 普通版（glibc）可执行文件安装
+# 输出带有 musl libc ，下载 musl 版 可执行文件安装
 ldd --version
 
 ```
@@ -81,6 +87,9 @@ ldd --version
   - [目的 域名/IP 分流实践](/docs/2-Landscape分流实践.md/#目的-域名ip-分流实践)
   - [基于 子网/vlan/ssid（WiFi） 的分流实现](/docs/2-Landscape分流实践.md/#基于-子网vlanssidwifi-的分流实现)
   - [对局域网 特定设备 中 特定应用(程序) 分流（通过 dscp 实现）](/docs/2-Landscape分流实践.md/#对局域网-特定设备-中-特定应用程序-分流通过-dscp-实现)
+- [流行 docker、dockercompose 管理工具](/docs/3-Docker容器作为分流出口-接应容器.md/#流行-dockerdockercompose-管理工具)
+  - [管理面板](/docs/3-Docker容器作为分流出口-接应容器.md/#管理面板)
+  - [docker run <=> compose.yaml 命令转换](/docs/3-Docker容器作为分流出口-接应容器.md/#docker-run--composeyaml)
 - [用 dpanel 部署 dockercompose](/docs/3-Docker容器作为分流出口-接应容器.md/#用-dpanel-部署-dockercompose)
   - [使用 dpanel 的必要性](/docs/3-Docker容器作为分流出口-接应容器.md/#使用-dpanel-的必要性)
   - [dpanel标准版 与 dpanel lite](/docs/3-Docker容器作为分流出口-接应容器.md/#dpanel标准版-与-dpanel-lite)

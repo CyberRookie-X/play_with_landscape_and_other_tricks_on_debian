@@ -1,7 +1,10 @@
 ![](/images/13.png)
 
-# 目录
+# 目录   
 
+- [流行 docker、dockercompose 管理工具](/docs/3-Docker容器作为分流出口-接应容器.md/#流行-dockerdockercompose-管理工具)
+  - [管理面板](/docs/3-Docker容器作为分流出口-接应容器.md/#管理面板)
+  - [docker run <=> compose.yaml 命令转换](/docs/3-Docker容器作为分流出口-接应容器.md/#docker-run--composeyaml)
 - [用 dpanel 部署 dockercompose](/docs/3-Docker容器作为分流出口-接应容器.md/#用-dpanel-部署-dockercompose)
   - [使用 dpanel 的必要性](/docs/3-Docker容器作为分流出口-接应容器.md/#使用-dpanel-的必要性)
   - [dpanel标准版 与 dpanel lite](/docs/3-Docker容器作为分流出口-接应容器.md/#dpanel标准版-与-dpanel-lite)
@@ -24,13 +27,13 @@
 # 流行 docker、dockercompose 管理工具
 
 ## 管理面板
-[Dpanel（中国大陆用户推荐）](https://dpanel.cc/install/shell)  
-[Dockge](https://dockge.kuma.pet/)  
-[Dockerman](https://dockman.radn.dev/)  
+### [Dpanel（中国大陆用户推荐）](https://dpanel.cc/install/shell)  
+### [Dockge](https://dockge.kuma.pet/)  
+### [Dockerman](https://dockman.radn.dev/)  
 
-## docker run <=> compose.yaml
+## docker run <=> compose.yaml 命令转换
 
-[composerize](https://www.composerize.com/)
+### *[composerize（建议收藏这个网站）](https://www.composerize.com/)*
 
 # 用 dpanel 部署 dockercompose
 
@@ -45,14 +48,15 @@
 ##  dpanel标准版 与 dpanel lite 
 
 标准版本中提供了域名绑定及证书功能，需要绑定 80 及 443 端口。Lite版与标准版只有镜像地址区别，除不再需要映射 80 及 443 端口外，其余配置均一致。  
-个人推荐 lite 版，标准版额外功能网页相对简陋，何不traefik？如需更丰富的配置可使用 [lucky](https://lucky666.cn/)、[Nginx UI](https://nginxui.com/zh_CN/guide/about.html)、[Nginx Proxy Manager](https://nginxproxymanager.com/)、[OpenResty Manager](https://om.uusec.com/cn/) 等项目。
+个人推荐 lite 版，标准版额外功能网页相对简陋，何不 traefik ？如需更丰富的配置可使用 [lucky](https://lucky666.cn/)、[Nginx UI](https://nginxui.com/zh_CN/guide/about.html)、[Nginx Proxy Manager](https://nginxproxymanager.com/)、[OpenResty Manager](https://om.uusec.com/cn/) 等软件。
 
 ## 安装 dpanel
 
 
-
+**⚠ 请勿使用 landscape UI 中的 `拉取镜像` 按钮**
 ```shell
-# 通过 阿里云拉取 镜像，请勿使用 landscape UI 中的 拉取镜像 按钮
+# 复制这条命令到 ssh 中执行
+# 通过 阿里云拉取 dpanel:lite
 docker pull registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:lite
 
 ```
