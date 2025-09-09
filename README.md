@@ -83,6 +83,7 @@ ldd --version
   - [修改apache80端口到8080, 以免后续与其他反代软件冲突](/docs/1-安装升级指南.md/#修改apache80端口到8080-以免后续与其他反代软件冲突)
   - [如何升级 landscape](/docs/1-安装升级指南.md/#如何升级-landscape)
   - [在显示器/终端中 启动/关闭 landscape-router](/docs/1-安装升级指南.md/#在显示器终端中-启动关闭-landscape-router)
+  - [Landscape UI 失联 救急](/docs/1-安装升级指南.md/#landscape-ui-失联-救急)
 - [Landscape 实战案例](/docs/2-Landscape分流实践.md/#landscape-实战案例)
   - [目的 域名/IP 分流实践](/docs/2-Landscape分流实践.md/#目的-域名ip-分流实践)
   - [基于 子网/vlan/ssid（WiFi） 的分流实现](/docs/2-Landscape分流实践.md/#基于-子网vlanssidwifi-的分流实现)
