@@ -9,11 +9,11 @@
 ## 安装过程并不复杂，复制命令粘贴到SSH终端执行即可
 
 ## 核心特性
-* 分流控制（SIP、QoS(dscp)、DIP、域名、Geo 匹配规则）
+* 分流控制（SIP-CIDR、QoS(dscp)、DIP、域名、Geo 匹配规则）
 * eBPF 路由
 * 每个流 Flow 独立 dns 配置以及缓存（避免 dns 污染、泄露）
 * 流量导入 Docker 容器
-* Geo 管理
+* 地理关系库管理
 
 ## 内核版本兼容的 常见 Linux 发行版  
 ✅ 内核版本兼容  
