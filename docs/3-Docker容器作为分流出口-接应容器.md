@@ -10,7 +10,10 @@
   - [dpanel标准版 与 dpanel lite](/docs/3-Docker容器作为分流出口-接应容器.md/#dpanel标准版-与-dpanel-lite)
   - [安装 dpanel](/docs/3-Docker容器作为分流出口-接应容器.md/#安装-dpanel)
   - [在其他机器上使用 dpanel管理本机docker](/docs/3-Docker容器作为分流出口-接应容器.md//#在其他机器上使用-dpanel管理本机docker)
-- [Docker容器作为分流出口（接应容器部署）](/docs/3-Docker容器作为分流出口-接应容器.md/#docker容器作为分流出口接应容器部署)
+- [Docker容器作为分流出口 —— 包装脚本方式部署（推荐）](/docs/3-Docker容器作为分流出口-接应容器.md/#docker容器作为分流出口--包装脚本方式部署推荐)
+  - [Docker 部署 单个 容器](/docs/3-Docker容器作为分流出口-接应容器.md/#docker-部署-单个-容器)
+  - [Compose 部署 多个 容器](/docs/3-Docker容器作为分流出口-接应容器.md//#compose-部署-多个-容器)
+- [Docker容器作为分流出口 —— 挂载工作程序方式部署（不推荐）](/docs/3-Docker容器作为分流出口-接应容器.md/#docker容器作为分流出口--挂载工作程序方式部署不推荐)
   - [接应容器概述](/docs/3-Docker容器作为分流出口-接应容器.md/#接应容器概述)
   - [创建 worker_program 工作程序 启动脚本](/docs/3-Docker容器作为分流出口-接应容器.md/#创建-worker_program-工作程序-启动脚本)
   - [为 Docker 容器启用 ipv6](/docs/3-Docker容器作为分流出口-接应容器.md/#为-docker-容器启用-ipv6)
@@ -147,8 +150,124 @@ ghcr.nju.edu.cn
 
 ![图片来自 dpanel 文档](/images/18.png)
 
-# Docker容器作为分流出口（接应容器部署）
+# Docker容器作为分流出口 —— 包装脚本方式部署（推荐）
+## 下载 包装脚本 和 handler
+* 根据 CPU 架构、容器 OS 下载 合适的 redirect_pkg_handler
+* alpine 容器 下载 musl 版，debian/ubunt 容器 下载普通版（glibc）
+* 解压、上传、赋权
 
+包装脚本 [下载连接](https://github.com/CyberRookie-X/play_with_landscape_and_other_tricks_on_debian/blob/main/redirect_pkg_handler.sh) | redirect_pkg_handler [下载连接](https://github.com/ThisSeanZhang/landscape/releases)
+
+
+![](../images/19.png)
+
+
+## 找到容器 ENTRYPOINT、CMD
+
+### 方法一 通过 dockerfile 获取
+
+* 不赘述了，搞不明白问 AI
+
+### 通过 docker inspect 获取
+```shell
+# 同时获取 ENTRYPOINT 和 CMD 以 json格式
+# 搞不明白问 AI
+docker inspect --format='{{json .Config}}' <镜像名或ID> | jq .
+```
+
+## Docker 部署 单个 容器
+
+```shell
+docker run -d \
+  --name worker_program-1 \
+  --sysctl net.ipv4.conf.lo.accept_local=1 \
+  --cap-add=NET_ADMIN \
+  --cap-add=BPF \
+  --cap-add=PERFMON \
+  --privileged \
+  --entrypoint /land/redirect_pkg_handler.sh /original/entrypoint original cmd args \
+  -p 外部端口:内部端口 \
+  -v /home/worker_program-1/config:/config \ # 挂载配置文件目录
+  -v /root/.landscape-router/redirect_pkg_handler-x86_64-musl:/land/redirect_pkg_handler-x86_64-musl \ # 挂载handler 
+  -v /root/.landscape-router/redirect_pkg_handler.sh:/land/redirect_pkg_handler.sh \ # 挂载包装脚本
+  -v /root/.landscape-router/unix_link/:/ld_unix_link/ \ # 必要映射
+  some-image:latest # 修改成你需要的镜像
+```
+## compose 部署 多个 容器
+```yaml
+networks:
+  worker_program-br:
+    driver: bridge
+    enable_ipv6: true # 开启ipv6，容器自动获取ivp6配置（启用此项，docker配置中必须启用ipv6，否则会报错 /etc/docker/daemon.json）
+    ipam:
+      config:
+        - subnet: 172.100.0.0/16
+          gateway: 172.100.0.254
+services:
+  service-1:
+    sysctls:
+      - net.ipv4.conf.lo.accept_local=1
+    cap_add:
+      - NET_ADMIN
+      - BPF
+      - PERFMON
+    privileged: true
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: "10m"
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 512M
+    # 为启用 ports 配置时，使用容器ip:端口 即可在主机内访问容器web界面，主机外访问时需使用反代 或 端口映射到主机端口
+    #ports: # 可选配置  # 静态映射，主要用于映射web端口
+    #  - "0.0.0.0:外部端口号:内部端口号"        # 映射到主机v4端口
+    #  - "[::]:外部端口号:内部端口号"        # 映射到主机v6端口
+    networks:
+      worker_program-br:
+        ipv4_address: 172.100.0.1
+    entrypoint: ["/land/redirect_pkg_handler.sh", "/original/entrypoint", "original", "cmd", "args"]
+    volumes:
+      - /home/worker_program-1/config:/config  # 挂载配置文件目录
+      - /root/.landscape-router/redirect_pkg_handler-x86_64-musl:/land/redirect_pkg_handler-x86_64-musl  # 挂载handler 
+      - /root/.landscape-router/redirect_pkg_handler.sh:/land/redirect_pkg_handler.sh # 挂载包装脚本
+      - /root/.landscape-router/unix_link/:/ld_unix_link/ # 必要映射
+    image: some-image:latest # 修改成你需要的镜像
+
+  service-2:
+    sysctls:
+      - net.ipv4.conf.lo.accept_local=1
+    cap_add:
+      - NET_ADMIN
+      - BPF
+      - PERFMON
+    privileged: true
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: "10m"
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 512M
+    networks:
+      worker_program-br:
+        ipv4_address: 172.100.0.2
+    entrypoint: ["/land/redirect_pkg_handler.sh", "/original/entrypoint", "original", "cmd", "args"]
+    volumes:
+      - /home/worker_program-1/config:/config  # 挂载配置文件目录
+      - /root/.landscape-router/redirect_pkg_handler-x86_64-musl:/land/redirect_pkg_handler-x86_64-musl  # 挂载handler 
+      - /root/.landscape-router/redirect_pkg_handler.sh:/land/redirect_pkg_handler.sh # 挂载包装脚本
+      - /root/.landscape-router/unix_link/:/ld_unix_link/ # 必要映射
+    image: some-image:latest # 修改成你需要的镜像
+
+```
+
+
+# Docker容器作为分流出口 —— 挂载工作程序方式部署（不推荐）
 ## 接应容器概述  
 
 * 仅搭配 [**接应程序**](https://github.com/ThisSeanZhang/landscape/blob/main/landscape-ebpf/src/bin/redirect_pkg_handler.rs) 进行打包的容器，可作为有效的流 **出口容器**  
