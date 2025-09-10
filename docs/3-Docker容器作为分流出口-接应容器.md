@@ -11,6 +11,7 @@
   - [安装 dpanel](/docs/3-Docker容器作为分流出口-接应容器.md/#安装-dpanel)
   - [在其他机器上使用 dpanel管理本机docker](/docs/3-Docker容器作为分流出口-接应容器.md//#在其他机器上使用-dpanel管理本机docker)
 - [Docker容器作为分流出口 —— 包装脚本方式部署（推荐）](/docs/3-Docker容器作为分流出口-接应容器.md/#docker容器作为分流出口--包装脚本方式部署推荐)
+  - [原理概述](/docs/3-Docker容器作为分流出口-接应容器.md/#原理概述)
   - [Docker 部署 单个 容器](/docs/3-Docker容器作为分流出口-接应容器.md/#docker-部署-单个-容器)
   - [Compose 部署 多个 容器](/docs/3-Docker容器作为分流出口-接应容器.md//#compose-部署-多个-容器)
 - [Docker容器作为分流出口 —— 挂载工作程序方式部署（不推荐）](/docs/3-Docker容器作为分流出口-接应容器.md/#docker容器作为分流出口--挂载工作程序方式部署不推荐)
@@ -151,6 +152,14 @@ ghcr.nju.edu.cn
 ![图片来自 dpanel 文档](/images/18.png)
 
 # Docker容器作为分流出口 —— 包装脚本方式部署（推荐）
+
+## 原理概述
+1. 通过 dockerfile 或 docker inspect 获取 镜像 原本的 ENTRYPOINT 和 CMD
+2. 通过包装脚本覆盖容器原本的 ENTRYPOINT，将 原本的 ENTRYPOINT 和 CMD 传递给 包装脚本
+3. 脚本 检测/安装 所需依赖（脚本会为 CN 地区用户换源）
+4. 启动 redirect_pkg_handler
+5. 启动 容器 原本的 ENTRYPOINT 和 CMD
+
 ## 下载 包装脚本 和 handler
 * 根据 CPU 架构、容器 OS 下载 合适的 redirect_pkg_handler
 * alpine 容器 下载 musl 版，debian/ubunt 容器 下载普通版（glibc）
