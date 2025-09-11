@@ -55,7 +55,7 @@ MIRRORS="mirrors.ustc.edu.cn mirrors.aliyun.com mirrors.163.com mirrors.tuna.tsi
 
 # 日志函数，确保日志格式符合Docker规范，不依赖echo命令
 log() {
-    printf "%s %s %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "[redirect_pkg_handler-wrapper_script]" "$1"
+    printf "%s %s %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "[redirect_pkg_handler_wrapper_script]" "$1"
 }
 
 # 简单系统处理函数（Debian/Ubuntu/CentOS/Rocky Linux/AlmaLinux）
