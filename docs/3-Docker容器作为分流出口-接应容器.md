@@ -279,7 +279,7 @@ services:
       worker_program-br:
         ipv4_address: 172.100.0.1
     # encironment:
-    #   - REDIRECT_PKG_HANDLER_WRAPPER_REGION=cn \ # 为 alipne 容器更换随机中国源
+    #   - REDIRECT_PKG_HANDLER_WRAPPER_REGION=cn \ # 为 alipne 容器换源，从 中科大/清华/阿里/网易 中随机选一个
     #   - REDIRECT_PKG_HANDLER_WRAPPER_MIRROR=mirrors.nwafu.edu.cn \ # 为 alipne 容器更换指定源，如西北林业大学源
     entrypoint: ["/land/redirect_pkg_handler.sh", "/original/entrypoint", "original", "cmd", "args"] # 覆盖 原始 Entrypoint
     volumes:
@@ -310,7 +310,7 @@ services:
       worker_program-br:
         ipv4_address: 172.100.0.2
     # encironment:
-    #   - REDIRECT_PKG_HANDLER_WRAPPER_REGION=cn \ # 为 alipne 容器更换随机中国源
+    #   - REDIRECT_PKG_HANDLER_WRAPPER_REGION=cn \ 为 alipne 容器换源，从 中科大/清华/阿里/网易 中随机选一个
     #   - REDIRECT_PKG_HANDLER_WRAPPER_MIRROR=mirrors.nwafu.edu.cn \ # 为 alipne 容器更换指定源，如西北林业大学源
     entrypoint: ["/land/redirect_pkg_handler.sh", "/original/entrypoint", "original", "cmd", "args"] # 覆盖 原始 Entrypoint
     volumes:
