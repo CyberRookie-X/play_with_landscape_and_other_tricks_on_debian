@@ -171,22 +171,47 @@ ghcr.nju.edu.cn
 ![](../images/19.png)
 
 
-## 找到容器 ENTRYPOINT、CMD
+## 找到image ENTRYPOINT、CMD
 
 ### 方法一 通过 dockerfile 获取
 
-* 不赘述了，搞不明白问 AI
+* 找到 构建 image 的 Dockerfile，
+* Dockerfile 最后一行，一般是 ENTRYPOINT 或 CMD
 
 ### 通过 docker inspect 获取
 ```shell
-# 同时获取 ENTRYPOINT 和 CMD 以 json格式
-# 搞不明白问 AI
-docker inspect --format='{{json .Config}}' <镜像名或ID> | jq .
+# 列举 所有 docker image
+docker image ls
+
+```
+
+```shell
+# 同时获取 ENTRYPOINT 和 CMD 
+docker inspect --format='Entrypoint: {{.Config.Entrypoint}} Cmd: {{.Config.Cmd}}' <镜像名或ID>
+
+```
+
+### 以  `gdy666/lucky` 为例
+```shell
+docker inspect --format='Entrypoint: {{.Config.Entrypoint}} Cmd: {{.Config.Cmd}}' gdy666/lucky
+
+```
+下图是回显 
+
+![](/images/20.png)
+
+```docker
+# docker run 的 entrypoint
+--entrypoint /land/redirect_pkg_handler.sh /app/lucky -c /goodluck/lucky.conf -runInDocker \
+```
+```yaml
+# dompose 中的 entrypoint
+entrypoint: ["/land/redirect_pkg_handler.sh", "/app/lucky", "-c", "/goodluck/lucky.conf", "-runInDocker"]
 ```
 
 ## Docker 部署 单个 容器
 
-```shell
+```docker
 docker run -d \
   --name worker_program-1 \
   --sysctl net.ipv4.conf.lo.accept_local=1 \
@@ -194,7 +219,7 @@ docker run -d \
   --cap-add=BPF \
   --cap-add=PERFMON \
   --privileged \
-  --entrypoint /land/redirect_pkg_handler.sh /original/entrypoint original cmd args \
+  --entrypoint /land/redirect_pkg_handler.sh /original/entrypoint original cmd args \ # 覆盖 原始 Entrypoint
   -p 外部端口:内部端口 \
   -v /home/worker_program-1/config:/config \ # 挂载配置文件目录
   -v /root/.landscape-router/redirect_pkg_handler-x86_64-musl:/land/redirect_pkg_handler-x86_64-musl \ # 挂载handler 
@@ -237,7 +262,7 @@ services:
     networks:
       worker_program-br:
         ipv4_address: 172.100.0.1
-    entrypoint: ["/land/redirect_pkg_handler.sh", "/original/entrypoint", "original", "cmd", "args"]
+    entrypoint: ["/land/redirect_pkg_handler.sh", "/original/entrypoint", "original", "cmd", "args"] # 覆盖 原始 Entrypoint
     volumes:
       - /home/worker_program-1/config:/config  # 挂载配置文件目录
       - /root/.landscape-router/redirect_pkg_handler-x86_64-musl:/land/redirect_pkg_handler-x86_64-musl  # 挂载handler 
@@ -265,7 +290,7 @@ services:
     networks:
       worker_program-br:
         ipv4_address: 172.100.0.2
-    entrypoint: ["/land/redirect_pkg_handler.sh", "/original/entrypoint", "original", "cmd", "args"]
+    entrypoint: ["/land/redirect_pkg_handler.sh", "/original/entrypoint", "original", "cmd", "args"] # 覆盖 原始 Entrypoint
     volumes:
       - /home/worker_program-1/config:/config  # 挂载配置文件目录
       - /root/.landscape-router/redirect_pkg_handler-x86_64-musl:/land/redirect_pkg_handler-x86_64-musl  # 挂载handler 
@@ -364,7 +389,7 @@ systemctl restart landscape-router.service
 
 **worker_program 可替换为任意 工作程序**
 
-```shell
+```docker
 docker run -d \
   --name worker_program-1 \
   --sysctl net.ipv4.conf.lo.accept_local=1 \
