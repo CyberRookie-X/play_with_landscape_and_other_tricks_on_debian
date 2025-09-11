@@ -178,7 +178,7 @@ ghcr.nju.edu.cn
 * 找到 构建 image 的 Dockerfile，
 * Dockerfile 最后一行，一般是 ENTRYPOINT 或 CMD
 
-### 通过 docker inspect 获取
+### 方法二 通过 docker inspect 获取
 ```shell
 # 列举 所有 docker 镜像
 docker image ls
