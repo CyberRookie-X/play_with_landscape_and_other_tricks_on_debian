@@ -171,7 +171,7 @@ ghcr.nju.edu.cn
 ![](../images/19.png)
 
 
-## 找到image ENTRYPOINT、CMD
+## 获取容器镜像的 ENTRYPOINT、CMD
 
 ### 方法一 通过 dockerfile 获取
 
