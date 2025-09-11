@@ -161,8 +161,8 @@ ghcr.nju.edu.cn
 5. 启动 容器 原本的 ENTRYPOINT 和 CMD
 
 ## 下载 包装脚本 和 handler
-* 根据 CPU 架构、容器 OS 下载 合适的 redirect_pkg_handler
-* alpine 容器 下载 musl 版，debian/ubunt 容器 下载普通版（glibc）
+* 根据 CPU 架构、镜像 OS 发行版 下载 合适的 redirect_pkg_handler
+* alpine 镜像 下载 musl 版，debian/ubunt 镜像 下载普通版（glibc）
 * 解压、上传、赋权
 
 包装脚本 [下载连接](https://github.com/CyberRookie-X/play_with_landscape_and_other_tricks_on_debian/blob/main/redirect_pkg_handler.sh) | redirect_pkg_handler [下载连接](https://github.com/ThisSeanZhang/landscape/releases)
@@ -180,7 +180,7 @@ ghcr.nju.edu.cn
 
 ### 通过 docker inspect 获取
 ```shell
-# 列举 所有 docker image
+# 列举 所有 docker 镜像
 docker image ls
 
 ```
