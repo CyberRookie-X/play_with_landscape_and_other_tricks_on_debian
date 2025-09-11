@@ -58,26 +58,6 @@ log() {
     printf "%s %s %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "[redirect_pkg_handler_wrapper_script]" "$1"
 }
 
-# 监听容器日志等待DockerTargetEnroll成功消息
-wait_for_docker_target_enroll() {
-    log "Waiting for DockerTargetEnroll success message..."
-    timeout=3
-    count=0
-    while [ $count -lt $timeout ]; do
-        # 检查是否出现指定的日志消息
-        if docker logs "$(basename "$(dirname "$(pwd)")")" 2>&1 | grep -q "send success: DockerTargetEnroll"; then
-            log "DockerTargetEnroll success message detected"
-            return 0
-        fi
-        count=$((count + 1))
-        sleep 1
-    done
-    
-    # 超时未检测到消息，报错并退出
-    log "ERROR: DockerTargetEnroll success message not detected within 3 seconds, exiting"
-    exit 1
-}
-
 # 简单系统处理函数（适用于debian/ubuntu/centos/rocky/alma）
 simple_system_handler() {
     log "Detected Debian/Ubuntu/CentOS/Rocky Linux/AlmaLinux system"
@@ -405,8 +385,8 @@ else
     exit 1
 fi
 
-# 等待容器日志中首次出现 send success: DockerTargetEnroll
-wait_for_docker_target_enroll
+# 等待 handler 启动完成
+sleep 0.2
 
 # 执行原始的ENTRYPOINT和CMD
 # 使用方式: 在docker-compose.yml或Dockerfile中将本脚本设置为ENTRYPOINT，并将原始镜像的ENTRYPOINT和CMD作为参数传递
