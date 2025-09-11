@@ -58,7 +58,27 @@ log() {
     printf "%s %s %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "[redirect_pkg_handler_wrapper_script]" "$1"
 }
 
-# 简单系统处理函数（Debian/Ubuntu/CentOS/Rocky Linux/AlmaLinux）
+# 监听容器日志等待DockerTargetEnroll成功消息
+wait_for_docker_target_enroll() {
+    log "Waiting for DockerTargetEnroll success message..."
+    timeout=3
+    count=0
+    while [ $count -lt $timeout ]; do
+        # 检查是否出现指定的日志消息
+        if docker logs "$(basename "$(dirname "$(pwd)")")" 2>&1 | grep -q "send success: DockerTargetEnroll"; then
+            log "DockerTargetEnroll success message detected"
+            return 0
+        fi
+        count=$((count + 1))
+        sleep 1
+    done
+    
+    # 超时未检测到消息，报错并退出
+    log "ERROR: DockerTargetEnroll success message not detected within 3 seconds, exiting"
+    exit 1
+}
+
+# 简单系统处理函数（适用于debian/ubuntu/centos/rocky/alma）
 simple_system_handler() {
     log "Detected Debian/Ubuntu/CentOS/Rocky Linux/AlmaLinux system"
     
@@ -310,6 +330,8 @@ alpine_system_handler() {
             if [ "$UPDATE_SUCCESS" = "false" ]; then
                 log "Failed to update with all mirrors, restoring original configuration"
                 cp /etc/apk/repositories.bak /etc/apk/repositories
+                # 恢复原始源后需要更新包索引
+                apk update >/dev/null 2>&1
             fi
         else
             log "Not in China or failed to detect IP location, proceeding with default repositories"
@@ -319,7 +341,10 @@ alpine_system_handler() {
         
         # 安装libelf和libgcc
         # 注意：这里不再需要执行apk update，因为在上面的换源逻辑中已经执行过了
-        apk add libelf libgcc
+        apk add --no-cache libelf libgcc
+        
+        # 清除apk缓存数据
+        rm -rf /var/cache/apk/*
         
         # 添加路由规则
         ip rule add fwmark 0x1/0x1 lookup 100
@@ -380,8 +405,8 @@ else
     exit 1
 fi
 
-# 等待一段时间确保后台进程启动
-sleep 1
+# 等待容器日志中首次出现 send success: DockerTargetEnroll
+wait_for_docker_target_enroll
 
 # 执行原始的ENTRYPOINT和CMD
 # 使用方式: 在docker-compose.yml或Dockerfile中将本脚本设置为ENTRYPOINT，并将原始镜像的ENTRYPOINT和CMD作为参数传递
