@@ -176,7 +176,7 @@ ghcr.nju.edu.cn
 
 ### 方法一 通过 dockerfile 获取
 
-* 找到 构建 image 的 Dockerfile，
+* 找到 构建 image 的 Dockerfile
 * Dockerfile 最后一行，一般是 ENTRYPOINT 或 CMD
 
 ### 方法二 通过 docker inspect 获取
@@ -202,7 +202,7 @@ docker inspect --format='Entrypoint: {{.Config.Entrypoint}} Cmd: {{.Config.Cmd}}
 ![](/images/20.png)
 
 ```docker
-# docker run 的 entrypoint
+# docker run 中的 entrypoint
 --entrypoint /land/redirect_pkg_handler.sh /app/lucky -c /goodluck/lucky.conf -runInDocker \
 ```
 ```yaml

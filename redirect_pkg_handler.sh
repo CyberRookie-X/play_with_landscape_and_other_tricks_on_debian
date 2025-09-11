@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # 本脚本初次运行时，可能需要访问互联网
-# 本脚本支持基于 debian、ubuntu 和 alpine 打包的镜像
+# 本脚本支持基于 debian/ubuntu/centos/rocky/alma 和 alpine 打包的镜像
 
 # 使用方式: 
 # 1、从 dockerfile 或 docker inspect 找到 镜像原始的 ENTRYPOINT 和 CMD
@@ -32,7 +32,7 @@
 #       - "daemon off;"            # 原始镜像的 CMD 参数
 
 # 脚本逻辑说明
-# 1、检查 容器系统 是否属于 debian/ubuntu/centos/rocky/alma/debian ，在此范围之外的系统暂不支持
+# 1、检查 容器系统 是否属于 debian/ubuntu/centos/rocky/alma/debian/alpine ，在此范围之外的系统暂不支持
 # 2、对于 debian/ubuntu/centos/rocky/alma，配置防火墙，并运行 redirect_pkg_handler ，最后执行原始镜像的 ENTRYPOINT 和 CMD
 # 3、对于 alpine，具有 libelf 和 libgcc支持的，则配置防火墙，并运行 redirect_pkg_handler ，最后执行原始镜像的 ENTRYPOINT 和 CMD
 # 4、对于 alpine，没有 libelf 和 libgcc 支持
