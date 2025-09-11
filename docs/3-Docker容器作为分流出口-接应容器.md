@@ -166,10 +166,23 @@ ghcr.nju.edu.cn
 * 解压并上传到 Landscape Router 安装路径下
 * 为 包装脚本 和 handler 赋予可执行权限,如 755
 
-包装脚本 [下载连接](https://github.com/CyberRookie-X/play_with_landscape_and_other_tricks_on_debian/blob/main/redirect_pkg_handler.sh) | redirect_pkg_handler [下载连接](https://github.com/ThisSeanZhang/landscape/releases)
 
+包装脚本 [下载连接](https://github.com/CyberRookie-X/play_with_landscape_and_other_tricks_on_debian/blob/main/redirect_pkg_handler.sh) | redirect_pkg_handler [下载连接](https://github.com/ThisSeanZhang/landscape/releases)  
 
 ![](../images/19.png)
+
+## 包装脚本环境变量说明
+
+* 环境变量只对 需要换源、安装依赖的 alpine 系镜像有效
+* 不使用环境变量时，脚本从 互联网 API 获取必要信息，通常可以正常运行。
+* 如需部署大量容器（例如大于80个），建议添加通过环境变量添加私有镜像仓库。
+* 两个环境变量同时存在时，MIRROR 生效，REGION 失效。
+
+1. REDIRECT_PKG_HANDLER_WRAPPER_REGION    
+填入非 CN/cn 值时，跳过 IP 归属地检测 和 换源; 填入 CN/cn 会跳过 IP 归属地检测，从中科大/清华/阿里/网易 中随机选取一个可以成功 update 的源
+2. REDIRECT_PKG_HANDLER_WRAPPER_MIRROR   
+填入 alpine 镜像源地址，如 西北农林大学镜像源  REDIRECT_PKG_HANDLER_WRAPPER_MIRROR=mirrors.nwafu.edu.cn
+
 
 
 ## 获取容器镜像的 ENTRYPOINT、CMD
@@ -222,6 +235,8 @@ docker run -d \
   --privileged \
   --entrypoint /land/redirect_pkg_handler.sh /original/entrypoint original cmd args \ # 覆盖 原始 Entrypoint
   -p 外部端口:内部端口 \
+  # -e REDIRECT_PKG_HANDLER_WRAPPER_REGION=cn \ # 为 alipne 容器 更换随机中国源
+  # -e REDIRECT_PKG_HANDLER_WRAPPER_MIRROR=mirrors.nwafu.edu.cn \ # 为 alipne 容器 更换指定源
   -v /home/worker_program-1/config:/config \ # 挂载配置文件目录
   -v /root/.landscape-router/redirect_pkg_handler-x86_64-musl:/land/redirect_pkg_handler-x86_64-musl \ # 挂载handler 
   -v /root/.landscape-router/redirect_pkg_handler.sh:/land/redirect_pkg_handler.sh \ # 挂载包装脚本
@@ -257,12 +272,15 @@ services:
           cpus: '4.0'
           memory: 512M
     # 为启用 ports 配置时，使用容器ip:端口 即可在主机内访问容器web界面，主机外访问时需使用反代 或 端口映射到主机端口
-    #ports: # 可选配置  # 静态映射，主要用于映射web端口
-    #  - "0.0.0.0:外部端口号:内部端口号"        # 映射到主机v4端口
-    #  - "[::]:外部端口号:内部端口号"        # 映射到主机v6端口
+    # ports: # 可选配置  # 静态映射，主要用于映射web端口
+    #   - "0.0.0.0:外部端口号:内部端口号"        # 映射到主机v4端口
+    #   - "[::]:外部端口号:内部端口号"        # 映射到主机v6端口
     networks:
       worker_program-br:
         ipv4_address: 172.100.0.1
+    # encironment:
+    #   - REDIRECT_PKG_HANDLER_WRAPPER_REGION=cn \ # 为 alipne 容器更换随机中国源
+    #   - REDIRECT_PKG_HANDLER_WRAPPER_MIRROR=mirrors.nwafu.edu.cn \ # 为 alipne 容器更换指定源，如西北林业大学源
     entrypoint: ["/land/redirect_pkg_handler.sh", "/original/entrypoint", "original", "cmd", "args"] # 覆盖 原始 Entrypoint
     volumes:
       - /home/worker_program-1/config:/config  # 挂载配置文件目录
@@ -291,6 +309,9 @@ services:
     networks:
       worker_program-br:
         ipv4_address: 172.100.0.2
+    # encironment:
+    #   - REDIRECT_PKG_HANDLER_WRAPPER_REGION=cn \ # 为 alipne 容器更换随机中国源
+    #   - REDIRECT_PKG_HANDLER_WRAPPER_MIRROR=mirrors.nwafu.edu.cn \ # 为 alipne 容器更换指定源，如西北林业大学源
     entrypoint: ["/land/redirect_pkg_handler.sh", "/original/entrypoint", "original", "cmd", "args"] # 覆盖 原始 Entrypoint
     volumes:
       - /home/worker_program-1/config:/config  # 挂载配置文件目录
