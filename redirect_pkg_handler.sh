@@ -3,6 +3,30 @@
 # 本脚本初次运行时，可能需要访问互联网
 # 本脚本支持基于 debian/ubuntu/centos/rocky/alma 和 alpine 打包的镜像
 
+
+# 环境变量说明：
+# 环境变量只对 需要换源、安装依赖的 alpine 系镜像有效
+# 不使用环境变量时，脚本从 互联网 API 获取必要信息，通常可以正常运行。
+# 如需部署大量容器（例如大于80个），建议添加通过环境变量添加私有镜像仓库。
+# 两个环境变量同时存在时，MIRROR 生效，REGION 失效。
+#
+# 1. REDIRECT_PKG_HANDLER_WRAPPER_REGION    
+# 填入非 CN/cn 值时，跳过 IP 归属地检测 和 换源; 填入 CN/cn 会跳过 IP 归属地检测，从中科大/清华/阿里/网易 中随机选取一个可以成功 update 的源
+# 2. REDIRECT_PKG_HANDLER_WRAPPER_MIRROR   
+# 填入 alpine 镜像源地址，如 西北农林大学镜像源  REDIRECT_PKG_HANDLER_WRAPPER_MIRROR=mirrors.nwafu.edu.cn
+
+
+# 脚本逻辑说明
+# 1、检查 容器系统 是否属于 debian/ubuntu/centos/rocky/alma/debian/alpine ，在此范围之外的系统暂不支持
+# 2、对于 debian/ubuntu/centos/rocky/alma，配置防火墙，并运行 redirect_pkg_handler ，最后执行原始镜像的 ENTRYPOINT 和 CMD
+# 3、对于 alpine，具有 libelf 和 libgcc支持的，则配置防火墙，并运行 redirect_pkg_handler ，最后执行原始镜像的 ENTRYPOINT 和 CMD
+# 4、对于 alpine，没有 libelf 和 libgcc 支持
+# 4.1 通过 本机 IP 归属地查询，确定 alpine 源的可用性
+# 4.2 对于 alpine 源不可用的 国家/地区，如中国，进行换源操作（从 中科大/清华/阿里/网易 中随机选一个 能成功 apk update 的源）
+# 4.3 安装 libelf 和 libgcc，配置防火墙，并运行 redirect_pkg_handler ，最后执行原始镜像的 ENTRYPOINT 和 CMD
+
+
+
 # 使用方式: 
 # 1、从 dockerfile 或 docker inspect 找到 镜像原始的 ENTRYPOINT 和 CMD
 # 2、下载 redirect_pkg_handler-XXXXXXXX （从github下载后，无需修改该其文件名） 和 redirect_pkg_handler.sh 到 landscape Router 所在主机中，赋予可执行权限
@@ -11,15 +35,6 @@
 
 # 例如: ENTRYPOINT ["/land/redirect_pkg_handler.sh", "/original/entrypoint", "original", "cmd", "args"]
 
-# 环境变量说明：
-# 环境变量只对 需要换源、安装依赖的 alpine 系镜像有效
-# 不使用环境变量时，脚本从 互联网 API 获取必要信息，通常可以正常运行。
-# 如需部署大量容器（例如大于80个），建议添加通过环境变量添加私有镜像仓库。
-# 两个环境变量同时存在时，MIRROR 生效，REGION 失效。
-# 1. REDIRECT_PKG_HANDLER_WRAPPER_REGION    
-# 填入非 CN/cn 值时，跳过 IP 归属地检测 和 换源; 填入 CN/cn 会跳过 IP 归属地检测，从中科大/清华/阿里/网易 中随机选取一个可以成功 update 的源
-# 2. REDIRECT_PKG_HANDLER_WRAPPER_MIRROR   
-# 填入 alpine 镜像源地址，如 西北农林大学镜像源  REDIRECT_PKG_HANDLER_WRAPPER_MIRROR=mirrors.nwafu.edu.cn
 
 
 # 示例1
@@ -42,14 +57,6 @@
 #       - "-g"                     # 原始镜像的 CMD 参数
 #       - "daemon off;"            # 原始镜像的 CMD 参数
 
-# 脚本逻辑说明
-# 1、检查 容器系统 是否属于 debian/ubuntu/centos/rocky/alma/debian/alpine ，在此范围之外的系统暂不支持
-# 2、对于 debian/ubuntu/centos/rocky/alma，配置防火墙，并运行 redirect_pkg_handler ，最后执行原始镜像的 ENTRYPOINT 和 CMD
-# 3、对于 alpine，具有 libelf 和 libgcc支持的，则配置防火墙，并运行 redirect_pkg_handler ，最后执行原始镜像的 ENTRYPOINT 和 CMD
-# 4、对于 alpine，没有 libelf 和 libgcc 支持
-# 4.1 通过 本机 IP 归属地查询，确定 alpine 源的可用性
-# 4.2 对于 alpine 源不可用的 国家/地区，如中国，进行换源操作（从 中科大/清华/阿里/网易 中随机选一个 能成功 apk update 的源）
-# 4.3 安装 libelf 和 libgcc，配置防火墙，并运行 redirect_pkg_handler ，最后执行原始镜像的 ENTRYPOINT 和 CMD
 
 # TODO
 # 1. 多容器时，丛书容器 如何保证本地 apk 与 最新 镜像兼容问题。通过 apk update 获取最新 apk 列表，然后对比 apk 列表，如果本地 apk 不是最新版，等待 主容器拉取最新版 apk
