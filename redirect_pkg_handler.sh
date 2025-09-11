@@ -91,12 +91,12 @@ alpine_system_handler() {
     LIBELF_INSTALLED=false
     LIBGCC_INSTALLED=false
     
-    # 简单检查库是否存在
-    if ldconfig -p 2>/dev/null | grep -q libelf; then
+    # 使用apk info检查库是否已安装（适用于Alpine系统）
+    if apk info libelf >/dev/null 2>&1; then
         LIBELF_INSTALLED=true
     fi
     
-    if ldconfig -p 2>/dev/null | grep -q libgcc; then
+    if apk info libgcc >/dev/null 2>&1; then
         LIBGCC_INSTALLED=true
     fi
     
@@ -385,6 +385,7 @@ else
     exit 1
 fi
 
+# 我在有其他负载的情况下，实测 20ms 左右启动完成，留200ms应该够了吧
 # 等待 handler 启动完成
 sleep 0.2
 
