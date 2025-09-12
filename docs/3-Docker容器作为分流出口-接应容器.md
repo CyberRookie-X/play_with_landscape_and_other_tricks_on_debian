@@ -169,7 +169,7 @@ ghcr.nju.edu.cn
 
 包装脚本 [下载连接](https://github.com/CyberRookie-X/play_with_landscape_and_other_tricks_on_debian/blob/main/redirect_pkg_handler.sh) | redirect_pkg_handler [下载连接](https://github.com/ThisSeanZhang/landscape/releases)  
 
-![](../images/19.png)
+![](/images/19.png)
 
 ## 包装脚本环境变量说明
 
