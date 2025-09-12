@@ -263,14 +263,14 @@ services:
       - PERFMON
     privileged: true
     restart: unless-stopped
-    logging:
-      options:
-        max-size: "10m"
-    deploy:
-      resources:
-        limits:
-          cpus: '4.0'
-          memory: 512M
+    # logging:
+    #   options:
+    #     max-size: "10m"
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '4.0'
+    #       memory: 512M
     # 为启用 ports 配置时，使用容器ip:端口 即可在主机内访问容器web界面，主机外访问时需使用反代 或 端口映射到主机端口
     # ports: # 可选配置  # 静态映射，主要用于映射web端口
     #   - "0.0.0.0:外部端口号:内部端口号"        # 映射到主机v4端口
@@ -298,14 +298,14 @@ services:
       - PERFMON
     privileged: true
     restart: unless-stopped
-    logging:
-      options:
-        max-size: "10m"
-    deploy:
-      resources:
-        limits:
-          cpus: '4.0'
-          memory: 512M
+    # logging:
+    #   options:
+    #     max-size: "10m"
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '4.0'
+    #       memory: 512M
     networks:
       worker_program-br:
         ipv4_address: 172.100.0.2
@@ -452,18 +452,18 @@ services:
       - PERFMON
     privileged: true
     restart: unless-stopped
-    logging:
-      options:
-        max-size: "10m"
-    deploy:
-      resources:
-        limits:
-          cpus: '4.0'
-          memory: 512M
+    # logging:
+    #   options:
+    #     max-size: "10m"
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '4.0'
+    #       memory: 512M
     # 为启用 ports 配置时，使用容器ip:端口 即可在主机内访问容器web界面，主机外访问时需使用反代 或 端口映射到主机端口
-    #ports: # 可选配置  # 静态映射，主要用于映射web端口
-    #  - "0.0.0.0:外部端口号:内部端口号"        # 映射到主机v4端口
-    #  - "[::]:外部端口号:内部端口号"        # 映射到主机v6端口
+    # ports: # 可选配置  # 静态映射，主要用于映射web端口
+    #   - "0.0.0.0:外部端口号:内部端口号"        # 映射到主机v4端口
+    #   - "[::]:外部端口号:内部端口号"        # 映射到主机v6端口
     networks:
       worker_program-br:
         ipv4_address: 172.100.0.1
@@ -481,14 +481,14 @@ services:
       - PERFMON
     privileged: true
     restart: unless-stopped
-    logging:
-      options:
-        max-size: "10m"
-    deploy:
-      resources:
-        limits:
-          cpus: '4.0'
-          memory: 512M
+    # logging:
+    #   options:
+    #     max-size: "10m"
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '4.0'
+    #       memory: 512M
     networks:
       worker_program-br:
         ipv4_address: 172.100.0.2
