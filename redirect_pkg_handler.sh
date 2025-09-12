@@ -493,7 +493,7 @@ sleep 0.2
 
 # 执行原始的ENTRYPOINT和CMD
 # 使用方式: 在docker-compose.yml或Dockerfile中将本脚本设置为ENTRYPOINT，并将原始镜像的ENTRYPOINT和CMD作为参数传递
-# 例如: ENTRYPOINT ["/app/redirect_pkg_handler", "/original/entrypoint", "original", "cmd", "args"]
+# 例如: ENTRYPOINT ["/land/redirect_pkg_handler", "/original/entrypoint", "original", "cmd", "args"]
 if [ -n "$ORIGINAL_ENTRYPOINT_CMD" ]; then
     log "Executing original entrypoint: $ORIGINAL_ENTRYPOINT_CMD"
     exec "$ORIGINAL_ENTRYPOINT_CMD"
