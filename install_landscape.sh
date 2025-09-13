@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Landscape Router 交互式安装脚本
-# 适用于 Debian 13 x86_64 架构 和 Armbian aarch64 架构（需要内核版本 >= 6.9）
+# 适用于 Debian 13 x86_64 架构 和 Armbian aarch64 架构 (需要内核版本 >= 6.9) 
 
 # 全局变量
 INSTALL_LOG=""
@@ -78,7 +78,7 @@ check_system() {
     
     # 检查是否为 Debian 13 或 Armbian
     if ! grep -q "Debian GNU/Linux 13" /etc/os-release && ! grep -q "Armbian" /etc/os-release; then
-        log "警告: 此脚本专为 Debian 13 或 Armbian 设计，当前系统可能不兼容"
+        log "警告: 此脚本专为 Debian 13 或 Armbian 设计, 当前系统可能不兼容"
     fi
     
     # 检查是否为 Armbian 系统
@@ -92,7 +92,7 @@ check_system() {
     local arch
     arch=$(uname -m)
     if [ "$arch" != "x86_64" ] && [ "$arch" != "aarch64" ]; then
-        log "错误: 此脚本仅适用于 x86_64 或 aarch64 架构，当前架构为 $arch"
+        log "错误: 此脚本仅适用于 x86_64 或 aarch64 架构, 当前架构为 $arch"
         exit 1
     fi
     
@@ -102,7 +102,7 @@ check_system() {
         exit 1
     fi
     
-    # 检查内核版本（需要 >= 6.9）
+    # 检查内核版本 (需要 >= 6.9) 
     local kernel_version
     kernel_version=$(uname -r | cut -d'-' -f1)
     local major_version
@@ -111,7 +111,7 @@ check_system() {
     minor_version=$(echo "$kernel_version" | cut -d'.' -f2)
     
     if [ "$major_version" -lt 6 ] || { [ "$major_version" -eq 6 ] && [ "$minor_version" -lt 9 ]; }; then
-        log "错误: 内核版本过低，需要 6.9 或更高版本，当前版本为 $kernel_version"
+        log "错误: 内核版本过低, 需要 6.9 或更高版本, 当前版本为 $kernel_version"
         log "请先升级内核版本后再运行此脚本"
         exit 1
     fi
@@ -124,7 +124,7 @@ ask_user_config() {
     log "开始询问用户配置"
     
     # 提示用户所有问题回答完成后可以再次修改
-    echo "注意：您需要回答以下所有问题，完成后可以检查和修改任何配置项。"
+    echo "注意: 您需要回答以下所有问题, 完成后可以检查和修改任何配置项。"
     echo ""
     
     # 询问是否修改时区为中国上海
@@ -134,14 +134,14 @@ ask_user_config() {
     fi
 
     # 询问是否关闭 swap
-    read -rp "是否禁用 swap（虚拟内存）? (y/n): " answer
+    read -rp "是否禁用 swap (虚拟内存) ? (y/n): " answer
     if [[ ! "$answer" =~ ^[Nn]$ ]]; then
         SWAP_DISABLED=true
     fi
 
     # 询问是否换源 (Armbian 系统不提供此功能)
     if [ "$IS_ARMBIAN" = false ]; then
-        read -rp "是否更换 apt 软件源为 USTC（中科大）? (y/n): " answer
+        read -rp "是否更换 apt 软件源为 USTC (中科大) ? (y/n): " answer
         if [[ ! "$answer" =~ ^[Nn]$ ]]; then
             USE_CUSTOM_MIRROR=true
         fi
@@ -223,7 +223,7 @@ ask_user_config() {
     done
 
     # 询问管理员账号密码
-    read -rp "Landscape Router 管理员 用户名、密码 均为 root，是否修改? (y/n): " answer
+    read -rp "Landscape Router 管理员 用户名、密码 均为 root, 是否修改? (y/n): " answer
     if [[ ! "$answer" =~ ^[Nn]$ ]]; then
         read -rp "请输入管理员用户名 (默认: root): " custom_user
         if [ -n "$custom_user" ]; then
@@ -250,7 +250,7 @@ ask_user_config() {
         echo "请检查您的配置:"
         echo "=============================="
         echo "1. 系统时区设置为亚洲/上海: $([ "$TIMEZONE_SHANGHAI" = true ] && echo "是" || echo "否")"
-        echo "2. 禁用 swap（虚拟内存）: $([ "$SWAP_DISABLED" = true ] && echo "是" || echo "否")"
+        echo "2. 禁用 swap (虚拟内存) : $([ "$SWAP_DISABLED" = true ] && echo "是" || echo "否")"
         echo "3. 更换 apt 软件源为 USTC: $([ "$USE_CUSTOM_MIRROR" = true ] && echo "是" || echo "否")"
         echo "4. 安装 Docker: $([ "$DOCKER_INSTALLED" = true ] && echo "是" || echo "否")"
         if [ "$DOCKER_INSTALLED" = true ]; then
@@ -273,7 +273,7 @@ ask_user_config() {
         echo "$LAN_CONFIG" | sed 's/^/    /'
         echo "=============================="
         
-        read -rp "是否需要修改配置? (输入编号修改对应配置，输入 'done' 完成配置): " config_choice
+        read -rp "是否需要修改配置? (输入编号修改对应配置, 输入 'done' 完成配置): " config_choice
         case "$config_choice" in
             1)
                 read -rp "是否将系统时区修改为亚洲/上海? (y/n): " answer
@@ -293,7 +293,7 @@ ask_user_config() {
                 ;;
             3)
                 if [ "$IS_ARMBIAN" = false ]; then
-                    read -rp "是否更换 apt 软件源为 USTC（中科大）? (y/n): " answer
+                    read -rp "是否更换 apt 软件源为 USTC (中科大) ? (y/n): " answer
                     if [[ ! "$answer" =~ ^[Nn]$ ]]; then
                         USE_CUSTOM_MIRROR=true
                     else
@@ -409,7 +409,7 @@ ask_user_config() {
                 config_confirmed=true
                 ;;
             *)
-                echo "无效选择，请重新输入"
+                echo "无效选择, 请重新输入"
                 echo "按任意键继续..."
                 read -n 1 -s
                 ;;
@@ -435,7 +435,7 @@ config_lan_interface() {
     interfaces=$(ip link show | awk -F': ' '/^[0-9]+: [a-zA-Z]/ {print $2}' | grep -v lo)
     
     # 显示网卡详细信息
-    echo "可用网络接口信息："
+    echo "可用网络接口信息: "
     local i=1
     for iface in $interfaces; do
         echo "$i) $iface"
@@ -461,7 +461,7 @@ config_lan_interface() {
         
         # 检查输入格式有效性
         if ! [[ "$choice" =~ ^[0-9\ ]+$ ]]; then
-            echo "输入无效，只能包含数字和空格"
+            echo "输入无效, 只能包含数字和空格"
             continue
         fi
         
@@ -471,7 +471,7 @@ config_lan_interface() {
         
         for c in $choice; do
             if [ "$c" -lt 1 ] || [ "$c" -gt "$max_index" ]; then
-                echo "编号 $c 超出范围，请输入 1 到 $max_index 的数字"
+                echo "编号 $c 超出范围, 请输入 1 到 $max_index 的数字"
                 valid_input=false
                 break
             fi
@@ -490,7 +490,7 @@ config_lan_interface() {
     done
     
     # 处理选择的网卡
-    echo "已选择的网卡："
+    echo "已选择的网卡: "
     for c in $choice; do
         local selected_iface
         selected_iface=$(echo "$interfaces" | sed -n "${c}p")
@@ -530,7 +530,7 @@ config_lan_interface() {
         if valid_ip "$lan_ip"; then
             break
         else
-            echo "输入的 IP 地址无效，请输入有效的 IP 地址（例如：192.168.88.1）"
+            echo "输入的 IP 地址无效, 请输入有效的 IP 地址 (例如: 192.168.88.1) "
         fi
     done
     
@@ -545,7 +545,7 @@ config_lan_interface() {
         if valid_ip "$dhcp_start"; then
             break
         else
-            echo "输入的 IP 地址无效，请输入有效的 IP 地址（例如：192.168.88.100）"
+            echo "输入的 IP 地址无效, 请输入有效的 IP 地址 (例如: 192.168.88.100) "
         fi
     done
     
@@ -569,7 +569,7 @@ config_lan_interface() {
                 break
             fi
         else
-            echo "输入的 IP 地址无效，请输入有效的 IP 地址（例如：192.168.88.200）"
+            echo "输入的 IP 地址无效, 请输入有效的 IP 地址 (例如: 192.168.88.200) "
         fi
     done
     
@@ -585,7 +585,7 @@ interfaces = ($(printf '"%s", ' "${selected_interfaces[@]}" | sed 's/, $//'))"
 perform_installation() {
     log "开始执行安装"
     
-    # 1. 创建 Landscape 目录（移到第一个）
+    # 1. 创建 Landscape 目录 (移到第一个) 
     create_landscape_dir
     
     # 2. 修改时区
@@ -611,7 +611,7 @@ perform_installation() {
     
     # 6. 检查并安装 webserver
     if ! dpkg -l | grep -q apache2; then
-        log "检测到系统未安装 web server 环境，将自动安装 Apache2"
+        log "检测到系统未安装 web server 环境, 将自动安装 Apache2"
         install_webserver
     else
         log "检测到系统已安装 web server 环境"
@@ -660,7 +660,7 @@ disable_swap() {
     # 注释掉 fstab 中的 swap 条目
     sed -i 's/^[^#].*swap.*/#&/' /etc/fstab
     
-    log "swap（虚拟内存） 已禁用"
+    log "swap (虚拟内存)  已禁用"
 }
 
 # 换源
@@ -704,9 +704,9 @@ install_webserver() {
 install_docker() {
     log "安装 Docker"
     
-    # 检查 curl 是否已安装，未安装则安装
+    # 检查 curl 是否已安装, 未安装则安装
     if ! command -v curl &> /dev/null; then
-        log "未检测到 curl，正在安装..."
+        log "未检测到 curl, 正在安装..."
         apt_update
         apt_install "curl"
     else
@@ -790,13 +790,13 @@ apt_update() {
                     return 0
                 else
                     retry=$((retry+1))
-                    log "apt update 失败，正在进行第 $retry/$max_retry 次重试"
+                    log "apt update 失败, 正在进行第 $retry/$max_retry 次重试"
                     sleep 3
                 fi
             done
             
             if [ $retry -eq $max_retry ]; then
-                echo "apt update 失败，是否再次尝试？(y/n): "
+                echo "apt update 失败, 是否再次尝试？(y/n): "
                 read -r user_continue
                 user_continue=$(echo "$user_continue" | tr '[:upper:]' '[:lower:]')
             fi
@@ -805,7 +805,7 @@ apt_update() {
         log "错误: apt update 失败"
         exit 1
     else
-        log "apt update 已执行过，跳过"
+        log "apt update 已执行过, 跳过"
     fi
 }
 
@@ -826,13 +826,13 @@ apt_install() {
                 return 0
             else
                 retry=$((retry+1))
-                log "软件包 $packages 安装失败，正在进行第 $retry/$max_retry 次重试"
+                log "软件包 $packages 安装失败, 正在进行第 $retry/$max_retry 次重试"
                 sleep 3
             fi
         done
         
         if [ $retry -eq $max_retry ]; then
-            echo "软件包 $packages 安装失败，是否再次尝试？(y/n): "
+            echo "软件包 $packages 安装失败, 是否再次尝试？(y/n): "
             read -r user_continue
             user_continue=$(echo "$user_continue" | tr '[:upper:]' '[:lower:]')
         fi
@@ -864,7 +864,7 @@ create_landscape_dir() {
         
         # 先尝试直接移动日志文件
         if ! mv "$INSTALL_LOG" "$LANDSCAPE_DIR/script-log/$log_filename" 2>/dev/null; then
-            # 如果直接移动失败，尝试复制并清理原文件
+            # 如果直接移动失败, 尝试复制并清理原文件
             cp "$INSTALL_LOG" "$LANDSCAPE_DIR/script-log/$log_filename" && rm -f "$INSTALL_LOG"
         fi
         
@@ -881,11 +881,11 @@ create_landscape_dir() {
 install_landscape_router() {
     log "下载并安装 Landscape Router"
     
-    # 检查 curl 是否已安装，未安装则安装
+    # 检查 curl 是否已安装, 未安装则安装
     if ! command -v curl &> /dev/null; then
-        log "未检测到 curl，正在安装..."
+        log "未检测到 curl, 正在安装..."
         apt_update
-        apt install curl -y
+        apt_install "curl"
     else
         log "curl 已安装"
     fi
@@ -905,7 +905,7 @@ install_landscape_router() {
                 break
             else
                 retry=$((retry+1))
-                log "获取版本信息失败，正在进行第 $retry/$max_retry 次重试"
+                log "获取版本信息失败, 正在进行第 $retry/$max_retry 次重试"
                 sleep 3
             fi
         done
@@ -913,7 +913,7 @@ install_landscape_router() {
         if [ -n "$version" ]; then
             break
         else
-            echo "获取版本信息失败，是否再次尝试？(y/n): "
+            echo "获取版本信息失败, 是否再次尝试？(y/n): "
             read -r user_continue
             user_continue=$(echo "$user_continue" | tr '[:upper:]' '[:lower:]')
         fi
@@ -956,7 +956,7 @@ install_landscape_router() {
                 break
             else
                 retry=$((retry+1))
-                log "下载失败，等待 5 秒后重试"
+                log "下载失败, 等待 5 秒后重试"
                 sleep 5
             fi
         done
@@ -964,7 +964,7 @@ install_landscape_router() {
         if [ $retry -lt $MAX_RETRY ]; then
             break
         else
-            echo "下载 $binary_filename 失败，是否再次尝试？(y/n): "
+            echo "下载 $binary_filename 失败, 是否再次尝试？(y/n): "
             read -r user_continue
             user_continue=$(echo "$user_continue" | tr '[:upper:]' '[:lower:]')
         fi
@@ -979,7 +979,7 @@ install_landscape_router() {
     log "检查并安装 unzip 工具"
     
     if ! command -v unzip &> /dev/null; then
-        log "未检测到 unzip，正在安装..."
+        log "未检测到 unzip, 正在安装..."
         apt_update
         apt_install "unzip"
     else
@@ -1006,7 +1006,7 @@ install_landscape_router() {
                 break
             else
                 retry=$((retry+1))
-                log "下载失败，等待 5 秒后重试"
+                log "下载失败, 等待 5 秒后重试"
                 sleep 5
             fi
         done
@@ -1014,7 +1014,7 @@ install_landscape_router() {
         if [ $retry -lt $MAX_RETRY ]; then
             break
         else
-            echo "下载 static.zip 失败，是否再次尝试？(y/n): "
+            echo "下载 static.zip 失败, 是否再次尝试？(y/n): "
             read -r user_continue
             user_continue=$(echo "$user_continue" | tr '[:upper:]' '[:lower:]')
         fi
@@ -1134,7 +1134,7 @@ iface lo inet loopback
 
 EOF
 
-# 这几行是从上面拿下来的，是无效的代码，先放在这里，后面会删除
+# 这几行是从上面拿下来的, 是无效的代码, 先放在这里, 后面会删除
 # # LAN bridge
 # auto $(echo "$LAN_CONFIG" | grep "bridge_name" | cut -d '"' -f 2)
 # iface $(echo "$LAN_CONFIG" | grep "bridge_name" | cut -d '"' -f 2) inet static
@@ -1236,7 +1236,7 @@ EOF
     log "landscape_init.toml 配置文件创建完成"
 }
 
-# 创建 landscape.toml 配置文件（包含管理员账号密码）
+# 创建 landscape.toml 配置文件 (包含管理员账号密码) 
 create_landscape_toml() {
     log "创建 landscape.toml 配置文件"
     
@@ -1279,11 +1279,11 @@ finish_installation() {
     echo ""
     echo "1. 从 https://github.com/ThisSeanZhang/landscape/releases 下载最新版本"
     echo "2. 停止服务: systemctl stop landscape-router.service"
-    echo "3. 替换文件并赋予执行权限，如 755"
+    echo "3. 替换文件并赋予执行权限, 如 755"
     echo "4. 启动服务: systemctl start landscape-router.service"
     echo "或者使用项目提供的升级脚本 upgrade_landscape.sh"
     echo ""
-    echo "如果遇到主机失联情况，请按以下步骤操作:"
+    echo "如果遇到主机失联情况, 请按以下步骤操作:"
     echo ""
     echo "1. 在物理机上将合适网卡改为 static 并配置 IP/掩码"
     echo "2. 通过配置的 IP 访问 主机 或 Landscape UI"
@@ -1295,9 +1295,9 @@ finish_installation() {
     local lan_ip
     lan_ip=$(echo "$LAN_CONFIG" | grep "lan_ip" | cut -d '"' -f 2)
     echo "接下来 SSH 连接可能会中断"
-    echo "新的 SSH 地址为 $lan_ip:22"
+    echo "请通过 $lan_ip 连接 SSH 服务"
     echo ""
-    echo "请通过浏览器，访问以下地址管理您的 Landscape Router :"
+    echo "请通过浏览器, 访问以下地址管理您的 Landscape Router :"
     echo "  http://$lan_ip:6300"
     echo "管理员用户名: $ADMIN_USER"
     echo "管理员密码: $ADMIN_PASS"
@@ -1307,7 +1307,7 @@ finish_installation() {
     echo "网络配置即将生效"
     echo "已启动 Landscape Router 服务"
     # 重启网络服务 并 启动 Landscape Router 服务
-    ehco "安装完成，脚本退出"
+    echo "安装完成, 脚本退出"
     systemctl restart networking && systemctl start landscape-router.service
 
     log "安装完成"
