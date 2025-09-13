@@ -6,7 +6,7 @@
 
 **本教程已适配中国大陆网络** 
 
-## 安装过程并不复杂，复制命令粘贴到SSH终端执行即可
+## 脚本安装 Landscape Router [链接](/docs/1-安装升级指南.md/#安装-landscape-router脚本方式)
 
 ## 核心特性
 * 分流控制（SIP-CIDR、QoS(dscp)、DIP、域名、Geo 匹配规则）
@@ -66,6 +66,7 @@ ldd --version
   - [安装 debian](/docs/1-安装升级指南.md/#安装-debian)
 - [安装 landscape router（脚本方式）](/docs/1-安装升级指南.md/#安装-landscape-router脚本方式)
 - [升级 landscape router（脚本方式）](/docs/1-安装升级指南.md/#安装-landscape-router脚本方式)
+- [升级 landscape router（手工方式）](/docs/1-安装升级指南.md/#升级-landscape-router手工方式)
 - [安装 landscape router（手工方式）](/docs/1-安装升级指南.md/#安装-landscape-router手工方式)
   - [时区修改到上海](/docs/1-安装升级指南.md/#时区修改到上海)
   - [允许root用户使用密码登录ssh](/docs/1-安装升级指南.md/#允许root用户使用密码登录ssh)
@@ -84,7 +85,7 @@ ldd --version
   - [至此可以在 landscape-router web 中进行配置](/docs/1-安装升级指南.md/#至此可以在-landscape-router-web-中进行配置)
   - [应用 Landscape-Router 开机启动](/docs/1-安装升级指南.md/#应用-landscape-router-开机启动)
   - [修改apache80端口到8080, 以免后续与其他反代软件冲突](/docs/1-安装升级指南.md/#修改apache80端口到8080-以免后续与其他反代软件冲突)
-- [升级 landscape router（手工方式）](/docs/1-安装升级指南.md/#升级-landscape-router手工方式)
+
 - [在显示器/终端中 启动/关闭/查看 landscape-router ](/docs/1-安装升级指南.md/#在显示器终端中-启动关闭查看-landscape-router)
 - [主机 失联 救急](/docs/1-安装升级指南.md/#主机-失联-救急)
 - [Landscape 实战案例](/docs/2-Landscape分流实践.md/#landscape-实战案例)
