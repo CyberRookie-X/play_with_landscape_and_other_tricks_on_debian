@@ -1115,7 +1115,7 @@ EOF
 
 # 配置网络接口
 configure_network_interfaces() {
-    log "配置网络接口"
+    log "配置所有网络接口为 manual 模式"
     
     # 备份原网络配置
     cp /etc/network/interfaces /etc/network/interfaces.bak
@@ -1156,11 +1156,11 @@ iface $iface inet manual
 EOF
         fi
     done
-    
+    log "LAN 网桥配置 开始"
     # 创建 landscape_init.toml 配置文件
     create_landscape_init_toml
     
-    log "网络接口配置完成"
+    log "LAN 网桥配置 完成"
 }
 
 
@@ -1292,7 +1292,7 @@ finish_installation() {
     echo "Landscape Router 安装完成!"
     echo "=============================="
     echo ""
-    echo "请通过浏览器，访问以下地址管理您的路由器:"
+    echo "请通过浏览器，访问以下地址管理您的 Landscape Router :"
     local lan_ip
     lan_ip=$(echo "$LAN_CONFIG" | grep "lan_ip" | cut -d '"' -f 2)
     echo "  http://$lan_ip:6300"
