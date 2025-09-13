@@ -167,7 +167,7 @@ ghcr.nju.edu.cn
 * 为 包装脚本 和 handler 赋予可执行权限,如 755
 
 
-包装脚本 [下载连接](https://github.com/CyberRookie-X/play_with_landscape_and_other_tricks_on_debian/blob/main/redirect_pkg_handler.sh) | redirect_pkg_handler [下载连接](https://github.com/ThisSeanZhang/landscape/releases)  
+包装脚本 [下载连接](https://raw.githubusercontent.com/CyberRookie-X/Install_landscape_on_debian12_and_manage_compose_by_dpanel/main/redirect_pkg_handler.sh) | redirect_pkg_handler [下载连接](https://github.com/ThisSeanZhang/landscape/releases)  
 
 ![](/images/19.png)
 
