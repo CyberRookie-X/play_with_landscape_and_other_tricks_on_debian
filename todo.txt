@@ -1,7 +1,7 @@
 install_landsacpe.sh
 
 A 高
-网络配置部分，可能存在错误
+网络配置部分，存在错误
 增加多个 github 源
 gitee 镜像加速
 
