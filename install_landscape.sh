@@ -1279,7 +1279,7 @@ finish_installation() {
     echo ""
     echo "1. 从 https://github.com/ThisSeanZhang/landscape/releases 下载最新版本"
     echo "2. 停止服务: systemctl stop landscape-router.service"
-    echo "3. 替换文件并设置权限"
+    echo "3. 替换文件并赋予执行权限，如 755"
     echo "4. 启动服务: systemctl start landscape-router.service"
     echo "或者使用项目提供的升级脚本 upgrade_landscape.sh"
     echo ""
