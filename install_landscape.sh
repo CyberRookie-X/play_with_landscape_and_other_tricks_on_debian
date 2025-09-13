@@ -603,7 +603,13 @@ perform_installation() {
         change_apt_mirror
     fi
     
-    # 5. 检查并安装 webserver
+    # 5. 下载并安装 Landscape Router
+    install_landscape_router
+    
+    # 6. 创建 systemd 服务
+    create_systemd_service
+    
+    # 6. 检查并安装 webserver
     if ! dpkg -l | grep -q apache2; then
         log "检测到系统未安装 web server 环境，将自动安装 Apache2"
         install_webserver
@@ -611,35 +617,29 @@ perform_installation() {
         log "检测到系统已安装 web server 环境"
     fi
     
-    # 6. 安装 Docker
+    # 7. 安装 Docker
     if [ "$DOCKER_INSTALLED" = true ]; then
         install_docker
         configure_docker
     fi
     
-    # 7. 修改 Apache 端口
+    # 8. 修改 Apache 端口
     if [ "$MODIFY_APACHE_PORT" = true ]; then
         modify_apache_port
     fi
     
-    # 8. 安装 ppp
+    # 9. 安装 ppp
     if [ "$INSTALL_PPP" = true ]; then
         install_ppp
     fi
     
-    # 9. 下载并安装 Landscape Router
-    install_landscape_router
-    
-    # 10. 创建 systemd 服务
-    create_systemd_service
-    
-    # 11. 配置网络接口
+    # 10. 配置网络接口
     configure_network_interfaces
     
-    # 12. 创建管理员账号密码配置文件
+    # 11. 创建管理员账号密码配置文件
     create_landscape_toml
     
-    # 13. 关闭本机 DNS 服务
+    # 12. 关闭本机 DNS 服务
     disable_local_dns
     
     log "安装执行完成"
