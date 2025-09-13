@@ -223,7 +223,7 @@ ask_user_config() {
     done
 
     # 询问管理员账号密码
-    read -rp "是否设置 Landscape Router 管理员账号密码? (y/n): " answer
+    read -rp "Landscape Router 管理员 用户名、密码 均为 root，是否修改? (y/n): " answer
     if [[ ! "$answer" =~ ^[Nn]$ ]]; then
         read -rp "请输入管理员用户名 (默认: root): " custom_user
         if [ -n "$custom_user" ]; then
@@ -424,16 +424,15 @@ ask_user_config() {
 config_lan_interface() {
     echo "开始配置 LAN 网卡"
     
+    # 询问网桥名称
+    read -rp "请输入要创建的 LAN 网桥名称 (默认为 lan1): " bridge_name
+    if [ -z "$bridge_name" ]; then
+        bridge_name="lan1"
+    fi
+    
     # 获取可用网卡列表
     local interfaces
     interfaces=$(ip link show | awk -F': ' '/^[0-9]+: [a-zA-Z]/ {print $2}' | grep -v lo)
-    
-    # 检查 ifconfig command
-    if ! command -v ifconfig &> /dev/null; then
-        log "未检测到 ifconfig，正在安装 net-tools..."
-        apt_update
-        apt install net-tools -y
-    fi
     
     # 显示网卡详细信息
     echo "可用网络接口信息："
@@ -441,25 +440,19 @@ config_lan_interface() {
     for iface in $interfaces; do
         echo "$i) $iface"
         # 显示IP地址信息
-        local ip_info=$(ifconfig $iface 2>/dev/null | grep "inet " | awk '{print $2}')
+        local ip_info=$(ip addr show $iface 2>/dev/null | grep "inet " | awk '{print $2}' | cut -d'/' -f1)
         if [ -n "$ip_info" ]; then
             echo "   IP地址: $ip_info"
         fi
         # 显示MAC地址
-        local mac_info=$(ifconfig $iface | grep "ether" | awk '{print $2}')
+        local mac_info=$(ip addr show $iface | grep "link/ether" | awk '{print $2}')
         echo "   MAC地址: $mac_info"
         i=$((i+1))
     done
     echo ""
     
-    # 询问网桥名称
-    read -rp "请输入要创建的网桥名称 (默认为 lan1): " bridge_name
-    if [ -z "$bridge_name" ]; then
-        bridge_name="lan1"
-    fi
-    
     # 选择绑定到网桥的物理网卡
-    local selected_interfaces=()
+    selected_interfaces=()
     local valid_input=false
     
     while [ "$valid_input" = false ]; do
@@ -704,8 +697,7 @@ EOF
 install_webserver() {
     log "安装 Apache2"
     apt_update
-    apt install apache2 -y
-    log "Apache2 安装完成"
+    apt_install "apache2"
 }
 
 # 安装 Docker
@@ -716,7 +708,7 @@ install_docker() {
     if ! command -v curl &> /dev/null; then
         log "未检测到 curl，正在安装..."
         apt_update
-        apt install curl -y
+        apt_install "curl"
     else
         log "curl 已安装"
     fi
@@ -784,20 +776,77 @@ modify_apache_port() {
 apt_update() {
     if [ "$APT_UPDATED" = false ]; then
         log "执行 apt update"
-        apt update
-        APT_UPDATED=true
-        log "apt update 执行完成"
+        
+        local retry=0
+        local max_retry=10
+        local user_continue="y"
+        
+        while [ "$user_continue" = "y" ]; do
+            retry=0
+            while [ $retry -lt $max_retry ]; do
+                if apt update; then
+                    APT_UPDATED=true
+                    log "apt update 执行完成"
+                    return 0
+                else
+                    retry=$((retry+1))
+                    log "apt update 失败，正在进行第 $retry/$max_retry 次重试"
+                    sleep 3
+                fi
+            done
+            
+            if [ $retry -eq $max_retry ]; then
+                echo "apt update 失败，是否再次尝试？(y/n): "
+                read -r user_continue
+                user_continue=$(echo "$user_continue" | tr '[:upper:]' '[:lower:]')
+            fi
+        done
+        
+        log "错误: apt update 失败"
+        exit 1
     else
         log "apt update 已执行过，跳过"
     fi
+}
+
+# 带重试机制的 apt install 函数
+apt_install() {
+    local packages="$1"
+    log "安装软件包: $packages"
+    
+    local retry=0
+    local max_retry=10
+    local user_continue="y"
+    
+    while [ "$user_continue" = "y" ]; do
+        retry=0
+        while [ $retry -lt $max_retry ]; do
+            if apt install $packages -y; then
+                log "软件包 $packages 安装完成"
+                return 0
+            else
+                retry=$((retry+1))
+                log "软件包 $packages 安装失败，正在进行第 $retry/$max_retry 次重试"
+                sleep 3
+            fi
+        done
+        
+        if [ $retry -eq $max_retry ]; then
+            echo "软件包 $packages 安装失败，是否再次尝试？(y/n): "
+            read -r user_continue
+            user_continue=$(echo "$user_continue" | tr '[:upper:]' '[:lower:]')
+        fi
+    done
+    
+    log "错误: 软件包 $packages 安装失败"
+    exit 1
 }
 
 # 安装 ppp
 install_ppp() {
     log "安装 ppp"
     apt_update
-    apt install ppp -y
-    log "ppp 安装完成"
+    apt_install "ppp"
 }
 
 # 创建 Landscape 目录
@@ -845,16 +894,28 @@ install_landscape_router() {
     local version=""
     local retry=0
     local max_retry=10
+    local user_continue="y"
     
-    while [ $retry -lt $max_retry ]; do
-        version=$(curl -s "https://api.github.com/repos/ThisSeanZhang/landscape/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+    while [ "$user_continue" = "y" ]; do
+        retry=0
+        while [ $retry -lt $max_retry ]; do
+            version=$(curl -s "https://api.github.com/repos/ThisSeanZhang/landscape/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+            if [ -n "$version" ]; then
+                log "成功获取 Landscape Router 最新版本: $version"
+                break
+            else
+                retry=$((retry+1))
+                log "获取版本信息失败，正在进行第 $retry/$max_retry 次重试"
+                sleep 3
+            fi
+        done
+        
         if [ -n "$version" ]; then
-            log "成功获取 Landscape Router 最新版本: $version"
             break
         else
-            retry=$((retry+1))
-            log "获取版本信息失败，正在进行第 $retry/$max_retry 次重试"
-            sleep 3
+            echo "获取版本信息失败，是否再次尝试？(y/n): "
+            read -r user_continue
+            user_continue=$(echo "$user_continue" | tr '[:upper:]' '[:lower:]')
         fi
     done
     
@@ -884,19 +945,32 @@ install_landscape_router() {
     fi
     
     local retry=0
-    while [ $retry -lt $MAX_RETRY ]; do
-        log "正在下载 $binary_filename (尝试 $((retry+1))/$MAX_RETRY)"
-        if curl -fsSL -o "$LANDSCAPE_DIR/$binary_filename" "$binary_url"; then
-            log "$binary_filename 下载成功"
+    user_continue="y"
+    
+    while [ "$user_continue" = "y" ]; do
+        retry=0
+        while [ $retry -lt $MAX_RETRY ]; do
+            log "正在下载 $binary_filename (尝试 $((retry+1))/$MAX_RETRY)"
+            if curl -fsSL -o "$LANDSCAPE_DIR/$binary_filename" "$binary_url"; then
+                log "$binary_filename 下载成功"
+                break
+            else
+                retry=$((retry+1))
+                log "下载失败，等待 5 秒后重试"
+                sleep 5
+            fi
+        done
+        
+        if [ $retry -lt $MAX_RETRY ]; then
             break
         else
-            retry=$((retry+1))
-            log "下载失败，等待 5 秒后重试"
-            sleep 5
+            echo "下载 $binary_filename 失败，是否再次尝试？(y/n): "
+            read -r user_continue
+            user_continue=$(echo "$user_continue" | tr '[:upper:]' '[:lower:]')
         fi
     done
     
-    if [ $retry -eq $MAX_RETRY ]; then
+    if [ $retry -eq $MAX_RETRY ] && [ "$user_continue" != "y" ]; then
         log "错误: 下载 $binary_filename 失败"
         exit 1
     fi
@@ -907,8 +981,7 @@ install_landscape_router() {
     if ! command -v unzip &> /dev/null; then
         log "未检测到 unzip，正在安装..."
         apt_update
-        apt install unzip -y
-        log "unzip 安装完成"
+        apt_install "unzip"
     else
         log "unzip 已安装"
     fi
@@ -922,19 +995,32 @@ install_landscape_router() {
     fi
     
     retry=0
-    while [ $retry -lt $MAX_RETRY ]; do
-        log "正在下载 static.zip (尝试 $((retry+1))/$MAX_RETRY)"
-        if curl -fsSL -o "/tmp/static.zip" "$static_url"; then
-            log "static.zip 下载成功"
+    user_continue="y"
+    
+    while [ "$user_continue" = "y" ]; do
+        retry=0
+        while [ $retry -lt $MAX_RETRY ]; do
+            log "正在下载 static.zip (尝试 $((retry+1))/$MAX_RETRY)"
+            if curl -fsSL -o "/tmp/static.zip" "$static_url"; then
+                log "static.zip 下载成功"
+                break
+            else
+                retry=$((retry+1))
+                log "下载失败，等待 5 秒后重试"
+                sleep 5
+            fi
+        done
+        
+        if [ $retry -lt $MAX_RETRY ]; then
             break
         else
-            retry=$((retry+1))
-            log "下载失败，等待 5 秒后重试"
-            sleep 5
+            echo "下载 static.zip 失败，是否再次尝试？(y/n): "
+            read -r user_continue
+            user_continue=$(echo "$user_continue" | tr '[:upper:]' '[:lower:]')
         fi
     done
     
-    if [ $retry -eq $MAX_RETRY ]; then
+    if [ $retry -eq $MAX_RETRY ] && [ "$user_continue" != "y" ]; then
         log "错误: 下载 static.zip 失败"
         exit 1
     fi
@@ -1180,18 +1266,10 @@ disable_local_dns() {
 # 完成安装
 finish_installation() {
     log "完成安装过程"
-    
-    # 重启网络服务
-    log "重启网络服务"
-    systemctl restart networking
-    
-    # 启动 Landscape Router 服务
-    log "启动 Landscape Router 服务"
-    systemctl start landscape-router.service
-    
+
     # 设置开机自启
     systemctl enable landscape-router.service >/dev/null 2>&1
-    
+
     # 显示安装完成信息
     echo ""
     echo "=============================="
@@ -1204,6 +1282,7 @@ finish_installation() {
     echo "管理员用户名: $ADMIN_USER"
     echo "管理员密码: $ADMIN_PASS"
     echo ""
+    echo "管理员密码 不会出现在 安装脚本日志中"
     echo "安装脚本日志文件保存在: $INSTALL_LOG"
     echo ""
     echo "升级 Landscape Router 的方法:"
@@ -1218,21 +1297,11 @@ finish_installation() {
     echo "2. 通过配置的 IP 访问 主机 或 Landscape UI"
     echo "=============================="
     
-    log "安装完成"
-}
+    # 重启网络服务 并 启动 Landscape Router 服务
+    log "Landscape Router 服务已启动"
+    systemctl restart networking && systemctl start landscape-router.service
 
-# 安装 unzip 工具
-install_unzip() {
-    log "检查并安装 unzip 工具"
-    
-    if ! command -v unzip &> /dev/null; then
-        log "未检测到 unzip，正在安装..."
-        apt_update
-        apt install unzip -y
-        log "unzip 安装完成"
-    else
-        log "unzip 已安装"
-    fi
+    log "安装完成"
 }
 
 # 调用主函数
