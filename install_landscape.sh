@@ -1307,7 +1307,7 @@ finish_installation() {
     echo "网络配置即将生效"
     echo "已启动 Landscape Router 服务"
     # 重启网络服务 并 启动 Landscape Router 服务
-    log "安装完成，脚本退出"
+    ehco "安装完成，脚本退出"
     systemctl restart networking && systemctl start landscape-router.service
 
     log "安装完成"
