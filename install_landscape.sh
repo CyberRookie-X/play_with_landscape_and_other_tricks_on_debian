@@ -410,6 +410,7 @@ ask_user_config() {
                 ;;
             *)
                 echo "无效选择，请重新输入"
+                sleep 2
                 ;;
         esac
     done
