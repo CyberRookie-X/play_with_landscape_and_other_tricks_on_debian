@@ -134,7 +134,7 @@ ask_user_config() {
     fi
 
     # 询问是否关闭 swap
-    read -rp "是否关闭 swap? (y/n): " answer
+    read -rp "是否禁用 swap（虚拟内存）? (y/n): " answer
     if [[ ! "$answer" =~ ^[Nn]$ ]]; then
         SWAP_DISABLED=true
     fi
@@ -250,7 +250,7 @@ ask_user_config() {
         echo "请检查您的配置:"
         echo "=============================="
         echo "1. 系统时区设置为亚洲/上海: $([ "$TIMEZONE_SHANGHAI" = true ] && echo "是" || echo "否")"
-        echo "2. 关闭 swap: $([ "$SWAP_DISABLED" = true ] && echo "是" || echo "否")"
+        echo "2. 禁用 swap（虚拟内存）: $([ "$SWAP_DISABLED" = true ] && echo "是" || echo "否")"
         echo "3. 更换 apt 软件源为 USTC: $([ "$USE_CUSTOM_MIRROR" = true ] && echo "是" || echo "否")"
         echo "4. 安装 Docker: $([ "$DOCKER_INSTALLED" = true ] && echo "是" || echo "否")"
         if [ "$DOCKER_INSTALLED" = true ]; then
@@ -284,7 +284,7 @@ ask_user_config() {
                 fi
                 ;;
             2)
-                read -rp "是否关闭 swap? (y/n): " answer
+                read -rp "是否禁用 swap? (y/n): " answer
                 if [[ ! "$answer" =~ ^[Nn]$ ]]; then
                     SWAP_DISABLED=true
                 else
@@ -655,12 +655,12 @@ setup_timezone() {
 
 # 关闭 swap
 disable_swap() {
-    log "关闭 swap"
+    log "禁用 swap (虚拟内存)"
     
     # 注释掉 fstab 中的 swap 条目
     sed -i 's/^[^#].*swap.*/#&/' /etc/fstab
     
-    log "swap 关闭完成"
+    log "swap（虚拟内存） 已禁用"
 }
 
 # 换源
