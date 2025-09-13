@@ -128,30 +128,30 @@ ask_user_config() {
     echo ""
     
     # 询问是否修改时区为中国上海
-    read -rp "是否将系统时区修改为亚洲/上海? (y/N): " answer
-    if [[ "$answer" =~ ^[Yy]$ ]]; then
+    read -rp "是否将系统时区修改为亚洲/上海? (y/n): " answer
+    if [[ ! "$answer" =~ ^[Nn]$ ]]; then
         TIMEZONE_SHANGHAI=true
     fi
-    
+
     # 询问是否关闭 swap
-    read -rp "是否关闭 swap? (y/N): " answer
-    if [[ "$answer" =~ ^[Yy]$ ]]; then
+    read -rp "是否关闭 swap? (y/n): " answer
+    if [[ ! "$answer" =~ ^[Nn]$ ]]; then
         SWAP_DISABLED=true
     fi
-    
+
     # 询问是否换源 (Armbian 系统不提供此功能)
     if [ "$IS_ARMBIAN" = false ]; then
-        read -rp "是否更换 apt 软件源为 USTC（中科大）? (y/N): " answer
-        if [[ "$answer" =~ ^[Yy]$ ]]; then
+        read -rp "是否更换 apt 软件源为 USTC（中科大）? (y/n): " answer
+        if [[ ! "$answer" =~ ^[Nn]$ ]]; then
             USE_CUSTOM_MIRROR=true
         fi
     else
         log "Armbian 系统不提供换源功能"
     fi
-    
+
     # 询问是否安装 Docker
-    read -rp "是否安装 Docker? (y/N): " answer
-    if [[ "$answer" =~ ^[Yy]$ ]]; then
+    read -rp "是否安装 Docker? (y/n): " answer
+    if [[ ! "$answer" =~ ^[Nn]$ ]]; then
         DOCKER_INSTALLED=true
         
         # 询问 Docker 镜像源
@@ -167,31 +167,31 @@ ask_user_config() {
         esac
         
         # 询问是否为 Docker 开启 IPv6
-        read -rp "是否为 Docker 开启 IPv6 支持? (y/N): " answer
-        if [[ "$answer" =~ ^[Yy]$ ]]; then
+        read -rp "是否为 Docker 开启 IPv6 支持? (y/n): " answer
+        if [[ ! "$answer" =~ ^[Nn]$ ]]; then
             DOCKER_ENABLE_IPV6=true
         fi
     fi
-    
+
     # 询问是否修改 Apache 端口
-    read -rp "是否修改 Apache 端口以避免与其他反向代理软件冲突? (y/N): " answer
-    if [[ "$answer" =~ ^[Yy]$ ]]; then
+    read -rp "是否修改 Apache 端口以避免与其他反向代理软件冲突? (y/n): " answer
+    if [[ ! "$answer" =~ ^[Nn]$ ]]; then
         MODIFY_APACHE_PORT=true
         read -rp "请输入新的 Apache 端口 (默认为 8080): " answer
         if [[ -n "$answer" ]] && [[ "$answer" =~ ^[0-9]+$ ]]; then
             APACHE_PORT="$answer"
         fi
     fi
-    
+
     # 询问是否安装 ppp 用于 pppoe 拨号
-    read -rp "是否安装 ppp 用于 pppoe 拨号? (y/N): " answer
-    if [[ "$answer" =~ ^[Yy]$ ]]; then
+    read -rp "是否安装 ppp 用于 pppoe 拨号? (y/n): " answer
+    if [[ ! "$answer" =~ ^[Nn]$ ]]; then
         INSTALL_PPP=true
     fi
-    
+
     # 询问是否使用 GitHub 镜像加速
-    read -rp "是否使用 GitHub 镜像加速下载 Landscape Router 文件? (y/N): " answer
-    if [[ "$answer" =~ ^[Yy]$ ]]; then
+    read -rp "是否使用 GitHub 镜像加速下载 Landscape Router 文件? (y/n): " answer
+    if [[ ! "$answer" =~ ^[Nn]$ ]]; then
         USE_GITHUB_MIRROR=true
         echo "可选的 GitHub 镜像加速地址:"
         echo "1) https://ghfast.top (默认)"
@@ -221,10 +221,10 @@ ask_user_config() {
         
         break
     done
-    
+
     # 询问管理员账号密码
-    read -rp "是否设置 Landscape Router 管理员账号密码? (y/N): " answer
-    if [[ "$answer" =~ ^[Yy]$ ]]; then
+    read -rp "是否设置 Landscape Router 管理员账号密码? (y/n): " answer
+    if [[ ! "$answer" =~ ^[Nn]$ ]]; then
         read -rp "请输入管理员用户名 (默认: root): " custom_user
         if [ -n "$custom_user" ]; then
             ADMIN_USER="$custom_user"
@@ -276,16 +276,16 @@ ask_user_config() {
         read -rp "是否需要修改配置? (输入编号修改对应配置，输入 'done' 完成配置): " config_choice
         case "$config_choice" in
             1)
-                read -rp "是否将系统时区修改为亚洲/上海? (y/N): " answer
-                if [[ "$answer" =~ ^[Yy]$ ]]; then
+                read -rp "是否将系统时区修改为亚洲/上海? (y/n): " answer
+                if [[ ! "$answer" =~ ^[Nn]$ ]]; then
                     TIMEZONE_SHANGHAI=true
                 else
                     TIMEZONE_SHANGHAI=false
                 fi
                 ;;
             2)
-                read -rp "是否关闭 swap? (y/N): " answer
-                if [[ "$answer" =~ ^[Yy]$ ]]; then
+                read -rp "是否关闭 swap? (y/n): " answer
+                if [[ ! "$answer" =~ ^[Nn]$ ]]; then
                     SWAP_DISABLED=true
                 else
                     SWAP_DISABLED=false
@@ -293,8 +293,8 @@ ask_user_config() {
                 ;;
             3)
                 if [ "$IS_ARMBIAN" = false ]; then
-                    read -rp "是否更换 apt 软件源为 USTC（中科大）? (y/N): " answer
-                    if [[ "$answer" =~ ^[Yy]$ ]]; then
+                    read -rp "是否更换 apt 软件源为 USTC（中科大）? (y/n): " answer
+                    if [[ ! "$answer" =~ ^[Nn]$ ]]; then
                         USE_CUSTOM_MIRROR=true
                     else
                         USE_CUSTOM_MIRROR=false
@@ -304,8 +304,8 @@ ask_user_config() {
                 fi
                 ;;
             4)
-                read -rp "是否安装 Docker? (y/N): " answer
-                if [[ "$answer" =~ ^[Yy]$ ]]; then
+                read -rp "是否安装 Docker? (y/n): " answer
+                if [[ ! "$answer" =~ ^[Nn]$ ]]; then
                     DOCKER_INSTALLED=true
                     
                     echo "请选择 Docker 镜像源:"
@@ -319,8 +319,8 @@ ask_user_config() {
                         *) DOCKER_MIRROR="aliyun" ;;
                     esac
                     
-                    read -rp "是否为 Docker 开启 IPv6 支持? (y/N): " answer
-                    if [[ "$answer" =~ ^[Yy]$ ]]; then
+                    read -rp "是否为 Docker 开启 IPv6 支持? (y/n): " answer
+                    if [[ ! "$answer" =~ ^[Nn]$ ]]; then
                         DOCKER_ENABLE_IPV6=true
                     else
                         DOCKER_ENABLE_IPV6=false
@@ -330,8 +330,8 @@ ask_user_config() {
                 fi
                 ;;
             5)
-                read -rp "是否修改 Apache 端口以避免与其他反向代理软件冲突? (y/N): " answer
-                if [[ "$answer" =~ ^[Yy]$ ]]; then
+                read -rp "是否修改 Apache 端口以避免与其他反向代理软件冲突? (y/n): " answer
+                if [[ ! "$answer" =~ ^[Nn]$ ]]; then
                     MODIFY_APACHE_PORT=true
                     read -rp "请输入新的 Apache 端口 (默认为 8080): " answer
                     if [[ -n "$answer" ]] && [[ "$answer" =~ ^[0-9]+$ ]]; then
@@ -342,16 +342,16 @@ ask_user_config() {
                 fi
                 ;;
             6)
-                read -rp "是否安装 ppp 用于 pppoe 拨号? (y/N): " answer
-                if [[ "$answer" =~ ^[Yy]$ ]]; then
+                read -rp "是否安装 ppp 用于 pppoe 拨号? (y/n): " answer
+                if [[ ! "$answer" =~ ^[Nn]$ ]]; then
                     INSTALL_PPP=true
                 else
                     INSTALL_PPP=false
                 fi
                 ;;
             7)
-                read -rp "是否使用 GitHub 镜像加速下载 Landscape Router 文件? (y/N): " answer
-                if [[ "$answer" =~ ^[Yy]$ ]]; then
+                read -rp "是否使用 GitHub 镜像加速下载 Landscape Router 文件? (y/n): " answer
+                if [[ ! "$answer" =~ ^[Nn]$ ]]; then
                     USE_GITHUB_MIRROR=true
                     echo "可选的 GitHub 镜像加速地址:"
                     echo "1) https://ghfast.top (默认)"
@@ -385,8 +385,8 @@ ask_user_config() {
                 done
                 ;;
             9)
-                read -rp "是否设置 Landscape Router 管理员账号密码? (y/N): " answer
-                if [[ "$answer" =~ ^[Yy]$ ]]; then
+                read -rp "是否设置 Landscape Router 管理员账号密码? (y/n): " answer
+                if [[ ! "$answer" =~ ^[Nn]$ ]]; then
                     read -rp "请输入管理员用户名 (默认: root): " custom_user
                     if [ -n "$custom_user" ]; then
                         ADMIN_USER="$custom_user"
@@ -410,7 +410,8 @@ ask_user_config() {
                 ;;
             *)
                 echo "无效选择，请重新输入"
-                sleep 2
+                echo "按任意键继续..."
+                read -n 1 -s
                 ;;
         esac
     done
@@ -427,6 +428,30 @@ config_lan_interface() {
     local interfaces
     interfaces=$(ip link show | awk -F': ' '/^[0-9]+: [a-zA-Z]/ {print $2}' | grep -v lo)
     
+    # 检查 ifconfig command
+    if ! command -v ifconfig &> /dev/null; then
+        log "未检测到 ifconfig，正在安装 net-tools..."
+        apt_update
+        apt install net-tools -y
+    fi
+    
+    # 显示网卡详细信息
+    echo "可用网络接口信息："
+    local i=1
+    for iface in $interfaces; do
+        echo "$i) $iface"
+        # 显示IP地址信息
+        local ip_info=$(ifconfig $iface 2>/dev/null | grep "inet " | awk '{print $2}')
+        if [ -n "$ip_info" ]; then
+            echo "   IP地址: $ip_info"
+        fi
+        # 显示MAC地址
+        local mac_info=$(ifconfig $iface | grep "ether" | awk '{print $2}')
+        echo "   MAC地址: $mac_info"
+        i=$((i+1))
+    done
+    echo ""
+    
     # 询问网桥名称
     read -rp "请输入要创建的网桥名称 (默认为 lan1): " bridge_name
     if [ -z "$bridge_name" ]; then
@@ -434,77 +459,126 @@ config_lan_interface() {
     fi
     
     # 选择绑定到网桥的物理网卡
-    echo "可用的网络接口 (请选择要绑定到 $bridge_name 网桥的网卡):"
-    local i=1
-    for iface in $interfaces; do
-        echo "$i) $iface"
-        i=$((i+1))
-    done
-    
     local selected_interfaces=()
-    echo "请输入网卡编号 (多个编号用空格分隔，例如: 1 3 5):"
-    read -r choice
+    local valid_input=false
     
-    # 处理多个选择
-    local valid_choices=true
-    for c in $choice; do
-        if ! [[ "$c" =~ ^[0-9]+$ ]] || [ "$c" -lt 1 ] || [ "$c" -ge "$i" ]; then
-            valid_choices=false
-            break
-        fi
-    done
-    
-    # 如果选择无效，要求重新输入直到有效为止
-    while [ "$valid_choices" = false ]; do
-        echo "无效选择，请重新输入网卡编号 (多个编号用空格分隔):"
+    while [ "$valid_input" = false ]; do
+        echo "请输入要绑定到 $bridge_name 网桥的网卡编号 (多个编号用空格分隔):"
         read -r choice
         
-        valid_choices=true
+        # 检查输入格式有效性
+        if ! [[ "$choice" =~ ^[0-9\ ]+$ ]]; then
+            echo "输入无效，只能包含数字和空格"
+            continue
+        fi
+        
+        # 检查每个编号的有效性
+        valid_input=true
+        local max_index=$((i-1))
+        
         for c in $choice; do
-            if ! [[ "$c" =~ ^[0-9]+$ ]] || [ "$c" -lt 1 ] || [ "$c" -ge "$i" ]; then
-                valid_choices=false
+            if [ "$c" -lt 1 ] || [ "$c" -gt "$max_index" ]; then
+                echo "编号 $c 超出范围，请输入 1 到 $max_index 的数字"
+                valid_input=false
                 break
             fi
         done
+        
+        # 检查是否有重复选择
+        local unique_check=()
+        for c in $choice; do
+            if [[ " ${unique_check[*]} " =~ " ${c} " ]]; then
+                echo "检测到重复的选择: $c"
+                valid_input=false
+                break
+            fi
+            unique_check+=("$c")
+        done
     done
     
-    # 处理有效选择
+    # 处理选择的网卡
+    echo "已选择的网卡："
     for c in $choice; do
         local selected_iface
         selected_iface=$(echo "$interfaces" | sed -n "${c}p")
+        selected_interfaces+=("$selected_iface")
+        echo "- $selected_iface"
+    done
+    
+    # 验证 IP 地址格式的函数
+    function valid_ip() {
+        local ip=$1
+        local stat=1
         
-        # 检查是否已选择
-        local already_selected=false
-        for iface in "${selected_interfaces[@]}"; do
-            if [ "$iface" = "$selected_iface" ]; then
-                already_selected=true
-                break
+        if [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+            IFS='.' read -r -a ip_parts <<< "$ip"
+            
+            if [ "${ip_parts[0]}" -eq 127 ] && [ "${ip_parts[1]}" -le 255 ] && [ "${ip_parts[2]}" -le 255 ] && [ "${ip_parts[3]}" -le 255 ]; then
+                stat=0
+            elif [ "${ip_parts[0]}" -ge 1 ] && [ "${ip_parts[0]}" -le 255 ] && \
+                 [ "${ip_parts[1]}" -ge 0 ] && [ "${ip_parts[1]}" -le 255 ] && \
+                 [ "${ip_parts[2]}" -ge 0 ] && [ "${ip_parts[2]}" -le 255 ] && \
+                 [ "${ip_parts[3]}" -ge 1 ] && [ "${ip_parts[3]}" -le 254 ]; then
+                stat=0
             fi
-        done
+        fi
         
-        if [ "$already_selected" = true ]; then
-            echo "网卡 $selected_iface 已选择"
+        return $stat
+    }
+    
+    # 询问 LAN IP
+    while true; do
+        read -rp "请输入 LAN 网桥的 IP 地址 (默认为 192.168.88.1): " lan_ip
+        if [ -z "$lan_ip" ]; then
+            lan_ip="192.168.88.1"
+            break
+        fi
+        
+        if valid_ip "$lan_ip"; then
+            break
         else
-            selected_interfaces+=("$selected_iface")
-            echo "已选择网卡: $selected_iface"
+            echo "输入的 IP 地址无效，请输入有效的 IP 地址（例如：192.168.88.1）"
         fi
     done
     
-    # 询问 LAN IP 和 DHCP 范围
-    read -rp "请输入 LAN 网桥的 IP 地址 (默认为 192.168.88.1): " lan_ip
-    if [ -z "$lan_ip" ]; then
-        lan_ip="192.168.88.1"
-    fi
+    # 询问 DHCP 范围
+    while true; do
+        read -rp "请输入 DHCP IP 范围起始地址 (默认为 192.168.88.100): " dhcp_start
+        if [ -z "$dhcp_start" ]; then
+            dhcp_start="192.168.88.100"
+            break
+        fi
+        
+        if valid_ip "$dhcp_start"; then
+            break
+        else
+            echo "输入的 IP 地址无效，请输入有效的 IP 地址（例如：192.168.88.100）"
+        fi
+    done
     
-    read -rp "请输入 DHCP IP 范围起始地址 (默认为 192.168.88.100): " dhcp_start
-    if [ -z "$dhcp_start" ]; then
-        dhcp_start="192.168.88.100"
-    fi
-    
-    read -rp "请输入 DHCP IP 范围结束地址 (默认为 192.168.88.200): " dhcp_end
-    if [ -z "$dhcp_end" ]; then
-        dhcp_end="192.168.88.200"
-    fi
+    while true; do
+        read -rp "请输入 DHCP IP 范围结束地址 (默认为 192.168.88.200): " dhcp_end
+        if [ -z "$dhcp_end" ]; then
+            dhcp_end="192.168.88.200"
+            break
+        fi
+        
+        if valid_ip "$dhcp_end"; then
+            # 检查结束IP是否在合理范围内
+            local start_octets=(${dhcp_start//./ })
+            local end_octets=(${dhcp_end//./ })
+            
+            if [ "${end_octets[3]}" -le "${start_octets[3]}" ]; then
+                echo "DHCP 结束地址必须大于起始地址"
+            elif [ $((end_octets[3] - start_octets[3])) -gt 100 ]; then
+                echo "DHCP 地址范围不应超过 100 个地址"
+            else
+                break
+            fi
+        else
+            echo "输入的 IP 地址无效，请输入有效的 IP 地址（例如：192.168.88.200）"
+        fi
+    done
     
     # 构建 LAN 配置
     LAN_CONFIG="bridge_name = \"$bridge_name\"
