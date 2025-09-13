@@ -442,35 +442,51 @@ config_lan_interface() {
     done
     
     local selected_interfaces=()
-    while true; do
-        read -rp "请选择网卡编号 (输入编号后按回车，输入 'done' 完成选择): " choice
-        if [ "$choice" = "done" ]; then
-            if [ ${#selected_interfaces[@]} -eq 0 ]; then
-                echo "至少需要选择一个网卡"
-                continue
-            fi
+    echo "请输入网卡编号 (多个编号用空格分隔，例如: 1 3 5):"
+    read -r choice
+    
+    # 处理多个选择
+    local valid_choices=true
+    for c in $choice; do
+        if ! [[ "$c" =~ ^[0-9]+$ ]] || [ "$c" -lt 1 ] || [ "$c" -ge "$i" ]; then
+            valid_choices=false
             break
-        elif [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -lt "$i" ]; then
-            local selected_iface
-            selected_iface=$(echo "$interfaces" | sed -n "${choice}p")
-            
-            # 检查是否已选择
-            local already_selected=false
-            for iface in "${selected_interfaces[@]}"; do
-                if [ "$iface" = "$selected_iface" ]; then
-                    already_selected=true
-                    break
-                fi
-            done
-            
-            if [ "$already_selected" = true ]; then
-                echo "网卡 $selected_iface 已选择，请选择其他网卡"
-            else
-                selected_interfaces+=("$selected_iface")
-                echo "已选择网卡: $selected_iface"
+        fi
+    done
+    
+    # 如果选择无效，要求重新输入直到有效为止
+    while [ "$valid_choices" = false ]; do
+        echo "无效选择，请重新输入网卡编号 (多个编号用空格分隔):"
+        read -r choice
+        
+        valid_choices=true
+        for c in $choice; do
+            if ! [[ "$c" =~ ^[0-9]+$ ]] || [ "$c" -lt 1 ] || [ "$c" -ge "$i" ]; then
+                valid_choices=false
+                break
             fi
+        done
+    done
+    
+    # 处理有效选择
+    for c in $choice; do
+        local selected_iface
+        selected_iface=$(echo "$interfaces" | sed -n "${c}p")
+        
+        # 检查是否已选择
+        local already_selected=false
+        for iface in "${selected_interfaces[@]}"; do
+            if [ "$iface" = "$selected_iface" ]; then
+                already_selected=true
+                break
+            fi
+        done
+        
+        if [ "$already_selected" = true ]; then
+            echo "网卡 $selected_iface 已选择"
         else
-            echo "无效选择，请重新输入"
+            selected_interfaces+=("$selected_iface")
+            echo "已选择网卡: $selected_iface"
         fi
     done
     
@@ -811,6 +827,18 @@ install_landscape_router() {
         exit 1
     fi
     
+    # 确保 unzip 已安装
+    log "检查并安装 unzip 工具"
+    
+    if ! command -v unzip &> /dev/null; then
+        log "未检测到 unzip，正在安装..."
+        apt_update
+        apt install unzip -y
+        log "unzip 安装完成"
+    else
+        log "unzip 已安装"
+    fi
+    
     # 下载 static.zip
     local static_url
     if [ "$USE_GITHUB_MIRROR" = true ]; then
@@ -1117,6 +1145,20 @@ finish_installation() {
     echo "=============================="
     
     log "安装完成"
+}
+
+# 安装 unzip 工具
+install_unzip() {
+    log "检查并安装 unzip 工具"
+    
+    if ! command -v unzip &> /dev/null; then
+        log "未检测到 unzip，正在安装..."
+        apt_update
+        apt install unzip -y
+        log "unzip 安装完成"
+    else
+        log "unzip 已安装"
+    fi
 }
 
 # 调用主函数
