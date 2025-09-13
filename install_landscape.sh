@@ -1272,7 +1272,7 @@ finish_installation() {
 
     # 显示安装完成信息
     echo ""
-    echo "管理员密码 不会出现在 安装脚本日志中"
+    echo "管理员密码 不会出现在 安装脚本日志文件中"
     echo "安装脚本日志文件保存在: $INSTALL_LOG"
     echo ""
     echo "升级 Landscape Router 的方法:"
