@@ -1074,7 +1074,7 @@ install_landscape_router() {
     # 添加执行权限
     chmod +x "$LANDSCAPE_DIR/$binary_filename"
     
-    log "Landscape Router 安装完成"
+    log "Landscape Router 部署完成"
 }
 
 
