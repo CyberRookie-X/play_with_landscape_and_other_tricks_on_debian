@@ -1272,20 +1272,11 @@ finish_installation() {
 
     # 显示安装完成信息
     echo ""
-    echo "=============================="
-    echo "Landscape Router 安装完成!"
-    echo "=============================="
-    echo "请通过浏览器访问以下地址管理您的路由器:"
-    local lan_ip
-    lan_ip=$(echo "$LAN_CONFIG" | grep "lan_ip" | cut -d '"' -f 2)
-    echo "  http://$lan_ip:6300"
-    echo "管理员用户名: $ADMIN_USER"
-    echo "管理员密码: $ADMIN_PASS"
-    echo ""
     echo "管理员密码 不会出现在 安装脚本日志中"
     echo "安装脚本日志文件保存在: $INSTALL_LOG"
     echo ""
     echo "升级 Landscape Router 的方法:"
+    echo ""
     echo "1. 从 https://github.com/ThisSeanZhang/landscape/releases 下载最新版本"
     echo "2. 停止服务: systemctl stop landscape-router.service"
     echo "3. 替换文件并设置权限"
@@ -1293,9 +1284,23 @@ finish_installation() {
     echo "或者使用项目提供的升级脚本 upgrade_landscape.sh"
     echo ""
     echo "如果遇到主机失联情况，请按以下步骤操作:"
+    echo ""
     echo "1. 在物理机上将合适网卡改为 static 并配置 IP/掩码"
     echo "2. 通过配置的 IP 访问 主机 或 Landscape UI"
+    echo ""
     echo "=============================="
+    echo "Landscape Router 安装完成!"
+    echo "=============================="
+    echo ""
+    echo "请通过浏览器访问以下地址管理您的路由器:"
+    local lan_ip
+    lan_ip=$(echo "$LAN_CONFIG" | grep "lan_ip" | cut -d '"' -f 2)
+    echo "  http://$lan_ip:6300"
+    echo "管理员用户名: $ADMIN_USER"
+    echo "管理员密码: $ADMIN_PASS"
+    echo ""
+    echo "=============================="
+    echo ""
     
     # 重启网络服务 并 启动 Landscape Router 服务
     log "Landscape Router 服务已启动"
