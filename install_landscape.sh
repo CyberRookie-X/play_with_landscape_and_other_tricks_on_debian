@@ -15,17 +15,22 @@ DOCKER_MIRROR="aliyun"
 DOCKER_ENABLE_IPV6=false
 MODIFY_APACHE_PORT=false
 APACHE_PORT="8080"
-WAN_CONFIG=""
 LAN_CONFIG=""
 GITHUB_MIRROR=""
 USE_GITHUB_MIRROR=false
 MAX_RETRY=10
 IS_ARMBIAN=false
+ADMIN_USER="root"
+ADMIN_PASS="root"
+TEMP_PASS=""
+INSTALL_PPP=false
+APT_UPDATED=false
+TEMP_LOG_DIR=""
 
 # 主逻辑
 main() {
-    # 初始化日志
-    init_log
+    # 初始化临时日志
+    init_temp_log
     
     log "Landscape Router 交互式安装脚本开始执行"
     
@@ -44,21 +49,19 @@ main() {
 
 # 函数定义部分
 
-# 初始化日志
-init_log() {
-    local log_dir=""
-    log_dir="$(pwd)/landscape/script-log"
-    mkdir -p "$log_dir"
-    
+# 初始化临时日志
+init_temp_log() {
+    # 直接在 /tmp 目录下创建临时日志文件
     local timestamp
     timestamp=$(date +"%Y_%m_%d-%H_%M_%S-%3N")
-    INSTALL_LOG="$log_dir/install-$timestamp.log"
+    INSTALL_LOG="/tmp/install-$timestamp.log"
+    TEMP_LOG_DIR="/tmp"
     
     # 创建空日志文件
     touch "$INSTALL_LOG"
     
-    echo "安装日志将保存到: $INSTALL_LOG"
-    log "安装日志初始化完成"
+    echo "临时安装日志将保存到: $INSTALL_LOG"
+    log "临时安装日志初始化完成"
 }
 
 # 记录日志
@@ -120,29 +123,9 @@ check_system() {
 ask_user_config() {
     log "开始询问用户配置"
     
-    # 询问 Landscape 安装路径
-    while true; do
-        read -rp "请输入 Landscape Router 安装路径 (默认: /root/.landscape-router): " LANDSCAPE_DIR
-        if [ -z "$LANDSCAPE_DIR" ]; then
-            LANDSCAPE_DIR="/root/.landscape-router"
-        fi
-        
-        if [ ! -d "$(dirname "$LANDSCAPE_DIR")" ]; then
-            log "错误: 指定的安装路径的上级目录不存在"
-            continue
-        fi
-        
-        break
-    done
-    
-    # 更新日志路径
-    local log_dir="$LANDSCAPE_DIR/script-log"
-    mkdir -p "$log_dir"
-    local log_filename
-    log_filename=$(basename "$INSTALL_LOG")
-    mv "$INSTALL_LOG" "$log_dir/$log_filename" 2>/dev/null || true
-    INSTALL_LOG="$log_dir/$log_filename"
-    log "更新日志路径到: $INSTALL_LOG"
+    # 提示用户所有问题回答完成后可以再次修改
+    echo "注意：您需要回答以下所有问题，完成后可以检查和修改任何配置项。"
+    echo ""
     
     # 询问是否修改时区为中国上海
     read -rp "是否将系统时区修改为亚洲/上海? (y/N): " answer
@@ -164,16 +147,6 @@ ask_user_config() {
         fi
     else
         log "Armbian 系统不提供换源功能"
-    fi
-    
-    # 询问是否安装 webserver 环境
-    if ! dpkg -l | grep -q apache2; then
-        read -rp "检测到系统未安装 webserver 环境，是否安装 Apache2? (Y/n): " answer
-        if [[ ! "$answer" =~ ^[Nn]$ ]]; then
-            WEB_SERVER_INSTALLED=true
-        fi
-    else
-        log "检测到系统已安装 webserver 环境"
     fi
     
     # 询问是否安装 Docker
@@ -210,6 +183,12 @@ ask_user_config() {
         fi
     fi
     
+    # 询问是否安装 ppp 用于 pppoe 拨号
+    read -rp "是否安装 ppp 用于 pppoe 拨号? (y/N): " answer
+    if [[ "$answer" =~ ^[Yy]$ ]]; then
+        INSTALL_PPP=true
+    fi
+    
     # 询问是否使用 GitHub 镜像加速
     read -rp "是否使用 GitHub 镜像加速下载 Landscape Router 文件? (y/N): " answer
     if [[ "$answer" =~ ^[Yy]$ ]]; then
@@ -228,81 +207,216 @@ ask_user_config() {
         esac
     fi
     
-    # 配置 WAN 网卡
-    config_wan_interface
+    # 询问 Landscape 安装路径
+    while true; do
+        read -rp "请输入 Landscape Router 安装路径 (默认: /root/.landscape-router): " LANDSCAPE_DIR
+        if [ -z "$LANDSCAPE_DIR" ]; then
+            LANDSCAPE_DIR="/root/.landscape-router"
+        fi
+        
+        if [ ! -d "$(dirname "$LANDSCAPE_DIR")" ]; then
+            log "错误: 指定的安装路径的上级目录不存在"
+            continue
+        fi
+        
+        break
+    done
+    
+    # 询问管理员账号密码
+    read -rp "是否设置 Landscape Router 管理员账号密码? (y/N): " answer
+    if [[ "$answer" =~ ^[Yy]$ ]]; then
+        read -rp "请输入管理员用户名 (默认: root): " custom_user
+        if [ -n "$custom_user" ]; then
+            ADMIN_USER="$custom_user"
+        fi
+        
+        read -rsp "请输入管理员密码 (默认: root): " TEMP_PASS
+        echo  # 换行
+        if [ -n "$TEMP_PASS" ]; then
+            ADMIN_PASS="$TEMP_PASS"
+        fi
+        # 清除临时密码变量
+        TEMP_PASS=""
+    fi
     
     # 配置 LAN 网卡
     config_lan_interface
     
+    # 显示所有配置供用户检查和修改
+    local config_confirmed=false
+    while [ "$config_confirmed" = false ]; do
+        echo ""
+        echo "=============================="
+        echo "请检查您的配置:"
+        echo "=============================="
+        echo "1. 系统时区设置为亚洲/上海: $([ "$TIMEZONE_SHANGHAI" = true ] && echo "是" || echo "否")"
+        echo "2. 关闭 swap: $([ "$SWAP_DISABLED" = true ] && echo "是" || echo "否")"
+        echo "3. 更换 apt 软件源为 USTC: $([ "$USE_CUSTOM_MIRROR" = true ] && echo "是" || echo "否")"
+        echo "4. 安装 Docker: $([ "$DOCKER_INSTALLED" = true ] && echo "是" || echo "否")"
+        if [ "$DOCKER_INSTALLED" = true ]; then
+            echo "   Docker 镜像源: $DOCKER_MIRROR"
+            echo "   Docker IPv6 支持: $([ "$DOCKER_ENABLE_IPV6" = true ] && echo "是" || echo "否")"
+        fi
+        echo "5. 修改 Apache 端口: $([ "$MODIFY_APACHE_PORT" = true ] && echo "是" || echo "否")"
+        if [ "$MODIFY_APACHE_PORT" = true ]; then
+            echo "   Apache 端口: $APACHE_PORT"
+        fi
+        echo "6. 安装 ppp: $([ "$INSTALL_PPP" = true ] && echo "是" || echo "否")"
+        echo "7. 使用 GitHub 镜像加速: $([ "$USE_GITHUB_MIRROR" = true ] && echo "是" || echo "否")"
+        if [ "$USE_GITHUB_MIRROR" = true ]; then
+            echo "   GitHub 镜像地址: $GITHUB_MIRROR"
+        fi
+        echo "8. Landscape Router 安装路径: $LANDSCAPE_DIR"
+        echo "9. 管理员账号: $ADMIN_USER"
+        echo "   管理员密码: $ADMIN_PASS"
+        echo "10. LAN 网卡配置:"
+        echo "$LAN_CONFIG" | sed 's/^/    /'
+        echo "=============================="
+        
+        read -rp "是否需要修改配置? (输入编号修改对应配置，输入 'done' 完成配置): " config_choice
+        case "$config_choice" in
+            1)
+                read -rp "是否将系统时区修改为亚洲/上海? (y/N): " answer
+                if [[ "$answer" =~ ^[Yy]$ ]]; then
+                    TIMEZONE_SHANGHAI=true
+                else
+                    TIMEZONE_SHANGHAI=false
+                fi
+                ;;
+            2)
+                read -rp "是否关闭 swap? (y/N): " answer
+                if [[ "$answer" =~ ^[Yy]$ ]]; then
+                    SWAP_DISABLED=true
+                else
+                    SWAP_DISABLED=false
+                fi
+                ;;
+            3)
+                if [ "$IS_ARMBIAN" = false ]; then
+                    read -rp "是否更换 apt 软件源为 USTC（中科大）? (y/N): " answer
+                    if [[ "$answer" =~ ^[Yy]$ ]]; then
+                        USE_CUSTOM_MIRROR=true
+                    else
+                        USE_CUSTOM_MIRROR=false
+                    fi
+                else
+                    echo "Armbian 系统不提供换源功能"
+                fi
+                ;;
+            4)
+                read -rp "是否安装 Docker? (y/N): " answer
+                if [[ "$answer" =~ ^[Yy]$ ]]; then
+                    DOCKER_INSTALLED=true
+                    
+                    echo "请选择 Docker 镜像源:"
+                    echo "1) 阿里云 (默认)"
+                    echo "2) Azure 中国云"
+                    echo "3) 官方源 (国外)"
+                    read -rp "请选择 (1-3, 默认为1): " answer
+                    case "$answer" in
+                        2) DOCKER_MIRROR="azure" ;;
+                        3) DOCKER_MIRROR="official" ;;
+                        *) DOCKER_MIRROR="aliyun" ;;
+                    esac
+                    
+                    read -rp "是否为 Docker 开启 IPv6 支持? (y/N): " answer
+                    if [[ "$answer" =~ ^[Yy]$ ]]; then
+                        DOCKER_ENABLE_IPV6=true
+                    else
+                        DOCKER_ENABLE_IPV6=false
+                    fi
+                else
+                    DOCKER_INSTALLED=false
+                fi
+                ;;
+            5)
+                read -rp "是否修改 Apache 端口以避免与其他反向代理软件冲突? (y/N): " answer
+                if [[ "$answer" =~ ^[Yy]$ ]]; then
+                    MODIFY_APACHE_PORT=true
+                    read -rp "请输入新的 Apache 端口 (默认为 8080): " answer
+                    if [[ -n "$answer" ]] && [[ "$answer" =~ ^[0-9]+$ ]]; then
+                        APACHE_PORT="$answer"
+                    fi
+                else
+                    MODIFY_APACHE_PORT=false
+                fi
+                ;;
+            6)
+                read -rp "是否安装 ppp 用于 pppoe 拨号? (y/N): " answer
+                if [[ "$answer" =~ ^[Yy]$ ]]; then
+                    INSTALL_PPP=true
+                else
+                    INSTALL_PPP=false
+                fi
+                ;;
+            7)
+                read -rp "是否使用 GitHub 镜像加速下载 Landscape Router 文件? (y/N): " answer
+                if [[ "$answer" =~ ^[Yy]$ ]]; then
+                    USE_GITHUB_MIRROR=true
+                    echo "可选的 GitHub 镜像加速地址:"
+                    echo "1) https://ghfast.top (默认)"
+                    echo "2) 自定义地址"
+                    read -rp "请选择 (1-2, 默认为1): " answer
+                    case "$answer" in
+                        2)
+                            read -rp "请输入 GitHub 镜像加速地址: " GITHUB_MIRROR
+                            ;;
+                        *)
+                            GITHUB_MIRROR="https://ghfast.top"
+                            ;;
+                    esac
+                else
+                    USE_GITHUB_MIRROR=false
+                fi
+                ;;
+            8)
+                while true; do
+                    read -rp "请输入 Landscape Router 安装路径 (默认: /root/.landscape-router): " LANDSCAPE_DIR
+                    if [ -z "$LANDSCAPE_DIR" ]; then
+                        LANDSCAPE_DIR="/root/.landscape-router"
+                    fi
+                    
+                    if [ ! -d "$(dirname "$LANDSCAPE_DIR")" ]; then
+                        log "错误: 指定的安装路径的上级目录不存在"
+                        continue
+                    fi
+                    
+                    break
+                done
+                ;;
+            9)
+                read -rp "是否设置 Landscape Router 管理员账号密码? (y/N): " answer
+                if [[ "$answer" =~ ^[Yy]$ ]]; then
+                    read -rp "请输入管理员用户名 (默认: root): " custom_user
+                    if [ -n "$custom_user" ]; then
+                        ADMIN_USER="$custom_user"
+                    fi
+                    
+                    read -rsp "请输入管理员密码 (默认: root): " TEMP_PASS
+                    echo  # 换行
+                    if [ -n "$TEMP_PASS" ]; then
+                        ADMIN_PASS="$TEMP_PASS"
+                    fi
+                    # 清除临时密码变量
+                    TEMP_PASS=""
+                fi
+                ;;
+            10)
+                echo "重新配置 LAN 网卡"
+                config_lan_interface
+                ;;
+            done)
+                config_confirmed=true
+                ;;
+            *)
+                echo "无效选择，请重新输入"
+                ;;
+        esac
+    done
+    
     log "用户配置询问完成"
 }
 
-
-# 配置 WAN 网卡
-config_wan_interface() {
-    echo "开始配置 WAN 网卡"
-    
-    # 获取可用网卡列表
-    local interfaces
-    interfaces=$(ip link show | awk -F': ' '/^[0-9]+: [a-zA-Z]/ {print $2}' | grep -v lo)
-    
-    echo "可用的网络接口:"
-    local i=1
-    for iface in $interfaces; do
-        echo "$i) $iface"
-        i=$((i+1))
-    done
-    
-    # 选择 WAN 网卡
-    while true; do
-        read -rp "请选择作为 WAN 的网卡编号 (1-$((i-1))): " choice
-        if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -lt "$i" ]; then
-            local selected_iface
-            selected_iface=$(echo "$interfaces" | sed -n "${choice}p")
-            WAN_CONFIG="iface_name = \"$selected_iface\""
-            echo "已选择 $selected_iface 作为 WAN 网卡"
-            break
-        else
-            echo "无效选择，请重新输入"
-        fi
-    done
-    
-    # 选择 WAN 配置模式
-    echo "请选择 WAN 网卡配置模式:"
-    echo "1) DHCP 客户端 (默认)"
-    echo "2) 静态 IP"
-    read -rp "请选择 (1-2, 默认为1): " choice
-    
-    case "$choice" in
-        2)
-            # 静态 IP 配置
-            read -rp "请输入静态 IP 地址 (例如: 192.168.1.100): " static_ip
-            read -rp "请输入子网掩码 (例如: 24): " static_mask
-            read -rp "请输入网关 IP (例如: 192.168.1.1): " gateway_ip
-            
-            WAN_CONFIG+="
-enable = true
-
-[wan_config.ip_model]
-t = \"static\"
-default_router_ip = \"$gateway_ip\"
-default_router = true
-ipv4 = \"$static_ip\"
-ipv4_mask = $static_mask"
-            ;;
-        *)
-            # DHCP 客户端配置
-            WAN_CONFIG+="
-enable = true
-update_at = $(date +%s)000.0
-
-[wan_config.ip_model]
-t = \"dhcpclient\"
-default_router = true
-custome_opts = []"
-            ;;
-    esac
-}
 
 # 配置 LAN 网卡
 config_lan_interface() {
@@ -387,50 +501,61 @@ interfaces = ($(printf '"%s", ' "${selected_interfaces[@]}" | sed 's/, $//'))"
 perform_installation() {
     log "开始执行安装"
     
-    # 1. 修改时区
+    # 1. 创建 Landscape 目录（移到第一个）
+    create_landscape_dir
+    
+    # 2. 修改时区
     if [ "$TIMEZONE_SHANGHAI" = true ]; then
         setup_timezone
     fi
     
-    # 2. 关闭 swap
+    # 3. 关闭 swap
     if [ "$SWAP_DISABLED" = true ]; then
         disable_swap
     fi
     
-    # 3. 换源
+    # 4. 换源
     if [ "$USE_CUSTOM_MIRROR" = true ]; then
         change_apt_mirror
     fi
     
-    # 4. 安装 webserver
-    if [ "$WEB_SERVER_INSTALLED" = true ]; then
+    # 5. 检查并安装 webserver
+    if ! dpkg -l | grep -q apache2; then
+        log "检测到系统未安装 web server 环境，将自动安装 Apache2"
         install_webserver
+    else
+        log "检测到系统已安装 web server 环境"
     fi
     
-    # 5. 安装 Docker
+    # 6. 安装 Docker
     if [ "$DOCKER_INSTALLED" = true ]; then
         install_docker
         configure_docker
     fi
     
-    # 6. 修改 Apache 端口
+    # 7. 修改 Apache 端口
     if [ "$MODIFY_APACHE_PORT" = true ]; then
         modify_apache_port
     fi
     
-    # 7. 创建 Landscape 目录
-    create_landscape_dir
+    # 8. 安装 ppp
+    if [ "$INSTALL_PPP" = true ]; then
+        install_ppp
+    fi
     
-    # 8. 下载并安装 Landscape Router
+    # 9. 下载并安装 Landscape Router
     install_landscape_router
     
-    # 9. 创建 systemd 服务
+    # 10. 创建 systemd 服务
     create_systemd_service
     
-    # 10. 配置网络接口
+    # 11. 配置网络接口
     configure_network_interfaces
     
-    # 11. 关闭本机 DNS 服务
+    # 12. 创建管理员账号密码配置文件
+    create_landscape_toml
+    
+    # 13. 关闭本机 DNS 服务
     disable_local_dns
     
     log "安装执行完成"
@@ -478,7 +603,7 @@ deb-src http://mirrors.ustc.edu.cn/debian-security trixie-security main contrib 
 EOF
     
     # 更新包索引
-    apt update
+    apt_update
     
     log "apt 软件源更换完成"
 }
@@ -487,6 +612,7 @@ EOF
 # 安装 webserver
 install_webserver() {
     log "安装 Apache2"
+    apt_update
     apt install apache2 -y
     log "Apache2 安装完成"
 }
@@ -498,7 +624,7 @@ install_docker() {
     # 检查 curl 是否已安装，未安装则安装
     if ! command -v curl &> /dev/null; then
         log "未检测到 curl，正在安装..."
-        apt update
+        apt_update
         apt install curl -y
     else
         log "curl 已安装"
@@ -563,10 +689,50 @@ modify_apache_port() {
     log "Apache 端口修改完成"
 }
 
+# 独立的 apt update 函数
+apt_update() {
+    if [ "$APT_UPDATED" = false ]; then
+        log "执行 apt update"
+        apt update
+        APT_UPDATED=true
+        log "apt update 执行完成"
+    else
+        log "apt update 已执行过，跳过"
+    fi
+}
+
+# 安装 ppp
+install_ppp() {
+    log "安装 ppp"
+    apt_update
+    apt install ppp -y
+    log "ppp 安装完成"
+}
+
 # 创建 Landscape 目录
 create_landscape_dir() {
     log "创建 Landscape Router 目录: $LANDSCAPE_DIR"
     mkdir -p "$LANDSCAPE_DIR"
+    
+    # 在 Landscape 目录下创建 script-log 目录
+    mkdir -p "$LANDSCAPE_DIR/script-log"
+    
+    # 将临时日志移动到 Landscape 目录下
+    if [ -f "$INSTALL_LOG" ]; then
+        local log_filename
+        log_filename=$(basename "$INSTALL_LOG")
+        
+        # 先尝试直接移动日志文件
+        if ! mv "$INSTALL_LOG" "$LANDSCAPE_DIR/script-log/$log_filename" 2>/dev/null; then
+            # 如果直接移动失败，尝试复制并清理原文件
+            cp "$INSTALL_LOG" "$LANDSCAPE_DIR/script-log/$log_filename" && rm -f "$INSTALL_LOG"
+        fi
+        
+        # 更新日志文件路径
+        INSTALL_LOG="$LANDSCAPE_DIR/script-log/$log_filename"
+        log "日志路径已更新到: $INSTALL_LOG"
+    fi
+    
     log "Landscape Router 目录创建完成"
 }
 
@@ -578,7 +744,7 @@ install_landscape_router() {
     # 检查 curl 是否已安装，未安装则安装
     if ! command -v curl &> /dev/null; then
         log "未检测到 curl，正在安装..."
-        apt update
+        apt_update
         apt install curl -y
     else
         log "curl 已安装"
@@ -747,6 +913,7 @@ Restart=always
 User=root
 LimitMEMLOCK=infinity
 
+
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -775,18 +942,16 @@ source /etc/network/interfaces.d/*
 auto lo
 iface lo inet loopback
 
-# WAN interface
-auto $(echo "$WAN_CONFIG" | grep "iface_name" | cut -d '"' -f 2)
-iface $(echo "$WAN_CONFIG" | grep "iface_name" | cut -d '"' -f 2) inet manual
-
-# LAN bridge
-auto $(echo "$LAN_CONFIG" | grep "bridge_name" | cut -d '"' -f 2)
-iface $(echo "$LAN_CONFIG" | grep "bridge_name" | cut -d '"' -f 2) inet static
-    address $(echo "$LAN_CONFIG" | grep "lan_ip" | cut -d '"' -f 2)
-    netmask 255.255.255.0
 
 EOF
-    
+
+# 这几行是从上面拿下来的，是无效的代码，先放在这里，后面会删除
+# # LAN bridge
+# auto $(echo "$LAN_CONFIG" | grep "bridge_name" | cut -d '"' -f 2)
+# iface $(echo "$LAN_CONFIG" | grep "bridge_name" | cut -d '"' -f 2) inet static
+#     address $(echo "$LAN_CONFIG" | grep "lan_ip" | cut -d '"' -f 2)
+#     netmask 255.255.255.0
+
     # 添加绑定到网桥的物理接口
     local interfaces_list
     interfaces_list=$(echo "$LAN_CONFIG" | grep "interfaces" | cut -d '(' -f 2 | cut -d ')' -f 1)
@@ -813,9 +978,6 @@ EOF
 # 创建 landscape_init.toml 配置文件
 create_landscape_init_toml() {
     log "创建 landscape_init.toml 配置文件"
-    
-    local wan_iface
-    wan_iface=$(echo "$WAN_CONFIG" | grep "iface_name" | cut -d '"' -f 2)
     
     local bridge_name
     bridge_name=$(echo "$LAN_CONFIG" | grep "bridge_name" | cut -d '"' -f 2)
@@ -880,42 +1042,25 @@ ip_range_end = "$dhcp_end"
 server_ip_addr = "$lan_ip"
 network_mask = 24
 mac_binding_records = []
-
-# ==== 配置 wan 网卡 ====
-[[ifaces]]
-name = "$wan_iface"
-create_dev_type = "no_need_to_create"
-zone_type = "wan"
-enable_in_boot = true
-wifi_mode = "undefined"
-
-# WAN 网卡配置
-[[ipconfigs]]
-$(echo "$WAN_CONFIG" | grep -A 100 "enable = true")
-
-# 将 $wan_iface 设为 默认路由
-[[route_wans]]
-iface_name = "$wan_iface"
-enable = true
-
-[[nats]]
-iface_name = "$wan_iface"
-enable = true
-
-[nats.nat_config.tcp_range]
-start = 32768
-end = 65535
-
-[nats.nat_config.udp_range]
-start = 32768
-end = 65535
-
-[nats.nat_config.icmp_in_range]
-start = 32768
-end = 65535
 EOF
 
     log "landscape_init.toml 配置文件创建完成"
+}
+
+# 创建 landscape.toml 配置文件（包含管理员账号密码）
+create_landscape_toml() {
+    log "创建 landscape.toml 配置文件"
+    
+    mkdir -p "$LANDSCAPE_DIR/etc/landscape"
+    
+    cat > "$LANDSCAPE_DIR/etc/landscape/landscape.toml" << EOF
+[auth]
+# 管理员账号、密码
+admin_user = "$ADMIN_USER"
+admin_pass = "$ADMIN_PASS"
+EOF
+
+    log "landscape.toml 配置文件创建完成"
 }
 
 # 关闭本机 DNS 服务
@@ -953,10 +1098,10 @@ finish_installation() {
     local lan_ip
     lan_ip=$(echo "$LAN_CONFIG" | grep "lan_ip" | cut -d '"' -f 2)
     echo "  http://$lan_ip:6300"
-    echo "默认用户名: root"
-    echo "默认密码: root"
+    echo "管理员用户名: $ADMIN_USER"
+    echo "管理员密码: $ADMIN_PASS"
     echo ""
-    echo "日志文件保存在: $INSTALL_LOG"
+    echo "安装脚本日志文件保存在: $INSTALL_LOG"
     echo ""
     echo "升级 Landscape Router 的方法:"
     echo "1. 从 https://github.com/ThisSeanZhang/landscape/releases 下载最新版本"
