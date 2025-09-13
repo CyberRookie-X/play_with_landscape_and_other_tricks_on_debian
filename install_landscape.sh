@@ -1292,7 +1292,7 @@ finish_installation() {
     echo "Landscape Router 安装完成!"
     echo "=============================="
     echo ""
-    echo "请通过浏览器访问以下地址管理您的路由器:"
+    echo "请通过浏览器，访问以下地址管理您的路由器:"
     local lan_ip
     lan_ip=$(echo "$LAN_CONFIG" | grep "lan_ip" | cut -d '"' -f 2)
     echo "  http://$lan_ip:6300"
