@@ -1292,12 +1292,12 @@ finish_installation() {
     echo "Landscape Router 安装完成!"
     echo "=============================="
     echo ""
+    local lan_ip
+    lan_ip=$(echo "$LAN_CONFIG" | grep "lan_ip" | cut -d '"' -f 2)
     echo "接下来 SSH 连接可能会中断"
     echo "新的 SSH 地址为 $lan_ip:22"
     echo ""
     echo "请通过浏览器，访问以下地址管理您的 Landscape Router :"
-    local lan_ip
-    lan_ip=$(echo "$LAN_CONFIG" | grep "lan_ip" | cut -d '"' -f 2)
     echo "  http://$lan_ip:6300"
     echo "管理员用户名: $ADMIN_USER"
     echo "管理员密码: $ADMIN_PASS"
