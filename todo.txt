@@ -4,6 +4,7 @@ A 高
 增加多个 github 源
 gitee 镜像加速
 handler
+web server 安装未经测试，只装个 apache 似乎不正常？
 
 B 低
 alpine
