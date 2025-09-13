@@ -1,16 +1,23 @@
-安装脚本
+install_landsacpe.sh
 
 A 高
 网络配置部分，可能存在错误
 增加多个 github 源
+gitee 镜像加速
 
 
 B 低
 alpine
 多语言
 
-升级脚本
+
+
+upgrade_landsacpe.sh
 
 A 高
+完善镜像加速？
+修改 beta 版本 发布方式（release 中仅保留一个 beta 版本）
+增加 旧版本备份、回退功能（自动拉起脚本？）
+脚本自动复制到 landscape 安装路径，便于回退使用？
 
 B 低
