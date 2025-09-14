@@ -7,7 +7,7 @@
 # 环境变量说明：
 # 环境变量只对 需要换源、安装依赖的 alpine 系镜像有效
 # 不使用环境变量时，脚本从 互联网 API 获取必要信息，通常可以正常运行。
-# 如需部署大量容器（例如大于80个），建议添加通过环境变量添加私有镜像仓库。
+# 如需部署大量容器（例如大于100个），建议添加通过环境变量添加私有镜像仓库。
 # 两个环境变量同时存在时，MIRROR 生效，REGION 失效。
 #
 # 1. REDIRECT_PKG_HANDLER_WRAPPER_REGION    
@@ -23,7 +23,7 @@
 # 4、对于 alpine，没有 libelf 和 libgcc 支持
 # 4.1 确定 是否处于 无法访问 alpine 官方源 的地区。通过 环境变量 REDIRECT_PKG_HANDLER_WRAPPER_REGION 或 本机 IP 归属地查询，确定 是否处于 无法访问 alpine 官方源 的地区
 # 4.2 对于 alpine 源不可用的 国家/地区，如中国，进行换源操作 
-# 4.3 采用 环境变量 REDIRECT_PKG_HANDLER_WRAPPER_MIRROR 给出的源 或者 从 中科大/清华/阿里/网易/腾讯/华为 中随机选一个 能成功 apk update 的源
+# 4.3 采用 环境变量 REDIRECT_PKG_HANDLER_WRAPPER_MIRROR 给出的源 或者 从 中科大/清华/阿里/腾讯/华为 中随机选一个 能成功 apk update 的源
 # 4.4 安装 libelf 和 libgcc，配置防火墙，启动 redirect_pkg_handler ，等待 0.2 s，最后执行原始镜像的 ENTRYPOINT 和 CMD
 
 
