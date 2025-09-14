@@ -35,3 +35,12 @@ handler
 
 
 B 低
+
+
+redirect
+
+A 高
+# 3. REDIRECT_PKG_HANDLER_WRAPPER_REGION 
+# master selver，master 执行 update 和 下载，selver 仅安装不下载，通过标志来通信?
+
+B 低
