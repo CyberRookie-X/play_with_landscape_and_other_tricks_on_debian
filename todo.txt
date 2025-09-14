@@ -12,7 +12,7 @@ alpine
 centos 等
 多语言
 wan网卡配置，不一定要有，毕竟需要有网络才能安装，仅配置 dhcp client 或者 static ip 也行，懒得整了
-
+zip release 导致安装 unzip 占用 1M 硬盘空间
 
 
 
@@ -37,10 +37,14 @@ handler
 B 低
 
 
-redirect
+
+
+redirect.sh
 
 A 高
-# 3. REDIRECT_PKG_HANDLER_WRAPPER_REGION 
-# master selver，master 执行 update 和 下载，selver 仅安装不下载，通过标志来通信?
+
 
 B 低
+
+# 3. REDIRECT_PKG_HANDLER_WRAPPER_REGION 
+# master selver，master 执行 update 和 下载，selver 仅安装不下载，通过标志来通信?
