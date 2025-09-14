@@ -117,7 +117,6 @@ log() {
 
 # 初始化随机种子
 srand() {
-    # 使用更可靠的随机种子生成方法
     # 优先使用 /dev/urandom，如果不可用则使用高精度时间戳
     if [ -r "/dev/urandom" ] && command -v od >/dev/null 2>&1; then
         # 从 /dev/urandom 读取随机数据作为种子
