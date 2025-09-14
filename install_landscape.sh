@@ -234,15 +234,14 @@ ask_user_config() {
     fi
 
     # 询问是否使用 GitHub 镜像加速
-    echo "请选择 GitHub 镜像加速地址 (默认不使用加速):"
-    echo "0) 不使用加速 (默认)"
-    echo "1) https://ghfast.top"
+    echo "请选择 GitHub 镜像加速地址 (默认启用 https://ghfast.top):"
+    echo "0) 不使用加速"
+    echo "1) https://ghfast.top (默认)"
     echo "2) 自定义地址"
-    read -rp "请选择 (0-2, 默认为0): " answer
+    read -rp "请选择 (0-2, 默认为1): " answer
     case "$answer" in
-        1)
-            USE_GITHUB_MIRROR=true
-            GITHUB_MIRROR="https://ghfast.top"
+        0)
+            USE_GITHUB_MIRROR=false
             ;;
         2)
             read -rp "请输入 GitHub 镜像加速地址: " custom_mirror
@@ -254,7 +253,8 @@ ask_user_config() {
             fi
             ;;
         *)
-            USE_GITHUB_MIRROR=false
+            USE_GITHUB_MIRROR=true
+            GITHUB_MIRROR="https://ghfast.top"
             ;;
     esac
     
@@ -337,7 +337,7 @@ ask_user_config() {
         echo "    IP地址 = $(echo "$LAN_CONFIG" | grep "lan_ip" | cut -d '"' -f 2)"
         echo "    DHCP起始地址 = $(echo "$LAN_CONFIG" | grep "dhcp_start" | cut -d '"' -f 2)"
         echo "    DHCP结束地址 = $(echo "$LAN_CONFIG" | grep "dhcp_end" | cut -d '"' -f 2)"
-        echo "    网络掩码 = $(echo "$LAN_CONFIG" | grep "network_mask" | awk -F '= ' '{print $2}')"
+        echo "    网络掩码 = $(echo "$LAN_CONFIG" | grep "network_mask" | awk -F'= ' '{print $2}')"
         local interfaces_list
         interfaces_list=$(echo "$LAN_CONFIG" | grep "interfaces" | cut -d '(' -f 2 | cut -d ')' -f 1)
         echo "    绑定网卡 = $interfaces_list"
@@ -441,15 +441,14 @@ ask_user_config() {
                 fi
                 ;;
             7)
-                echo "请选择 GitHub 镜像加速地址 (默认不使用加速):"
-                echo "0) 不使用加速 (默认)"
-                echo "1) https://ghfast.top"
+                echo "请选择 GitHub 镜像加速地址 (默认启用 https://ghfast.top):"
+                echo "0) 不使用加速"
+                echo "1) https://ghfast.top (默认)"
                 echo "2) 自定义地址"
-                read -rp "请选择 (0-2, 默认为0): " answer
+                read -rp "请选择 (0-2, 默认为1): " answer
                 case "$answer" in
-                    1)
-                        USE_GITHUB_MIRROR=true
-                        GITHUB_MIRROR="https://ghfast.top"
+                    0)
+                        USE_GITHUB_MIRROR=false
                         ;;
                     2)
                         read -rp "请输入 GitHub 镜像加速地址: " custom_mirror
@@ -461,7 +460,8 @@ ask_user_config() {
                         fi
                         ;;
                     *)
-                        USE_GITHUB_MIRROR=false
+                        USE_GITHUB_MIRROR=true
+                        GITHUB_MIRROR="https://ghfast.top"
                         ;;
                 esac
                 ;;
