@@ -74,9 +74,6 @@ ARCH=$(uname -m)
 # 定义可用的镜像源列表
 MIRRORS="mirrors.ustc.edu.cn mirrors.aliyun.com mirrors.tuna.tsinghua.edu.cn mirrors.cloud.tencent.com repo.huaweicloud.com"
 
-# 初始化随机种子
-RANDOM_SEED=$(date +%s%N)
-
 # ==================== 主函数 ====================
 
 main() {
