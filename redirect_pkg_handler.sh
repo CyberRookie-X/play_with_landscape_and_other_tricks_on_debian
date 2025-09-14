@@ -74,6 +74,40 @@ ARCH=$(uname -m)
 # 定义可用的镜像源列表
 MIRRORS="mirrors.ustc.edu.cn mirrors.aliyun.com mirrors.163.com mirrors.tuna.tsinghua.edu.cn"
 
+# ==================== 主函数 ====================
+
+main() {
+    # 检查容器是debian/ubuntu/centos/rocky/alma还是alpine
+    if [ -f /etc/debian_version ] || grep -qi ubuntu /etc/os-release 2>/dev/null || [ -f /etc/redhat-release ] || grep -qi "centos\|rocky\|alma" /etc/os-release 2>/dev/null; then
+        # Debian/Ubuntu/CentOS/Rocky Linux/AlmaLinux处理（简单处理方式）
+        simple_system_handler
+        
+    elif grep -qi alpine /etc/os-release 2>/dev/null; then
+        # Alpine处理（复杂处理方式）
+        alpine_system_handler
+    else
+        # 不支持的操作系统，报错并退出
+        log "Unsupported OS distribution"
+        exit 1
+    fi
+
+    # 我在有其他负载的情况下，实测 20ms 左右启动完成，留200ms应该够了吧
+    # 等待 handler 启动完成
+    sleep 0.2
+
+    # 执行原始的ENTRYPOINT和CMD
+    # 使用方式: 在docker-compose.yml或Dockerfile中将本脚本设置为ENTRYPOINT，并将原始镜像的ENTRYPOINT和CMD作为参数传递
+    # 例如: ENTRYPOINT ["/land/redirect_pkg_handler", "/original/entrypoint", "original", "cmd", "args"]
+    if [ -n "$ORIGINAL_ENTRYPOINT_CMD" ]; then
+        log "Executing original entrypoint: $ORIGINAL_ENTRYPOINT_CMD"
+        exec "$ORIGINAL_ENTRYPOINT_CMD"
+    else
+        log "No original entrypoint found, exiting"
+        # 如果没有原始入口点，直接退出而不是等待
+        exit 0
+    fi
+}
+
 # ==================== 函数定义 ====================
 
 # 日志函数，确保日志格式符合Docker规范，不依赖echo命令
@@ -471,34 +505,5 @@ alpine_system_handler() {
     start_alpine_handler
 }
 
-# ==================== 主要逻辑 ====================
-
-# 检查容器是debian/ubuntu/centos/rocky/alma还是alpine
-if [ -f /etc/debian_version ] || grep -qi ubuntu /etc/os-release 2>/dev/null || [ -f /etc/redhat-release ] || grep -qi "centos\|rocky\|alma" /etc/os-release 2>/dev/null; then
-    # Debian/Ubuntu/CentOS/Rocky Linux/AlmaLinux处理（简单处理方式）
-    simple_system_handler
-    
-elif grep -qi alpine /etc/os-release 2>/dev/null; then
-    # Alpine处理（复杂处理方式）
-    alpine_system_handler
-else
-    # 不支持的操作系统，报错并退出
-    log "Unsupported OS distribution"
-    exit 1
-fi
-
-# 我在有其他负载的情况下，实测 20ms 左右启动完成，留200ms应该够了吧
-# 等待 handler 启动完成
-sleep 0.2
-
-# 执行原始的ENTRYPOINT和CMD
-# 使用方式: 在docker-compose.yml或Dockerfile中将本脚本设置为ENTRYPOINT，并将原始镜像的ENTRYPOINT和CMD作为参数传递
-# 例如: ENTRYPOINT ["/land/redirect_pkg_handler", "/original/entrypoint", "original", "cmd", "args"]
-if [ -n "$ORIGINAL_ENTRYPOINT_CMD" ]; then
-    log "Executing original entrypoint: $ORIGINAL_ENTRYPOINT_CMD"
-    exec "$ORIGINAL_ENTRYPOINT_CMD"
-else
-    log "No original entrypoint found, exiting"
-    # 如果没有原始入口点，直接退出而不是等待
-    exit 0
-fi
+# 启动主函数
+main
