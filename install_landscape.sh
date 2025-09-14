@@ -1546,36 +1546,34 @@ source /etc/network/interfaces.d/*
 auto lo
 iface lo inet loopback
 
-
 EOF
 
-# 这几行是从上面拿下来的, 是无效的代码, 先放在这里, 后面会删除
-# # LAN bridge
-# auto $(echo "$LAN_CONFIG" | grep "bridge_name" | cut -d '"' -f 2)
-# iface $(echo "$LAN_CONFIG" | grep "bridge_name" | cut -d '"' -f 2) inet static
-#     address $(echo "$LAN_CONFIG" | grep "lan_ip" | cut -d '"' -f 2)
-#     netmask 255.255.255.0
-
-    # 添加绑定到网桥的物理接口
-    local interfaces_list
-    interfaces_list=$(echo "$LAN_CONFIG" | grep "interfaces" | cut -d '(' -f 2 | cut -d ')' -f 1)
+    # 获取所有网络接口
+    local all_interfaces
+    all_interfaces=$(ip link show | awk -F': ' '/^[0-9]+: [a-zA-Z]/ {print $2}' | grep -v lo)
     
-    IFS=', ' read -r -a iface_array <<< "$interfaces_list"
-    for iface in "${iface_array[@]}"; do
-        iface=$(echo "$iface" | tr -d '"')
-        if [ -n "$iface" ]; then
-            cat >> /etc/network/interfaces << EOF
+    # 处理所有网卡，将物理网卡设置为manual模式（排除虚拟网卡）
+    for iface in $all_interfaces; do
+        # 跳过虚拟网卡 (docker、veth、br、tap、tun等开头的接口)
+        if [[ "$iface" =~ ^(docker|veth|br|tap|tun|vboxnet|vmnet|macvtap|ip6tnl|sit|gre|gretap|erspan|ipip|ip6gre|ip6gretap|ip6erspan|vti|vti6|nlmon|nflog|nfqueue|vcan|vxcan|mpls|rwl|wwan|ppp|sl|isdn|hdlc|arc|appletalk|rose|netrom|ax25|dccp|sctp|llc|ieee802154|caif|caif6|caif2|caif4|caif5|caif7|caif8|caif9|caif10|caif11|caif12|caif13|caif14|caif15|caif16|caif17|caif18|caif19|caif20) ]]; then
+            log "跳过虚拟网卡: $iface"
+            continue
+        fi
+        
+        # 将物理网卡设置为manual模式
+        log "将物理网卡 $iface 设置为 manual 模式"
+        cat >> /etc/network/interfaces << EOF
 auto $iface
 iface $iface inet manual
 
 EOF
-        fi
     done
-    log "LAN 网桥配置 开始"
+    
+    log "LAN 网桥配置开始"
     # 创建 landscape_init.toml 配置文件
     create_landscape_init_toml
     
-    log "LAN 网桥配置 完成"
+    log "LAN 网桥配置完成"
 }
 
 

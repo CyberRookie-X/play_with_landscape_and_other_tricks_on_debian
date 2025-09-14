@@ -1,6 +1,8 @@
 install_landsacpe.sh
 
 A 高
+
+选择询问 在 landscape 中被使用的网卡，设为 manual。要怎么做才好呢？
 增加多个 github 源
 gitee 镜像加速
 handler
