@@ -885,6 +885,33 @@ change_apt_mirror() {
                 version_codename="stable"
             fi
             
+            # 针对不同镜像源，Debian 安全更新使用专门的URL
+            local security_mirror_url="$mirror_url"
+            case "$MIRROR_SOURCE" in
+                "aliyun")
+                    security_mirror_url="https://mirrors.aliyun.com/debian-security/"
+                    ;;
+                "ustc")
+                    security_mirror_url="https://mirrors.ustc.edu.cn/debian-security/"
+                    ;;
+                "tsinghua")
+                    security_mirror_url="https://mirrors.tuna.tsinghua.edu.cn/debian-security/"
+                    ;;
+                "tencent")
+                    security_mirror_url="https://mirrors.cloud.tencent.com/debian-security/"
+                    ;;
+                "huawei")
+                    security_mirror_url="https://mirrors.huaweicloud.com/debian-security/"
+                    ;;
+                "netease")
+                    # 网易镜像源使用不同的安全更新结构
+                    security_mirror_url="${mirror_url}debian-security/"
+                    ;;
+                *)
+                    security_mirror_url="${mirror_url}security/"
+                    ;;
+            esac
+            
             # 写入新源
             cat > /etc/apt/sources.list << EOF
 # 默认注释了源码镜像以提高 apt update 速度，如有需要可取消注释
@@ -897,8 +924,8 @@ deb $mirror_url $version_codename-updates main contrib non-free non-free-firmwar
 deb $mirror_url $version_codename-backports main contrib non-free non-free-firmware
 # deb-src $mirror_url $version_codename-backports main contrib non-free non-free-firmware
 
-deb ${mirror_url}security/ $version_codename-security main contrib non-free non-free-firmware
-# deb-src ${mirror_url}security/ $version_codename-security main contrib non-free non-free-firmware
+deb $security_mirror_url $version_codename-security main contrib non-free non-free-firmware
+# deb-src $security_mirror_url $version_codename-security main contrib non-free non-free-firmware
 EOF
             ;;
             
@@ -907,6 +934,23 @@ EOF
             if [ -z "$version_codename" ]; then
                 version_codename="focal"  # 默认使用 focal
             fi
+            
+            # 针对不同镜像源，Ubuntu/Linux Mint 安全更新使用专门的URL
+            local ubuntu_security_mirror_url="$mirror_url"
+            case "$MIRROR_SOURCE" in
+                "aliyun")
+                    # 阿里云Ubuntu安全更新使用 mirrors.aliyun.com/ubuntu/
+                    ubuntu_security_mirror_url="$mirror_url"
+                    ;;
+                "ustc")
+                    # 中科大镜像站将 security.ubuntu.com 重定向到 mirrors.ustc.edu.cn
+                    ubuntu_security_mirror_url="$mirror_url"
+                    ;;
+                *)
+                    # 其他镜像源通常使用镜像站自己的路径
+                    ubuntu_security_mirror_url="${mirror_url}security/"
+                    ;;
+            esac
             
             # 写入新源
             cat > /etc/apt/sources.list << EOF
@@ -920,8 +964,8 @@ deb $mirror_url $version_codename-updates main restricted universe multiverse
 deb $mirror_url $version_codename-backports main restricted universe multiverse
 # deb-src $mirror_url $version_codename-backports main restricted universe multiverse
 
-deb ${mirror_url}security/ $version_codename-security main restricted universe multiverse
-# deb-src ${mirror_url}security/ $version_codename-security main restricted universe multiverse
+deb $ubuntu_security_mirror_url $version_codename-security main restricted universe multiverse
+# deb-src $ubuntu_security_mirror_url $version_codename-security main restricted universe multiverse
 EOF
             ;;
     esac

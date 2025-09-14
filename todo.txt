@@ -2,6 +2,11 @@ install_landsacpe.sh
 
 A 高
 
+docker aroz源 和 官方源 似乎不可用?
+apt 重试,逻辑不正确
+默认改为 ustc 源
+
+
 选择询问 在 landscape 中被使用的网卡，设为 manual。要怎么做才好呢？
 增加多个 github 源
 gitee 镜像加速
