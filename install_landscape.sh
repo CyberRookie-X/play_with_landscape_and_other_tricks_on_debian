@@ -10,6 +10,8 @@ WEB_SERVER_INSTALLED=false
 TIMEZONE_SHANGHAI=false
 SWAP_DISABLED=false
 USE_CUSTOM_MIRROR=false
+MIRROR_SOURCE="ustc"  # 默认使用中科大源
+SUPPORTED_SYSTEM=false  # 是否为支持换源的系统
 DOCKER_INSTALLED=false
 DOCKER_MIRROR="aliyun"
 DOCKER_ENABLE_IPV6=false
@@ -33,10 +35,10 @@ main() {
     init_temp_log
     
     log "Landscape Router 交互式安装脚本开始执行"
-    
+
     # 检查系统环境
     check_system
-    
+
     # 询问用户配置
     ask_user_config
     
@@ -76,33 +78,25 @@ log() {
 check_system() {
     log "检查系统环境"
     
-    # 检查是否为 Debian 13 或 Armbian
-    if ! grep -q "Debian GNU/Linux 13" /etc/os-release && ! grep -q "Armbian" /etc/os-release; then
-        log "警告: 此脚本专为 Debian 13 或 Armbian 设计, 当前系统可能不兼容"
-    fi
-    
-    # 检查是否为 Armbian 系统
-    if grep -q "Armbian" /etc/os-release; then
-        IS_ARMBIAN=true
-    else
-        IS_ARMBIAN=false
-    fi
-    
-    # 检查架构
-    local arch
-    arch=$(uname -m)
-    if [ "$arch" != "x86_64" ] && [ "$arch" != "aarch64" ]; then
-        log "错误: 此脚本仅适用于 x86_64 或 aarch64 架构, 当前架构为 $arch"
+    # 检查是否具有 apt
+    if ! command -v apt >/dev/null 2>&1; then
+        log "错误: 系统中未找到 apt 包管理器"
         exit 1
     fi
     
-    # 检查是否以 root 权限运行
-    if [ "$EUID" -ne 0 ]; then
-        log "错误: 此脚本需要 root 权限运行"
+    # 检查是否有 systemd
+    if ! command -v systemctl >/dev/null 2>&1; then
+        log "错误: 系统中未找到 systemd"
         exit 1
     fi
     
-    # 检查内核版本 (需要 >= 6.9) 
+    # 检查是否有 /etc/network/interfaces
+    if [ ! -f "/etc/network/interfaces" ]; then
+        log "错误: 系统中未找到 /etc/network/interfaces 文件"
+        exit 1
+    fi
+    
+    # 检查内核版本 (需要 > 6.9) 
     local kernel_version
     kernel_version=$(uname -r | cut -d'-' -f1)
     local major_version
@@ -111,8 +105,21 @@ check_system() {
     minor_version=$(echo "$kernel_version" | cut -d'.' -f2)
     
     if [ "$major_version" -lt 6 ] || { [ "$major_version" -eq 6 ] && [ "$minor_version" -lt 9 ]; }; then
-        log "错误: 内核版本过低, 需要 6.9 或更高版本, 当前版本为 $kernel_version"
+        log "错误: 内核版本过低, 需要 6.9 以上版本, 当前版本为 $kernel_version"
         log "请先升级内核版本后再运行此脚本"
+        exit 1
+    fi
+    
+    # 检查架构
+    local arch
+    arch=$(uname -m)
+    if [ "$arch" != "x86_64" ] && [ "$arch" != "aarch64" ]; then
+        log "警告: 此脚本主要适用于 x86_64 或 aarch64 架构, 当前架构为 $arch"
+    fi
+    
+    # 检查是否以 root 权限运行
+    if [ "$EUID" -ne 0 ]; then
+        log "错误: 此脚本需要 root 权限运行"
         exit 1
     fi
     
@@ -124,7 +131,8 @@ ask_user_config() {
     log "开始询问用户配置"
     
     # 提示用户所有问题回答完成后可以再次修改
-    echo "注意: 您需要回答以下所有问题, 完成后可以检查和修改任何配置项。"
+    echo ""
+    echo "注意: 您需要回答以下所有问题, 回答结束后可以检查和修改任何配置项。"
     echo ""
     
     # 询问是否修改时区为中国上海
@@ -139,14 +147,40 @@ ask_user_config() {
         SWAP_DISABLED=true
     fi
 
-    # 询问是否换源 (Armbian 系统不提供此功能)
-    if [ "$IS_ARMBIAN" = false ]; then
-        read -rp "是否更换 apt 软件源为 USTC (中科大) ? (y/n): " answer
-        if [[ ! "$answer" =~ ^[Nn]$ ]]; then
-            USE_CUSTOM_MIRROR=true
-        fi
+    # 询问是否换源 (仅对支持的系统进行询问)
+    # 检查是否为支持换源的系统 (Debian, Ubuntu, Linux Mint)
+    if grep -q "Debian" /etc/os-release || grep -q "Ubuntu" /etc/os-release || grep -q "Linux Mint" /etc/os-release; then
+        echo "请选择要使用的 apt 软件源镜像 (默认不换源):"
+        echo "0) 不换源 (默认)"
+        echo "1) 中科大"
+        echo "2) 清华大学"
+        echo "3) 阿里云"
+        echo "4) 网易"
+        read -rp "请选择 (0-4, 默认为0): " answer
+        case "$answer" in
+            1) 
+                USE_CUSTOM_MIRROR=true
+                MIRROR_SOURCE="ustc"
+                ;;
+            2) 
+                USE_CUSTOM_MIRROR=true
+                MIRROR_SOURCE="tsinghua"
+                ;;
+            3) 
+                USE_CUSTOM_MIRROR=true
+                MIRROR_SOURCE="aliyun"
+                ;;
+            4) 
+                USE_CUSTOM_MIRROR=true
+                MIRROR_SOURCE="netease"
+                ;;
+            *)
+                USE_CUSTOM_MIRROR=false
+                ;;
+        esac
     else
-        log "Armbian 系统不提供换源功能"
+        echo "当前系统不支持自动换源功能"
+        echo "仅支持 Debian、Ubuntu 和 Linux Mint 系统换源"
     fi
 
     # 询问是否安装 Docker
@@ -190,22 +224,29 @@ ask_user_config() {
     fi
 
     # 询问是否使用 GitHub 镜像加速
-    read -rp "是否使用 GitHub 镜像加速下载 Landscape Router 文件? (y/n): " answer
-    if [[ ! "$answer" =~ ^[Nn]$ ]]; then
-        USE_GITHUB_MIRROR=true
-        echo "可选的 GitHub 镜像加速地址:"
-        echo "1) https://ghfast.top (默认)"
-        echo "2) 自定义地址"
-        read -rp "请选择 (1-2, 默认为1): " answer
-        case "$answer" in
-            2)
-                read -rp "请输入 GitHub 镜像加速地址: " GITHUB_MIRROR
-                ;;
-            *)
-                GITHUB_MIRROR="https://ghfast.top"
-                ;;
-        esac
-    fi
+    echo "请选择 GitHub 镜像加速地址 (默认不使用加速):"
+    echo "0) 不使用加速 (默认)"
+    echo "1) https://ghfast.top"
+    echo "2) 自定义地址"
+    read -rp "请选择 (0-2, 默认为0): " answer
+    case "$answer" in
+        1)
+            USE_GITHUB_MIRROR=true
+            GITHUB_MIRROR="https://ghfast.top"
+            ;;
+        2)
+            read -rp "请输入 GitHub 镜像加速地址: " custom_mirror
+            if [ -n "$custom_mirror" ]; then
+                USE_GITHUB_MIRROR=true
+                GITHUB_MIRROR="$custom_mirror"
+            else
+                USE_GITHUB_MIRROR=false
+            fi
+            ;;
+        *)
+            USE_GITHUB_MIRROR=false
+            ;;
+    esac
     
     # 询问 Landscape 安装路径
     while true; do
@@ -251,7 +292,17 @@ ask_user_config() {
         echo "=============================="
         echo "1. 系统时区设置为亚洲/上海: $([ "$TIMEZONE_SHANGHAI" = true ] && echo "是" || echo "否")"
         echo "2. 禁用 swap (虚拟内存) : $([ "$SWAP_DISABLED" = true ] && echo "是" || echo "否")"
-        echo "3. 更换 apt 软件源为 USTC: $([ "$USE_CUSTOM_MIRROR" = true ] && echo "是" || echo "否")"
+        echo "3. 更换 apt 软件源: $([ "$USE_CUSTOM_MIRROR" = true ] && echo "是" || echo "否")"
+        if [ "$USE_CUSTOM_MIRROR" = true ]; then
+            local mirror_name="未知"
+            case "$MIRROR_SOURCE" in
+                "ustc") mirror_name="中科大" ;;
+                "tsinghua") mirror_name="清华大学" ;;
+                "aliyun") mirror_name="阿里云" ;;
+                "netease") mirror_name="网易" ;;
+            esac
+            echo "   镜像源: $mirror_name"
+        fi
         echo "4. 安装 Docker: $([ "$DOCKER_INSTALLED" = true ] && echo "是" || echo "否")"
         if [ "$DOCKER_INSTALLED" = true ]; then
             echo "   Docker 镜像源: $DOCKER_MIRROR"
@@ -292,13 +343,30 @@ ask_user_config() {
                 fi
                 ;;
             3)
-                if [ "$IS_ARMBIAN" = false ]; then
-                    read -rp "是否更换 apt 软件源为 USTC (中科大) ? (y/n): " answer
+                if [ "$SUPPORTED_SYSTEM" = true ]; then
+                    read -rp "是否更换 apt 软件源? (y/n): " answer
                     if [[ ! "$answer" =~ ^[Nn]$ ]]; then
                         USE_CUSTOM_MIRROR=true
+                        
+                        # 询问使用哪个镜像源
+                        echo "请选择要使用的镜像源:"
+                        echo "1) 中科大 (默认)"
+                        echo "2) 清华大学"
+                        echo "3) 阿里云"
+                        echo "4) 网易"
+                        read -rp "请选择 (1-4, 默认为1): " answer
+                        case "$answer" in
+                            2) MIRROR_SOURCE="tsinghua" ;;
+                            3) MIRROR_SOURCE="aliyun" ;;
+                            4) MIRROR_SOURCE="netease" ;;
+                            *) MIRROR_SOURCE="ustc" ;;
+                        esac
                     else
                         USE_CUSTOM_MIRROR=false
                     fi
+                elif [ "$IS_ARMBIAN" = false ]; then
+                    echo "当前系统不支持自动换源功能"
+                    echo "仅支持 Debian、Ubuntu 和 Linux Mint 系统换源"
                 else
                     echo "Armbian 系统不提供换源功能"
                 fi
@@ -350,24 +418,29 @@ ask_user_config() {
                 fi
                 ;;
             7)
-                read -rp "是否使用 GitHub 镜像加速下载 Landscape Router 文件? (y/n): " answer
-                if [[ ! "$answer" =~ ^[Nn]$ ]]; then
-                    USE_GITHUB_MIRROR=true
-                    echo "可选的 GitHub 镜像加速地址:"
-                    echo "1) https://ghfast.top (默认)"
-                    echo "2) 自定义地址"
-                    read -rp "请选择 (1-2, 默认为1): " answer
-                    case "$answer" in
-                        2)
-                            read -rp "请输入 GitHub 镜像加速地址: " GITHUB_MIRROR
-                            ;;
-                        *)
-                            GITHUB_MIRROR="https://ghfast.top"
-                            ;;
-                    esac
-                else
-                    USE_GITHUB_MIRROR=false
-                fi
+                echo "请选择 GitHub 镜像加速地址 (默认不使用加速):"
+                echo "0) 不使用加速 (默认)"
+                echo "1) https://ghfast.top"
+                echo "2) 自定义地址"
+                read -rp "请选择 (0-2, 默认为0): " answer
+                case "$answer" in
+                    1)
+                        USE_GITHUB_MIRROR=true
+                        GITHUB_MIRROR="https://ghfast.top"
+                        ;;
+                    2)
+                        read -rp "请输入 GitHub 镜像加速地址: " custom_mirror
+                        if [ -n "$custom_mirror" ]; then
+                            USE_GITHUB_MIRROR=true
+                            GITHUB_MIRROR="$custom_mirror"
+                        else
+                            USE_GITHUB_MIRROR=false
+                        fi
+                        ;;
+                    *)
+                        USE_GITHUB_MIRROR=false
+                        ;;
+                esac
                 ;;
             8)
                 while true; do
@@ -665,26 +738,140 @@ disable_swap() {
 
 # 换源
 change_apt_mirror() {
-    log "更换 apt 软件源为 ustc 源"
+    log "更换 apt 软件源"
+    
+    # 检查是否为支持的系统类型
+    local is_supported=false
+    if grep -q "Debian" /etc/os-release || grep -q "Ubuntu" /etc/os-release || grep -q "Linux Mint" /etc/os-release; then
+        is_supported=true
+    fi
+    
+    if [ "$is_supported" = false ]; then
+        log "警告: 不支持的系统类型，仅支持 Debian、Ubuntu 和 Linux Mint"
+        log "提示: 不支持小众发行版换源，建议小众发行版自行换源"
+        return 0
+    fi
+    
+    # 检查系统类型
+    local system_type=""
+    local system_version=""
+    local version_codename=""
+    
+    if grep -q "Debian" /etc/os-release; then
+        system_type="debian"
+        system_version=$(grep "VERSION_ID" /etc/os-release | cut -d'=' -f2 | tr -d '"')
+        version_codename=$(grep "VERSION_CODENAME" /etc/os-release | cut -d'=' -f2)
+    elif grep -q "Ubuntu" /etc/os-release; then
+        system_type="ubuntu"
+        system_version=$(grep "VERSION_ID" /etc/os-release | cut -d'=' -f2 | tr -d '"')
+        version_codename=$(grep "VERSION_CODENAME" /etc/os-release | cut -d'=' -f2)
+    elif grep -q "Linux Mint" /etc/os-release; then
+        system_type="linuxmint"
+        system_version=$(grep "VERSION_ID" /etc/os-release | cut -d'=' -f2 | tr -d '"')
+        # Linux Mint 使用 Ubuntu 的代号，需要特殊处理
+        # 从 VERSION 中提取 Ubuntu 代号
+        local ubuntu_codename=$(grep "UBUNTU_CODENAME" /etc/os-release | cut -d'=' -f2)
+        if [ -n "$ubuntu_codename" ]; then
+            version_codename="$ubuntu_codename"
+        else
+            # 如果没有 UBUNTU_CODENAME，尝试从 VERSION 中提取
+            local version_desc=$(grep "VERSION=" /etc/os-release | cut -d'=' -f2 | tr -d '"')
+            # 这里简化处理，实际应该根据 Linux Mint 版本映射到 Ubuntu 代号
+            version_codename="focal"  # 默认 focal，实际应该有更精确的映射
+        fi
+    fi
+    
+    # 确定使用的镜像源URL
+    local mirror_url=""
+    case "$MIRROR_SOURCE" in
+        "ustc")
+            case "$system_type" in
+                "debian") mirror_url="https://mirrors.ustc.edu.cn/debian/" ;;
+                "ubuntu") mirror_url="https://mirrors.ustc.edu.cn/ubuntu/" ;;
+                "linuxmint") mirror_url="https://mirrors.ustc.edu.cn/linuxmint/" ;;
+            esac
+            ;;
+        "tsinghua")
+            case "$system_type" in
+                "debian") mirror_url="https://mirrors.tuna.tsinghua.edu.cn/debian/" ;;
+                "ubuntu") mirror_url="https://mirrors.tuna.tsinghua.edu.cn/ubuntu/" ;;
+                "linuxmint") mirror_url="https://mirrors.tuna.tsinghua.edu.cn/linuxmint/" ;;
+            esac
+            ;;
+        "aliyun")
+            case "$system_type" in
+                "debian") mirror_url="https://mirrors.aliyun.com/debian/" ;;
+                "ubuntu") mirror_url="https://mirrors.aliyun.com/ubuntu/" ;;
+                "linuxmint") mirror_url="https://mirrors.aliyun.com/linuxmint/" ;;
+            esac
+            ;;
+        "netease")
+            case "$system_type" in
+                "debian") mirror_url="https://mirrors.163.com/debian/" ;;
+                "ubuntu") mirror_url="https://mirrors.163.com/ubuntu/" ;;
+                "linuxmint") mirror_url="https://mirrors.163.com/linuxmint/" ;;
+            esac
+            ;;
+    esac
+    
+    log "系统类型: $system_type"
+    log "系统版本: $system_version"
+    log "版本代号: $version_codename"
+    log "使用镜像源: $MIRROR_SOURCE ($mirror_url)"
     
     # 备份原源
-    cp /etc/apt/sources.list /etc/apt/sources.list.bak
+    if [ -f "/etc/apt/sources.list" ]; then
+        cp /etc/apt/sources.list /etc/apt/sources.list.bak
+    fi
     
-    # 写入新源
-    cat > /etc/apt/sources.list << EOF
-deb http://mirrors.ustc.edu.cn/debian/ trixie main contrib non-free non-free-firmware
-deb-src http://mirrors.ustc.edu.cn/debian/ trixie main contrib non-free non-free-firmware
+    # 根据系统类型生成对应的源列表
+    case "$system_type" in
+        "debian")
+            # 如果无法获取版本代号，则使用通用代号
+            if [ -z "$version_codename" ]; then
+                version_codename="stable"
+            fi
+            
+            # 写入新源
+            cat > /etc/apt/sources.list << EOF
+# 默认注释了源码镜像以提高 apt update 速度，如有需要可取消注释
+deb $mirror_url $version_codename main contrib non-free non-free-firmware
+# deb-src $mirror_url $version_codename main contrib non-free non-free-firmware
 
-deb http://mirrors.ustc.edu.cn/debian/ trixie-updates main contrib non-free non-free-firmware
-deb-src http://mirrors.ustc.edu.cn/debian/ trixie-updates main contrib non-free non-free-firmware
+deb $mirror_url $version_codename-updates main contrib non-free non-free-firmware
+# deb-src $mirror_url $version_codename-updates main contrib non-free non-free-firmware
 
-deb http://mirrors.ustc.edu.cn/debian/ trixie-backports main contrib non-free non-free-firmware
-deb-src http://mirrors.ustc.edu.cn/debian/ trixie-backports main contrib non-free non-free-firmware
+deb $mirror_url $version_codename-backports main contrib non-free non-free-firmware
+# deb-src $mirror_url $version_codename-backports main contrib non-free non-free-firmware
 
-# 安全更新源
-deb http://mirrors.ustc.edu.cn/debian-security trixie-security main contrib non-free non-free-firmware
-deb-src http://mirrors.ustc.edu.cn/debian-security trixie-security main contrib non-free non-free-firmware
+deb ${mirror_url}security/ $version_codename-security main contrib non-free non-free-firmware
+# deb-src ${mirror_url}security/ $version_codename-security main contrib non-free non-free-firmware
 EOF
+            ;;
+            
+        "ubuntu"|"linuxmint")
+            # 如果无法获取版本代号，则使用通用代号
+            if [ -z "$version_codename" ]; then
+                version_codename="focal"  # 默认使用 focal
+            fi
+            
+            # 写入新源
+            cat > /etc/apt/sources.list << EOF
+# 默认注释了源码镜像以提高 apt update 速度，如有需要可取消注释
+deb $mirror_url $version_codename main restricted universe multiverse
+# deb-src $mirror_url $version_codename main restricted universe multiverse
+
+deb $mirror_url $version_codename-updates main restricted universe multiverse
+# deb-src $mirror_url $version_codename-updates main restricted universe multiverse
+
+deb $mirror_url $version_codename-backports main restricted universe multiverse
+# deb-src $mirror_url $version_codename-backports main restricted universe multiverse
+
+deb ${mirror_url}security/ $version_codename-security main restricted universe multiverse
+# deb-src ${mirror_url}security/ $version_codename-security main restricted universe multiverse
+EOF
+            ;;
+    esac
     
     # 更新包索引
     apt_update
@@ -890,43 +1077,7 @@ install_landscape_router() {
         log "curl 已安装"
     fi
     
-    # 获取最新稳定版本
-    local version=""
-    local retry=0
-    local max_retry=10
-    local user_continue="y"
-    
-    while [ "$user_continue" = "y" ]; do
-        retry=0
-        while [ $retry -lt $max_retry ]; do
-            version=$(curl -s "https://api.github.com/repos/ThisSeanZhang/landscape/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
-            if [ -n "$version" ]; then
-                log "成功获取 Landscape Router 最新版本: $version"
-                break
-            else
-                retry=$((retry+1))
-                log "获取版本信息失败, 正在进行第 $retry/$max_retry 次重试"
-                sleep 3
-            fi
-        done
-        
-        if [ -n "$version" ]; then
-            break
-        else
-            echo "获取版本信息失败, 是否再次尝试？(y/n): "
-            read -r user_continue
-            user_continue=$(echo "$user_continue" | tr '[:upper:]' '[:lower:]')
-        fi
-    done
-    
-    if [ -z "$version" ]; then
-        log "错误: 无法获取 Landscape Router 最新版本信息"
-        exit 1
-    fi
-    
-    log "检测到最新版本: $version"
-    
-    # 根据架构确定二进制文件名
+        # 根据架构确定二进制文件名
     local binary_filename=""
     local system_arch
     system_arch=$(uname -m)
@@ -936,16 +1087,16 @@ install_landscape_router() {
         binary_filename="landscape-webserver-x86_64"
     fi
     
-    # 下载 landscape-webserver 二进制文件
+    # 直接下载 latest 版本的 landscape-webserver 二进制文件
     local binary_url
     if [ "$USE_GITHUB_MIRROR" = true ]; then
-        binary_url="$GITHUB_MIRROR/https://github.com/ThisSeanZhang/landscape/releases/download/$version/$binary_filename"
+        binary_url="$GITHUB_MIRROR/https://github.com/ThisSeanZhang/landscape/releases/latest/download/$binary_filename"
     else
-        binary_url="https://github.com/ThisSeanZhang/landscape/releases/download/$version/$binary_filename"
+        binary_url="https://github.com/ThisSeanZhang/landscape/releases/latest/download/$binary_filename"
     fi
     
     local retry=0
-    user_continue="y"
+    local user_continue="y"
     
     while [ "$user_continue" = "y" ]; do
         retry=0
@@ -986,12 +1137,12 @@ install_landscape_router() {
         log "unzip 已安装"
     fi
     
-    # 下载 static.zip
+    # 下载 latest 版本的 static.zip
     local static_url
     if [ "$USE_GITHUB_MIRROR" = true ]; then
-        static_url="$GITHUB_MIRROR/https://github.com/ThisSeanZhang/landscape/releases/download/$version/static.zip"
+        static_url="$GITHUB_MIRROR/https://github.com/ThisSeanZhang/landscape/releases/latest/download/static.zip"
     else
-        static_url="https://github.com/ThisSeanZhang/landscape/releases/download/$version/static.zip"
+        static_url="https://github.com/ThisSeanZhang/landscape/releases/latest/download/static.zip"
     fi
     
     retry=0
@@ -1073,6 +1224,15 @@ install_landscape_router() {
     
     # 添加执行权限
     chmod +x "$LANDSCAPE_DIR/$binary_filename"
+    
+    # 获取版本信息
+    local version
+    version=$("$LANDSCAPE_DIR/$binary_filename" --version 2>/dev/null)
+    if [ -n "$version" ]; then
+        log "Landscape Router 版本信息: $version"
+    else
+        log "无法获取 Landscape Router 版本信息"
+    fi
     
     log "Landscape Router 部署完成"
 }
