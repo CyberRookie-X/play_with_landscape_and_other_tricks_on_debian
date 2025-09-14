@@ -930,20 +930,80 @@ install_docker() {
         log "curl 已安装"
     fi
     
-    # 根据选择的镜像源安装 Docker
-    case "$DOCKER_MIRROR" in
-        "aliyun")
-            curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun
-            ;;
-        "azure")
-            curl -fsSL https://get.docker.com | bash -s docker --mirror AzureChinaCloud
-            ;;
-        *)
-            curl -fsSL https://get.docker.com | bash
-            ;;
-    esac
+    local retry=0
+    local max_retry=1
+    local user_choice=""
     
-    log "Docker 安装完成"
+    while [ "$user_choice" != "n" ]; do
+        retry=0
+        while [ $retry -lt $max_retry ]; do
+            log "正在安装 Docker (尝试 $((retry+1))/$max_retry)"
+            
+            # 根据选择的镜像源安装 Docker
+            case "$DOCKER_MIRROR" in
+                "aliyun")
+                    if curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun; then
+                        log "Docker 安装成功"
+                        return 0
+                    fi
+                    ;;
+                "azure")
+                    if curl -fsSL https://get.docker.com | bash -s docker --mirror AzureChinaCloud; then
+                        log "Docker 安装成功"
+                        return 0
+                    fi
+                    ;;
+                *)
+                    if curl -fsSL https://get.docker.com | bash; then
+                        log "Docker 安装成功"
+                        return 0
+                    fi
+                    ;;
+            esac
+            
+            retry=$((retry+1))
+            log "Docker 安装失败"
+        done
+        
+        if [ $retry -eq $max_retry ]; then
+            echo "Docker 安装失败, 请选择操作:"
+            echo "  r) 重试一次"
+            echo "  m) 重新选择镜像源再试"
+            echo "  n) 退出安装"
+            read -rp "请输入选项 (r/m/n): " user_choice
+            user_choice=$(echo "$user_choice" | tr '[:upper:]' '[:lower:]')
+            
+            case "$user_choice" in
+                "r")
+                    # 重试，保持当前镜像源
+                    user_choice="y"  # 重置选择以便继续循环
+                    retry=0  # 重置重试计数
+                    ;;
+                "m")
+                    # 重新选择镜像源
+                    echo "请选择 Docker 镜像源:"
+                    echo "1) 阿里云 (默认)"
+                    echo "2) Azure 中国云"
+                    echo "3) 官方源 (国外)"
+                    read -rp "请选择 (1-3, 默认为1): " mirror_choice
+                    case "$mirror_choice" in
+                        2) DOCKER_MIRROR="azure" ;;
+                        3) DOCKER_MIRROR="official" ;;
+                        *) DOCKER_MIRROR="aliyun" ;;
+                    esac
+                    user_choice="y"  # 重置选择以便继续循环
+                    retry=0  # 重置重试计数
+                    ;;
+                *)
+                    # 默认为退出安装
+                    user_choice="n"
+                    ;;
+            esac
+        fi
+    done
+    
+    log "错误: Docker 安装失败"
+    exit 1
 }
 
 
@@ -989,16 +1049,95 @@ modify_apache_port() {
     log "Apache 端口修改完成"
 }
 
+# 处理 apt 换源选择的通用函数
+handle_apt_mirror_choice() {
+    log "用户选择换源操作"
+    if [ "$USE_CUSTOM_MIRROR" = false ]; then
+        echo "当前未配置自定义镜像源，无法换源。"
+        echo "请选择: "
+        echo "1) 再次尝试3次"
+        echo "2) 退出安装 (输入除1以外的任意字符)"
+        read -r user_choice
+        
+        if [ "$user_choice" != "1" ]; then
+            log "用户选择退出安装"
+            exit 1
+        else
+            user_choice="y"
+        fi
+        echo "$user_choice"  # 返回用户选择
+    else
+        # 备份当前源
+        if [ -f "/etc/apt/sources.list" ]; then
+            cp /etc/apt/sources.list /etc/apt/sources.list.pre-fail.bak
+        fi
+        
+        # 根据当前镜像源切换到下一个可用镜像源
+        local next_mirror=""
+        case "$MIRROR_SOURCE" in
+            "ustc") next_mirror="tsinghua" ;;
+            "tsinghua") next_mirror="aliyun" ;;
+            "aliyun") next_mirror="tencent" ;;
+            "tencent") next_mirror="huawei" ;;
+            "huawei") next_mirror="netease" ;;
+            "netease") next_mirror="ustc" ;;
+            *) next_mirror="ustc" ;;
+        esac
+        
+        MIRROR_SOURCE="$next_mirror"
+        change_apt_mirror
+        echo "y"  # 返回用户选择以便继续循环
+    fi
+}
+
+# 处理 GitHub 镜像加速选择的通用函数
+handle_github_mirror_choice() {
+    local binary_name="$1"  # 传入正在下载的文件名
+    log "用户选择使用 GitHub 镜像加速"
+    if [ "$USE_GITHUB_MIRROR" = false ]; then
+        echo "请选择 GitHub 镜像加速地址:"
+        echo "1) https://ghfast.top"
+        echo "2) 自定义地址"
+        echo "3) 取消并再次尝试3次"
+        read -rp "请选择 (1-3): " mirror_choice
+        
+        case "$mirror_choice" in
+            1)
+                USE_GITHUB_MIRROR=true
+                GITHUB_MIRROR="https://ghfast.top"
+                echo "1"  # 表示选择了镜像1
+                ;;
+            2)
+                read -rp "请输入 GitHub 镜像加速地址: " custom_mirror
+                if [ -n "$custom_mirror" ]; then
+                    USE_GITHUB_MIRROR=true
+                    GITHUB_MIRROR="$custom_mirror"
+                    echo "2"  # 表示选择了自定义镜像
+                else
+                    echo "输入的镜像地址为空，取消使用镜像加速"
+                    echo "3"  # 表示取消操作
+                fi
+                ;;
+            *)
+                echo "3"  # 表示取消操作
+                ;;
+        esac
+    else
+        echo "当前已配置 GitHub 镜像加速，无法进一步优化"
+        echo "y"  # 继续重试
+    fi
+}
+
 # 独立的 apt update 函数
 apt_update() {
     if [ "$APT_UPDATED" = false ]; then
         log "执行 apt update"
         
         local retry=0
-        local max_retry=10
-        local user_continue="y"
+        local max_retry=3
+        local user_choice=""
         
-        while [ "$user_continue" = "y" ]; do
+        while [ "$user_choice" != "n" ]; do
             retry=0
             while [ $retry -lt $max_retry ]; do
                 if apt update; then
@@ -1013,9 +1152,15 @@ apt_update() {
             done
             
             if [ $retry -eq $max_retry ]; then
-                echo "apt update 失败, 是否再次尝试？(y/n): "
-                read -r user_continue
-                user_continue=$(echo "$user_continue" | tr '[:upper:]' '[:lower:]')
+                echo "apt update 失败, 是否再次尝试3次？(y/n) 或输入 'm' 尝试换源: "
+                read -r user_choice
+                user_choice=$(echo "$user_choice" | tr '[:upper:]' '[:lower:]')
+                
+                # 如果用户选择换源
+                if [ "$user_choice" = "m" ]; then
+                    user_choice=$(handle_apt_mirror_choice)
+                    retry=0  # 重置重试计数
+                fi
             fi
         done
         
@@ -1032,10 +1177,10 @@ apt_install() {
     log "安装软件包: $packages"
     
     local retry=0
-    local max_retry=10
-    local user_continue="y"
+    local max_retry=3
+    local user_choice=""
     
-    while [ "$user_continue" = "y" ]; do
+    while [ "$user_choice" != "n" ]; do
         retry=0
         while [ $retry -lt $max_retry ]; do
             if apt install $packages -y; then
@@ -1049,9 +1194,15 @@ apt_install() {
         done
         
         if [ $retry -eq $max_retry ]; then
-            echo "软件包 $packages 安装失败, 是否再次尝试？(y/n): "
-            read -r user_continue
-            user_continue=$(echo "$user_continue" | tr '[:upper:]' '[:lower:]')
+            echo "软件包 $packages 安装失败, 是否再次尝试3次？(y/n) 或输入 'm' 尝试换源: "
+            read -r user_choice
+            user_choice=$(echo "$user_choice" | tr '[:upper:]' '[:lower:]')
+            
+            # 如果用户选择换源
+            if [ "$user_choice" = "m" ]; then
+                user_choice=$(handle_apt_mirror_choice)
+                retry=0  # 重置重试计数
+            fi
         fi
     done
     
@@ -1126,12 +1277,13 @@ install_landscape_router() {
     fi
     
     local retry=0
-    local user_continue="y"
+    local max_retry=3
+    local user_choice=""
     
-    while [ "$user_continue" = "y" ]; do
+    while [ "$user_choice" != "n" ]; do
         retry=0
-        while [ $retry -lt $MAX_RETRY ]; do
-            log "正在下载 $binary_filename (尝试 $((retry+1))/$MAX_RETRY)"
+        while [ $retry -lt $max_retry ]; do
+            log "正在下载 $binary_filename (尝试 $((retry+1))/$max_retry)"
             if curl -fsSL -o "$LANDSCAPE_DIR/$binary_filename" "$binary_url"; then
                 log "$binary_filename 下载成功"
                 break
@@ -1142,16 +1294,41 @@ install_landscape_router() {
             fi
         done
         
-        if [ $retry -lt $MAX_RETRY ]; then
-            break
+        if [ $retry -eq $max_retry ]; then
+            echo "下载 $binary_filename 失败, 是否再次尝试3次？(y/n) 或输入 'm' 使用 GitHub 镜像加速: "
+            read -r user_choice
+            user_choice=$(echo "$user_choice" | tr '[:upper:]' '[:lower:]')
+            
+            # 如果用户选择使用 GitHub 镜像加速
+            if [ "$user_choice" = "m" ]; then
+                local mirror_result=""
+                mirror_result=$(handle_github_mirror_choice "$binary_filename")
+                
+                case "$mirror_result" in
+                    "1")
+                        # 更新下载 URL
+                        binary_url="$GITHUB_MIRROR/https://github.com/ThisSeanZhang/landscape/releases/latest/download/$binary_filename"
+                        user_choice="y"  # 重置选择以便继续循环
+                        retry=0  # 重置重试计数
+                        ;;
+                    "2")
+                        # 更新下载 URL
+                        binary_url="$GITHUB_MIRROR/https://github.com/ThisSeanZhang/landscape/releases/latest/download/$binary_filename"
+                        user_choice="y"  # 重置选择以便继续循环
+                        retry=0  # 重置重试计数
+                        ;;
+                    *)
+                        user_choice="y"
+                        ;;
+                esac
+            fi
         else
-            echo "下载 $binary_filename 失败, 是否再次尝试？(y/n): "
-            read -r user_continue
-            user_continue=$(echo "$user_continue" | tr '[:upper:]' '[:lower:]')
+            # 下载成功则跳出循环
+            break
         fi
     done
     
-    if [ $retry -eq $MAX_RETRY ] && [ "$user_continue" != "y" ]; then
+    if [ $retry -eq $max_retry ] && [ "$user_choice" = "n" ]; then
         log "错误: 下载 $binary_filename 失败"
         exit 1
     fi
@@ -1176,12 +1353,12 @@ install_landscape_router() {
     fi
     
     retry=0
-    user_continue="y"
+    user_choice=""
     
-    while [ "$user_continue" = "y" ]; do
+    while [ "$user_choice" != "n" ]; do
         retry=0
-        while [ $retry -lt $MAX_RETRY ]; do
-            log "正在下载 static.zip (尝试 $((retry+1))/$MAX_RETRY)"
+        while [ $retry -lt $max_retry ]; do
+            log "正在下载 static.zip (尝试 $((retry+1))/$max_retry)"
             if curl -fsSL -o "/tmp/static.zip" "$static_url"; then
                 log "static.zip 下载成功"
                 break
@@ -1192,16 +1369,41 @@ install_landscape_router() {
             fi
         done
         
-        if [ $retry -lt $MAX_RETRY ]; then
-            break
+        if [ $retry -eq $max_retry ]; then
+            echo "下载 static.zip 失败, 是否再次尝试3次？(y/n) 或输入 'm' 使用 GitHub 镜像加速: "
+            read -r user_choice
+            user_choice=$(echo "$user_choice" | tr '[:upper:]' '[:lower:]')
+            
+            # 如果用户选择使用 GitHub 镜像加速
+            if [ "$user_choice" = "m" ]; then
+                local mirror_result=""
+                mirror_result=$(handle_github_mirror_choice "static.zip")
+                
+                case "$mirror_result" in
+                    "1")
+                        # 更新下载 URL
+                        static_url="$GITHUB_MIRROR/https://github.com/ThisSeanZhang/landscape/releases/latest/download/static.zip"
+                        user_choice="y"  # 重置选择以便继续循环
+                        retry=0  # 重置重试计数
+                        ;;
+                    "2")
+                        # 更新下载 URL
+                        static_url="$GITHUB_MIRROR/https://github.com/ThisSeanZhang/landscape/releases/latest/download/static.zip"
+                        user_choice="y"  # 重置选择以便继续循环
+                        retry=0  # 重置重试计数
+                        ;;
+                    *)
+                        user_choice="y"
+                        ;;
+                esac
+            fi
         else
-            echo "下载 static.zip 失败, 是否再次尝试？(y/n): "
-            read -r user_continue
-            user_continue=$(echo "$user_continue" | tr '[:upper:]' '[:lower:]')
+            # 下载成功则跳出循环
+            break
         fi
     done
     
-    if [ $retry -eq $MAX_RETRY ] && [ "$user_continue" != "y" ]; then
+    if [ $retry -eq $max_retry ] && [ "$user_choice" = "n" ]; then
         log "错误: 下载 static.zip 失败"
         exit 1
     fi
