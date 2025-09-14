@@ -179,7 +179,7 @@ ghcr.nju.edu.cn
 * 两个环境变量同时存在时，MIRROR 生效，REGION 失效。
 
 1. REDIRECT_PKG_HANDLER_WRAPPER_REGION    
-填入非 CN/cn 值时，跳过 IP 归属地检测 和 换源; 填入 CN/cn 会跳过 IP 归属地检测，从中科大/清华/阿里/网易 中随机选取一个可以成功 update 的源
+填入非 CN/cn 值时，跳过 IP 归属地检测 和 换源; 填入 CN/cn 会跳过 IP 归属地检测，从中科大/清华/阿里/腾讯/华为 中随机选取一个可以成功 update 的源
 2. REDIRECT_PKG_HANDLER_WRAPPER_MIRROR   
 填入 alpine 镜像源地址，如 西北农林大学镜像源  REDIRECT_PKG_HANDLER_WRAPPER_MIRROR=mirrors.nwafu.edu.cn
 

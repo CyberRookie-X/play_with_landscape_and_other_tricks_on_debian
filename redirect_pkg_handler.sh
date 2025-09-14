@@ -11,19 +11,19 @@
 # 两个环境变量同时存在时，MIRROR 生效，REGION 失效。
 #
 # 1. REDIRECT_PKG_HANDLER_WRAPPER_REGION    
-# 填入非 CN/cn 值时，跳过 IP 归属地检测 和 换源; 填入 CN/cn 会跳过 IP 归属地检测，从中科大/清华/阿里/网易 中随机选取一个可以成功 update 的源
+# 填入非 CN/cn 值时，跳过 IP 归属地检测 和 换源; 填入 CN/cn 会跳过 IP 归属地检测，从中科大/清华/阿里/腾讯/华为 中随机选取一个可以成功 update 的源
 # 2. REDIRECT_PKG_HANDLER_WRAPPER_MIRROR   
 # 填入 alpine 镜像源地址，如 西北农林大学镜像源  REDIRECT_PKG_HANDLER_WRAPPER_MIRROR=mirrors.nwafu.edu.cn
 
 
 # 脚本逻辑说明
-# 1、检查 容器系统 是否属于 debian/ubuntu/centos/rocky/alma/debian/alpine ，在此范围之外的系统暂不支持
+# 1、检查 容器系统 是否属于 debian/ubuntu/centos/rocky/alma，在此范围之外的系统暂不支持
 # 2、对于 debian/ubuntu/centos/rocky/alma，配置防火墙，并运行 redirect_pkg_handler ，最后执行原始镜像的 ENTRYPOINT 和 CMD
 # 3、对于 alpine，具有 libelf 和 libgcc支持的，则配置防火墙，并运行 redirect_pkg_handler ，最后执行原始镜像的 ENTRYPOINT 和 CMD
 # 4、对于 alpine，没有 libelf 和 libgcc 支持
 # 4.1 确定 是否处于 无法访问 alpine 官方源 的地区。通过 环境变量 REDIRECT_PKG_HANDLER_WRAPPER_REGION 或 本机 IP 归属地查询，确定 是否处于 无法访问 alpine 官方源 的地区
 # 4.2 对于 alpine 源不可用的 国家/地区，如中国，进行换源操作 
-# 4.3 采用 环境变量 REDIRECT_PKG_HANDLER_WRAPPER_MIRROR 给出的源 或者 从 中科大/清华/阿里/网易 中随机选一个 能成功 apk update 的源
+# 4.3 采用 环境变量 REDIRECT_PKG_HANDLER_WRAPPER_MIRROR 给出的源 或者 从 中科大/清华/阿里/网易/腾讯/华为 中随机选一个 能成功 apk update 的源
 # 4.4 安装 libelf 和 libgcc，配置防火墙，启动 redirect_pkg_handler ，等待 0.2 s，最后执行原始镜像的 ENTRYPOINT 和 CMD
 
 
@@ -72,7 +72,10 @@ ORIGINAL_ENTRYPOINT_CMD="$@"
 ARCH=$(uname -m)
 
 # 定义可用的镜像源列表
-MIRRORS="mirrors.ustc.edu.cn mirrors.aliyun.com mirrors.163.com mirrors.tuna.tsinghua.edu.cn"
+MIRRORS="mirrors.ustc.edu.cn mirrors.aliyun.com mirrors.tuna.tsinghua.edu.cn mirrors.cloud.tencent.com repo.huaweicloud.com"
+
+# 初始化随机种子
+RANDOM_SEED=$(date +%s%N)
 
 # ==================== 主函数 ====================
 
@@ -113,6 +116,22 @@ main() {
 # 日志函数，确保日志格式符合Docker规范，不依赖echo命令
 log() {
     printf "%s %s %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "[redirect_pkg_handler_wrapper_script]" "$1"
+}
+
+# 初始化随机种子
+srand() {
+    # 使用更可靠的随机种子生成方法
+    # 优先使用 /dev/urandom，如果不可用则使用高精度时间戳
+    if [ -r "/dev/urandom" ] && command -v od >/dev/null 2>&1; then
+        # 从 /dev/urandom 读取随机数据作为种子
+        RANDOM_SEED=$(od -vAn -N4 -tu4 < /dev/urandom | tr -d ' ')
+    else
+        # 使用纳秒级时间戳和进程ID的组合作为种子
+        RANDOM_SEED=$(date +%s%N)
+        RANDOM_SEED=$((RANDOM_SEED + $$ + RANDOM_SEED * 1103515245 + 12345))
+    fi
+    RANDOM_SEED=$((RANDOM_SEED * 1103515245 + 12345))
+    printf "%d\n" $((RANDOM_SEED >> 16))
 }
 
 # ==================== 非 Alpine 系统处理函数 ====================
@@ -196,22 +215,41 @@ handle_mirror_with_env_vars() {
             # 备份原始源
             cp /etc/apk/repositories /etc/apk/repositories.bak
             
-            # 随机选择一个镜像源
-            MIRROR_COUNT=$(echo $MIRRORS | wc -w)
-            RANDOM_INDEX=$(awk -v min=1 -v max=$MIRROR_COUNT 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')
-            SELECTED_MIRROR=$(echo $MIRRORS | cut -d' ' -f$RANDOM_INDEX)
+            # 创建镜像源列表副本用于尝试
+            AVAILABLE_MIRRORS="$MIRRORS"
+            SELECTED_MIRROR=""
+            UPDATE_SUCCESS=false
             
-            log "Selected mirror: $SELECTED_MIRROR"
-            # 使用选中的镜像源
-            sed -i "s/dl-cdn.alpinelinux.org/$SELECTED_MIRROR/g" /etc/apk/repositories
+            # 尝试不同的镜像源直到成功或没有更多源可尝试
+            while [ "$UPDATE_SUCCESS" = "false" ] && [ -n "$AVAILABLE_MIRRORS" ]; do
+                # 随机选择一个镜像源
+                MIRROR_COUNT=$(echo $AVAILABLE_MIRRORS | wc -w)
+                RANDOM_INDEX=$(( ( $(srand) % MIRROR_COUNT ) + 1 ))
+                SELECTED_MIRROR=$(echo $AVAILABLE_MIRRORS | cut -d' ' -f$RANDOM_INDEX)
+                
+                log "Trying mirror: $SELECTED_MIRROR"
+                # 使用选中的镜像源
+                sed -i "s/dl-cdn.alpinelinux.org/$SELECTED_MIRROR/g" /etc/apk/repositories
+                
+                # 尝试更新包列表
+                if apk update >/dev/null 2>&1; then
+                    UPDATE_SUCCESS=true
+                    log "Successfully updated with mirror: $SELECTED_MIRROR"
+                else
+                    log "Failed to update with mirror: $SELECTED_MIRROR"
+                    # 从可用镜像源列表中移除失败的源
+                    AVAILABLE_MIRRORS=$(echo $AVAILABLE_MIRRORS | sed "s/$SELECTED_MIRROR//g" | tr -s ' ' | sed 's/^ *//;s/ *$//')
+                    # 恢复原始源配置以便重试
+                    cp /etc/apk/repositories.bak /etc/apk/repositories
+                fi
+            done
             
-            # 更新包列表
-            if ! apk update >/dev/null 2>&1; then
-                log "Failed to update with selected mirror, restoring original configuration"
+            # 如果所有镜像源都尝试失败，记录错误并恢复原始配置
+            if [ "$UPDATE_SUCCESS" = "false" ]; then
+                log "Failed to update with all mirrors, restoring original configuration"
                 cp /etc/apk/repositories.bak /etc/apk/repositories
+                # 恢复原始源后需要更新包索引
                 apk update >/dev/null 2>&1
-            else
-                log "Successfully updated with selected mirror"
             fi
         else
             log "Region set to $REDIRECT_PKG_HANDLER_WRAPPER_REGION, skipping IP detection and mirror change"
@@ -411,7 +449,7 @@ handle_mirror_by_ip() {
         while [ "$UPDATE_SUCCESS" = "false" ] && [ -n "$AVAILABLE_MIRRORS" ]; do
             # 随机选择一个镜像源
             MIRROR_COUNT=$(echo $AVAILABLE_MIRRORS | wc -w)
-            RANDOM_INDEX=$(awk -v min=1 -v max=$MIRROR_COUNT 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')
+            RANDOM_INDEX=$(( ( $(srand) % MIRROR_COUNT ) + 1 ))
             SELECTED_MIRROR=$(echo $AVAILABLE_MIRRORS | cut -d' ' -f$RANDOM_INDEX)
             
             log "Trying mirror: $SELECTED_MIRROR"

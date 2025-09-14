@@ -155,8 +155,10 @@ ask_user_config() {
         echo "1) 中科大"
         echo "2) 清华大学"
         echo "3) 阿里云"
-        echo "4) 网易"
-        read -rp "请选择 (0-4, 默认为0): " answer
+        echo "4) 网易(不支持Alpine)"
+        echo "5) 腾讯"
+        echo "6) 华为"
+        read -rp "请选择 (0-6, 默认为0): " answer
         case "$answer" in
             1) 
                 USE_CUSTOM_MIRROR=true
@@ -173,6 +175,14 @@ ask_user_config() {
             4) 
                 USE_CUSTOM_MIRROR=true
                 MIRROR_SOURCE="netease"
+                ;;
+            5)
+                USE_CUSTOM_MIRROR=true
+                MIRROR_SOURCE="tencent"
+                ;;
+            6)
+                USE_CUSTOM_MIRROR=true
+                MIRROR_SOURCE="huawei"
                 ;;
             *)
                 USE_CUSTOM_MIRROR=false
@@ -299,7 +309,9 @@ ask_user_config() {
                 "ustc") mirror_name="中科大" ;;
                 "tsinghua") mirror_name="清华大学" ;;
                 "aliyun") mirror_name="阿里云" ;;
-                "netease") mirror_name="网易" ;;
+                "netease") mirror_name="网易(不支持Alpine)" ;;
+                "tencent") mirror_name="腾讯" ;;
+                "huawei") mirror_name="华为" ;;
             esac
             echo "   镜像源: $mirror_name"
         fi
@@ -353,12 +365,16 @@ ask_user_config() {
                         echo "1) 中科大 (默认)"
                         echo "2) 清华大学"
                         echo "3) 阿里云"
-                        echo "4) 网易"
-                        read -rp "请选择 (1-4, 默认为1): " answer
+                        echo "4) 网易(不支持Alpine)"
+                        echo "5) 腾讯"
+                        echo "6) 华为"
+                        read -rp "请选择 (1-6, 默认为1): " answer
                         case "$answer" in
                             2) MIRROR_SOURCE="tsinghua" ;;
                             3) MIRROR_SOURCE="aliyun" ;;
                             4) MIRROR_SOURCE="netease" ;;
+                            5) MIRROR_SOURCE="tencent" ;;
+                            6) MIRROR_SOURCE="huawei" ;;
                             *) MIRROR_SOURCE="ustc" ;;
                         esac
                     else
@@ -810,6 +826,20 @@ change_apt_mirror() {
                 "debian") mirror_url="https://mirrors.163.com/debian/" ;;
                 "ubuntu") mirror_url="https://mirrors.163.com/ubuntu/" ;;
                 "linuxmint") mirror_url="https://mirrors.163.com/linuxmint/" ;;
+            esac
+            ;;
+        "tencent")
+            case "$system_type" in
+                "debian") mirror_url="https://mirrors.cloud.tencent.com/debian/" ;;
+                "ubuntu") mirror_url="https://mirrors.cloud.tencent.com/ubuntu/" ;;
+                "linuxmint") mirror_url="https://mirrors.cloud.tencent.com/linuxmint/" ;;
+            esac
+            ;;
+        "huawei")
+            case "$system_type" in
+                "debian") mirror_url="https://mirrors.huaweicloud.com/repository/debian/" ;;
+                "ubuntu") mirror_url="https://mirrors.huaweicloud.com/repository/ubuntu/" ;;
+                "linuxmint") mirror_url="https://mirrors.huaweicloud.com/repository/linuxmint/" ;;
             esac
             ;;
     esac
