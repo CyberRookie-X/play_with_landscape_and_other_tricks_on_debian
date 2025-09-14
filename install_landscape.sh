@@ -324,7 +324,7 @@ ask_user_config() {
         if [ "$MODIFY_APACHE_PORT" = true ]; then
             echo "   Apache 端口: $APACHE_PORT"
         fi
-        echo "6. 安装 ppp: $([ "$INSTALL_PPP" = true ] && echo "是" || echo "否")"
+        echo "6. 安装 ppp (用于 PPPOE 拨号): $([ "$INSTALL_PPP" = true ] && echo "是" || echo "否")"
         echo "7. 使用 GitHub 镜像加速: $([ "$USE_GITHUB_MIRROR" = true ] && echo "是" || echo "否")"
         if [ "$USE_GITHUB_MIRROR" = true ]; then
             echo "   GitHub 镜像地址: $GITHUB_MIRROR"
