@@ -301,7 +301,7 @@ ask_user_config() {
         echo "请检查您的配置:"
         echo "=============================="
         echo "1. 系统时区设置为亚洲/上海: $([ "$TIMEZONE_SHANGHAI" = true ] && echo "是" || echo "否")"
-        echo "2. 禁用 swap (虚拟内存) : $([ "$SWAP_DISABLED" = true ] && echo "是" || echo "否")"
+        echo "2. 禁用 swap (虚拟内存): $([ "$SWAP_DISABLED" = true ] && echo "是" || echo "否")"
         echo "3. 更换 apt 软件源: $([ "$USE_CUSTOM_MIRROR" = true ] && echo "是" || echo "否")"
         if [ "$USE_CUSTOM_MIRROR" = true ]; then
             local mirror_name="未知"
@@ -333,7 +333,14 @@ ask_user_config() {
         echo "9. 管理员账号: $ADMIN_USER"
         echo "   管理员密码: $ADMIN_PASS"
         echo "10. LAN 网卡配置:"
-        echo "$LAN_CONFIG" | sed 's/^/    /'
+        echo "    网桥名称 = $(echo "$LAN_CONFIG" | grep "bridge_name" | cut -d '"' -f 2)"
+        echo "    LAN IP地址 = $(echo "$LAN_CONFIG" | grep "lan_ip" | cut -d '"' -f 2)"
+        echo "    DHCP起始地址 = $(echo "$LAN_CONFIG" | grep "dhcp_start" | cut -d '"' -f 2)"
+        echo "    DHCP结束地址 = $(echo "$LAN_CONFIG" | grep "dhcp_end" | cut -d '"' -f 2)"
+        echo "    网络掩码 = $(echo "$LAN_CONFIG" | grep "network_mask" | awk -F '= ' '{print $2}')"
+        local interfaces_list
+        interfaces_list=$(echo "$LAN_CONFIG" | grep "interfaces" | cut -d '(' -f 2 | cut -d ')' -f 1)
+        echo "    绑定网卡 = $interfaces_list"
         echo "=============================="
         
         read -rp "是否需要修改配置? (输入编号修改对应配置, 输入 'done' 完成配置): " config_choice
@@ -662,11 +669,27 @@ config_lan_interface() {
         fi
     done
     
+    # 询问网络掩码
+    while true; do
+        read -rp "请输入网络掩码位数 (默认为 24): " network_mask
+        if [ -z "$network_mask" ]; then
+            network_mask=24
+            break
+        fi
+        
+        if [[ "$network_mask" =~ ^[0-9]+$ ]] && [ "$network_mask" -ge 8 ] && [ "$network_mask" -le 32 ]; then
+            break
+        else
+            echo "输入的网络掩码无效, 请输入 8 到 32 之间的数字"
+        fi
+    done
+    
     # 构建 LAN 配置
     LAN_CONFIG="bridge_name = \"$bridge_name\"
 lan_ip = \"$lan_ip\"
 dhcp_start = \"$dhcp_start\"
 dhcp_end = \"$dhcp_end\"
+network_mask = $network_mask
 interfaces = ($(printf '"%s", ' "${selected_interfaces[@]}" | sed 's/, $//'))"
 }
 
@@ -1572,6 +1595,9 @@ create_landscape_init_toml() {
     local dhcp_end
     dhcp_end=$(echo "$LAN_CONFIG" | grep "dhcp_end" | cut -d '"' -f 2)
     
+    local network_mask
+    network_mask=$(echo "$LAN_CONFIG" | grep "network_mask" | awk -F'= ' '{print $2}')
+    
     local interfaces_list
     interfaces_list=$(echo "$LAN_CONFIG" | grep "interfaces" | cut -d '(' -f 2 | cut -d ')' -f 1)
     
@@ -1621,7 +1647,7 @@ enable = true
 ip_range_start = "$dhcp_start"
 ip_range_end = "$dhcp_end"
 server_ip_addr = "$lan_ip"
-network_mask = 24
+network_mask = $network_mask
 mac_binding_records = []
 EOF
 
