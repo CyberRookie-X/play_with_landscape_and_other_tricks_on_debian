@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Landscape Router 交互式安装脚本
-# 适用于 Debian 13 x86_64 架构 和 Armbian aarch64 架构 (需要内核版本 >= 6.9) 
-
+# 适用于 Debian、Ubuntu、Mint、Armbian (需要内核版本 >= 6.9) 
+# 适用于 x86_64 架构 和 Armbian aarch64 架构
 # 全局变量
 INSTALL_LOG=""
 LANDSCAPE_DIR=""
