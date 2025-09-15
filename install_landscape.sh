@@ -158,7 +158,7 @@ ask_user_config() {
         echo "2) Apache2"
         echo "3) Nginx"
         echo "4) Lighttpd"
-        echo "5) 不安装 web server (可能无法运行)"
+        echo "5) 不安装 web server "
         read -rp "请选择 (1-5, 默认为1): " webserver_choice
         case "$webserver_choice" in
             2)
@@ -191,6 +191,7 @@ ask_user_config() {
         elif command -v lighttpd >/dev/null 2>&1; then
             WEB_SERVER_TYPE="lighttpd"
         fi
+        log "检测到系统已安装 web server: $WEB_SERVER_TYPE"
     fi
     
     # 询问是否修改时区为中国上海
@@ -405,7 +406,7 @@ ask_user_config() {
                 echo "2) Apache2"
                 echo "3) Nginx"
                 echo "4) Lighttpd"
-                echo "5) 不安装"
+                echo "5) 不安装 web server"
                 read -rp "请选择 (1-5, 默认为 1): " webserver_choice
                 case "$webserver_choice" in
                     2)
@@ -795,13 +796,15 @@ perform_installation() {
     create_systemd_service
     
     # 6. 检查并安装 webserver
-    if [ "$WEB_SERVER_INSTALLED" = true ]; then
+    if [ "$WEB_SERVER_INSTALLED" = true ] && [ -n "$WEB_SERVER_TYPE" ]; then
         if ! dpkg -l | grep -q "$WEB_SERVER_TYPE" && ! command -v "$WEB_SERVER_TYPE" >/dev/null 2>&1; then
             log "检测到系统未安装 $WEB_SERVER_TYPE, 将自动安装"
             install_webserver
         else
             log "检测到系统已安装 $WEB_SERVER_TYPE"
         fi
+    elif [ "$WEB_SERVER_INSTALLED" = true ] && [ -z "$WEB_SERVER_TYPE" ]; then
+        log "用户选择不安装 web server, 跳过安装步骤"
     fi
     
     # 7. 安装 Docker
@@ -815,7 +818,7 @@ perform_installation() {
         if [ "$WEB_SERVER_TYPE" = "apache2" ] || [ -z "$WEB_SERVER_TYPE" ]; then
             modify_apache_port
         else
-            log "警告: 当前Web Server类型为 $WEB_SERVER_TYPE，无法修改Apache端口"
+            log "警告: 当前Web Server类型为 $WEB_SERVER_TYPE, 无法修改Apache端口"
         fi
     fi
     
@@ -868,17 +871,6 @@ change_apt_mirror() {
         log "警告: 不支持的系统类型，仅支持 Debian、Ubuntu 和 Linux Mint"
         log "提示: 不支持小众发行版换源，建议小众发行版自行换源"
         return 0
-    fi
-
-    local timestamp
-    timestamp=$(date +"%Y_%m_%d-%H_%M_%S-%3N")
-    INSTALL_LOG="/tmp/install-$timestamp.log"
-
-    # 备份原源，仅在第一次换源时进行
-    if [ "$APT_SOURCE_BACKED_UP" = false ] && [ -f "/etc/apt/sources.list" ]; then
-        cp /etc/apt/sources.list /etc/apt/sources.list.pre-fail-$timestamp.bak
-        APT_SOURCE_BACKED_UP=true
-        log "已备份原始源文件到 /etc/apt/sources.list.pre-fail-$timestamp.bak"
     fi
     
     # 检查系统类型
@@ -971,9 +963,15 @@ change_apt_mirror() {
     log "版本代号: $version_codename"
     log "使用镜像源: $MIRROR_SOURCE ($mirror_url)"
     
-    # 备份原源
-    if [ -f "/etc/apt/sources.list" ]; then
-        cp /etc/apt/sources.list /etc/apt/sources.list.bak
+    local timestamp
+    timestamp=$(date +"%Y_%m_%d-%H_%M_%S-%3N")
+    INSTALL_LOG="/tmp/install-$timestamp.log"
+
+    # 备份原源，仅在第一次换源时进行
+    if [ "$APT_SOURCE_BACKED_UP" = false ] && [ -f "/etc/apt/sources.list" ]; then
+        cp /etc/apt/sources.list /etc/apt/sources.list.pre-fail-$timestamp.bak
+        APT_SOURCE_BACKED_UP=true
+        log "已备份原始源文件到 /etc/apt/sources.list.pre-fail-$timestamp.bak"
     fi
     
     # 根据系统类型生成对应的源列表
