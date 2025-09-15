@@ -27,6 +27,7 @@ TEMP_PASS=""
 INSTALL_PPP=false
 APT_UPDATED=false
 TEMP_LOG_DIR=""
+APT_SOURCE_BACKED_UP=false  # 是否已经备份过源文件
 
 # 主逻辑
 main() {
@@ -868,6 +869,17 @@ change_apt_mirror() {
         log "提示: 不支持小众发行版换源，建议小众发行版自行换源"
         return 0
     fi
+
+    local timestamp
+    timestamp=$(date +"%Y_%m_%d-%H_%M_%S-%3N")
+    INSTALL_LOG="/tmp/install-$timestamp.log"
+
+    # 备份原源，仅在第一次换源时进行
+    if [ "$APT_SOURCE_BACKED_UP" = false ] && [ -f "/etc/apt/sources.list" ]; then
+        cp /etc/apt/sources.list /etc/apt/sources.list.pre-fail-$timestamp.bak
+        APT_SOURCE_BACKED_UP=true
+        log "已备份原始源文件到 /etc/apt/sources.list.pre-fail-$timestamp.bak"
+    fi
     
     # 检查系统类型
     local system_type=""
@@ -894,7 +906,16 @@ change_apt_mirror() {
             # 如果没有 UBUNTU_CODENAME，尝试从 VERSION 中提取
             local version_desc=$(grep "VERSION=" /etc/os-release | cut -d'=' -f2 | tr -d '"')
             # 这里简化处理，实际应该根据 Linux Mint 版本映射到 Ubuntu 代号
-            version_codename="focal"  # 默认 focal，实际应该有更精确的映射
+            # 从 VERSION 中提取 Ubuntu 代号
+            local ubuntu_codename=$(grep "UBUNTU_CODENAME" /etc/os-release | cut -d'=' -f2)
+            if [ -n "$ubuntu_codename" ]; then
+                version_codename="$ubuntu_codename"
+            else
+                # 如果没有 UBUNTU_CODENAME，尝试从 VERSION 中提取
+                local version_desc=$(grep "VERSION=" /etc/os-release | cut -d'=' -f2 | tr -d '"')
+                # 这里简化处理，实际应该根据 Linux Mint 版本映射到 Ubuntu 代号
+                version_codename="focal"  # 默认 focal，实际应该有更精确的映射
+            fi
         fi
     fi
     
@@ -1098,7 +1119,7 @@ install_docker() {
     while [ "$user_choice" != "n" ]; do
         retry=0
         while [ $retry -lt $max_retry ]; do
-            log "正在安装 Docker (尝试 $((retry+1))/$max_retry)"
+            log "正在安装 Docker 耗时较长 请稍候 (尝试 $((retry+1))/$max_retry)"
             
             # 根据选择的镜像源安装 Docker
             case "$DOCKER_MIRROR" in
@@ -1198,45 +1219,40 @@ EOF
 
 
 # 处理 apt 换源选择的通用函数
-handle_apt_mirror_choice() {
-    log "用户选择换源操作"
-    if [ "$USE_CUSTOM_MIRROR" = false ]; then
-        echo "当前未配置自定义镜像源，无法换源。"
-        echo "请选择: "
-        echo "1) 再次尝试3次"
-        echo "2) 退出安装 (输入除1以外的任意字符)"
-        read -r user_choice
-        
-        if [ "$user_choice" != "1" ]; then
-            log "用户选择退出安装"
-            exit 1
-        else
-            user_choice="y"
-        fi
-        echo "$user_choice"  # 返回用户选择
-    else
-        # 备份当前源
-        if [ -f "/etc/apt/sources.list" ]; then
-            cp /etc/apt/sources.list /etc/apt/sources.list.pre-fail.bak
-        fi
-        
-        # 根据当前镜像源切换到下一个可用镜像源
-        local next_mirror=""
-        case "$MIRROR_SOURCE" in
-            "ustc") next_mirror="tsinghua" ;;
-            "tsinghua") next_mirror="aliyun" ;;
-            "aliyun") next_mirror="tencent" ;;
-            "tencent") next_mirror="huawei" ;;
-            "huawei") next_mirror="netease" ;;
-            "netease") next_mirror="ustc" ;;
-            *) next_mirror="ustc" ;;
-        esac
-        
-        MIRROR_SOURCE="$next_mirror"
-        change_apt_mirror
-        echo "y"  # 返回用户选择以便继续循环
-    fi
-}
+# handle_apt_mirror_choice() {
+#     log "用户选择换源操作"
+#     if [ "$USE_CUSTOM_MIRROR" = false ]; then
+#         echo "当前未配置自定义镜像源，无法换源。"
+#         echo "请选择: "
+#         echo "1) 再次尝试3次"
+#         echo "2) 退出安装 (输入除1以外的任意字符)"
+#         read -r user_choice
+#         
+#         if [ "$user_choice" != "1" ]; then
+#             log "用户选择退出安装"
+#             exit 1
+#         else
+#             user_choice="y"
+#         fi
+#         echo "$user_choice"  # 返回用户选择
+#     else
+#         # 根据当前镜像源切换到下一个可用镜像源
+#         local next_mirror=""
+#         case "$MIRROR_SOURCE" in
+#             "ustc") next_mirror="tsinghua" ;;
+#             "tsinghua") next_mirror="aliyun" ;;
+#             "aliyun") next_mirror="tencent" ;;
+#             "tencent") next_mirror="huawei" ;;
+#             "huawei") next_mirror="netease" ;;
+#             "netease") next_mirror="ustc" ;;
+#             *) next_mirror="ustc" ;;
+#         esac
+#         
+#         MIRROR_SOURCE="$next_mirror"
+#         change_apt_mirror
+#         echo "y"  # 返回用户选择以便继续循环
+#     fi
+# }
 
 # 处理 GitHub 镜像加速选择的通用函数
 handle_github_mirror_choice() {
@@ -1503,7 +1519,7 @@ install_landscape_router() {
     while [ "$user_choice" != "n" ]; do
         retry=0
         while [ $retry -lt $max_retry ]; do
-            log "正在下载 $binary_filename (尝试 $((retry+1))/$max_retry)"
+            log "正在下载 $binary_filename  耗时较长 请稍候 (尝试 $((retry+1))/$max_retry)"
             if curl -fsSL -o "$LANDSCAPE_DIR/$binary_filename" "$binary_url"; then
                 log "$binary_filename 下载成功"
                 break
@@ -1578,7 +1594,7 @@ install_landscape_router() {
     while [ "$user_choice" != "n" ]; do
         retry=0
         while [ $retry -lt $max_retry ]; do
-            log "正在下载 static.zip (尝试 $((retry+1))/$max_retry)"
+            log "正在下载 static.zip 耗时较长 请稍候(尝试 $((retry+1))/$max_retry)"
             if curl -fsSL -o "/tmp/static.zip" "$static_url"; then
                 log "static.zip 下载成功"
                 break
@@ -1927,3 +1943,6 @@ finish_installation() {
 
     log "安装完成"
 }
+
+# 调用主函数启动脚本执行
+main "$@"
