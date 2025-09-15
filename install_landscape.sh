@@ -7,6 +7,7 @@
 INSTALL_LOG=""
 LANDSCAPE_DIR=""
 WEB_SERVER_INSTALLED=false
+WEB_SERVER_TYPE=""
 TIMEZONE_SHANGHAI=false
 SWAP_DISABLED=false
 USE_CUSTOM_MIRROR=false
@@ -15,8 +16,6 @@ SUPPORTED_SYSTEM=false  # 是否为支持换源的系统
 DOCKER_INSTALLED=false
 DOCKER_MIRROR="aliyun"
 DOCKER_ENABLE_IPV6=false
-MODIFY_APACHE_PORT=false
-APACHE_PORT="8080"
 LAN_CONFIG=""
 GITHUB_MIRROR=""
 USE_GITHUB_MIRROR=false
@@ -96,6 +95,15 @@ check_system() {
         exit 1
     fi
     
+    # 检查是否已安装web server (apache2, nginx, lighttpd)
+    if ! dpkg -l | grep -q apache2 && ! command -v nginx >/dev/null 2>&1 && ! command -v lighttpd >/dev/null 2>&1; then
+        log "警告: 系统中未检测到 web server 环境 (apache2/nginx/lighttpd)"
+        log "Landscape Router 需要 web server 环境才能正常运行"
+        log "缺少 web server 可能会导致主机失联问题"
+    else
+        log "检测到系统已安装 web server 环境"
+    fi
+    
     # 检查内核版本 (需要 > 6.9) 
     local kernel_version
     kernel_version=$(uname -r | cut -d'-' -f1)
@@ -135,6 +143,55 @@ ask_user_config() {
     echo "注意: 您需要回答以下所有问题, 回答结束后可以检查和修改任何配置项。"
     echo ""
     
+    # 检查web server环境
+    if ! dpkg -l | grep -q apache2 && ! command -v nginx >/dev/null 2>&1 && ! command -v lighttpd >/dev/null 2>&1; then
+        echo "警告: 系统中未检测到 web server 环境 (如 apache2, nginx, lighttpd)"
+        echo "Landscape Router 需要 web server 环境才能正常运行"
+        echo "缺少 web server 可能会导致主机失联问题"
+        echo ""
+        echo "本脚本中 web server 环境 检测/安装 的功能未经验证"
+        echo "建议自行处理后, 再执行安装脚本"
+        echo ""
+        echo "请选择要安装的 Web Server:"
+        echo "1) 退出安装脚本, 自行处理 (推荐)(默认)"
+        echo "2) Apache2"
+        echo "3) Nginx"
+        echo "4) Lighttpd"
+        echo "5) 不安装 web server (可能无法运行)"
+        read -rp "请选择 (1-5, 默认为1): " webserver_choice
+        case "$webserver_choice" in
+            2)
+                WEB_SERVER_INSTALLED=true
+                WEB_SERVER_TYPE="apache2"
+                ;;
+            3)
+                WEB_SERVER_INSTALLED=true
+                WEB_SERVER_TYPE="nginx"
+                ;;
+            4)
+                WEB_SERVER_INSTALLED=true
+                WEB_SERVER_TYPE="lighttpd"
+                ;;
+            5)
+                WEB_SERVER_INSTALLED=false
+                WEB_SERVER_TYPE=""
+                ;;
+            *)
+                log "用户选择退出安装"
+                exit 1
+                ;;
+        esac
+    else
+        WEB_SERVER_INSTALLED=true
+        if dpkg -l | grep -q apache2; then
+            WEB_SERVER_TYPE="apache2"
+        elif command -v nginx >/dev/null 2>&1; then
+            WEB_SERVER_TYPE="nginx"
+        elif command -v lighttpd >/dev/null 2>&1; then
+            WEB_SERVER_TYPE="lighttpd"
+        fi
+    fi
+    
     # 询问是否修改时区为中国上海
     read -rp "是否将系统时区修改为亚洲/上海? (y/n): " answer
     if [[ ! "$answer" =~ ^[Nn]$ ]]; then
@@ -150,17 +207,17 @@ ask_user_config() {
     # 询问是否换源 (仅对支持的系统进行询问)
     # 检查是否为支持换源的系统 (Debian, Ubuntu, Linux Mint)
     if grep -q "Debian" /etc/os-release || grep -q "Ubuntu" /etc/os-release || grep -q "Linux Mint" /etc/os-release; then
-        echo "请选择要使用的 apt 软件源镜像 (默认不换源):"
-        echo "0) 不换源 (默认)"
-        echo "1) 中科大"
+        echo "请选择要使用的 apt 软件源镜像 (默认使用中科大源):"
+        echo "1) 中科大 (默认)"
         echo "2) 清华大学"
         echo "3) 阿里云"
         echo "4) 网易(不支持Alpine)"
         echo "5) 腾讯"
         echo "6) 华为"
-        read -rp "请选择 (0-6, 默认为0): " answer
+        echo "0) 不换源"
+        read -rp "请选择 (0-6, 默认为1): " answer
         case "$answer" in
-            1) 
+            1|"") 
                 USE_CUSTOM_MIRROR=true
                 MIRROR_SOURCE="ustc"
                 ;;
@@ -214,16 +271,6 @@ ask_user_config() {
         read -rp "是否为 Docker 开启 IPv6 支持? (y/n): " answer
         if [[ ! "$answer" =~ ^[Nn]$ ]]; then
             DOCKER_ENABLE_IPV6=true
-        fi
-    fi
-
-    # 询问是否修改 Apache 端口
-    read -rp "是否修改 Apache 端口以避免与其他反向代理软件冲突? (y/n): " answer
-    if [[ ! "$answer" =~ ^[Nn]$ ]]; then
-        MODIFY_APACHE_PORT=true
-        read -rp "请输入新的 Apache 端口 (默认为 8080): " answer
-        if [[ -n "$answer" ]] && [[ "$answer" =~ ^[0-9]+$ ]]; then
-            APACHE_PORT="$answer"
         fi
     fi
 
@@ -315,14 +362,14 @@ ask_user_config() {
             esac
             echo "   镜像源: $mirror_name"
         fi
-        echo "4. 安装 Docker: $([ "$DOCKER_INSTALLED" = true ] && echo "是" || echo "否")"
+        echo "4. 安装 Web Server: $([ "$WEB_SERVER_INSTALLED" = true ] && echo "是" || echo "否")"
+        if [ "$WEB_SERVER_INSTALLED" = true ]; then
+            echo "   Web Server 类型: $WEB_SERVER_TYPE"
+        fi
+        echo "5. 安装 Docker: $([ "$DOCKER_INSTALLED" = true ] && echo "是" || echo "否")"
         if [ "$DOCKER_INSTALLED" = true ]; then
             echo "   Docker 镜像源: $DOCKER_MIRROR"
             echo "   Docker IPv6 支持: $([ "$DOCKER_ENABLE_IPV6" = true ] && echo "是" || echo "否")"
-        fi
-        echo "5. 修改 Apache 端口: $([ "$MODIFY_APACHE_PORT" = true ] && echo "是" || echo "否")"
-        if [ "$MODIFY_APACHE_PORT" = true ]; then
-            echo "   Apache 端口: $APACHE_PORT"
         fi
         echo "6. 安装 ppp (用于 PPPOE 拨号): $([ "$INSTALL_PPP" = true ] && echo "是" || echo "否")"
         echo "7. 使用 GitHub 镜像加速: $([ "$USE_GITHUB_MIRROR" = true ] && echo "是" || echo "否")"
@@ -346,6 +393,43 @@ ask_user_config() {
         read -rp "是否需要修改配置? (输入编号修改对应配置, 输入 'done' 完成配置): " config_choice
         case "$config_choice" in
             1)
+                echo "Landscape Router 需要 web server 环境才能正常运行"
+                echo "缺少 web server 可能会导致主机失联问题"
+                echo ""
+                echo "本脚本中 web server 环境 检测/安装 的功能未经验证"
+                echo "建议自行处理后, 再执行安装脚本"
+                echo ""
+                echo "请选择要安装的 Web Server:"
+                echo "1) 退出安装脚本, 自行处理 (推荐)(默认)"
+                echo "2) Apache2"
+                echo "3) Nginx"
+                echo "4) Lighttpd"
+                echo "5) 不安装"
+                read -rp "请选择 (1-5, 默认为 1): " webserver_choice
+                case "$webserver_choice" in
+                    2)
+                        WEB_SERVER_INSTALLED=true
+                        WEB_SERVER_TYPE="apache2"
+                        ;;
+                    3)
+                        WEB_SERVER_INSTALLED=true
+                        WEB_SERVER_TYPE="nginx"
+                        ;;
+                    4)
+                        WEB_SERVER_INSTALLED=true
+                        WEB_SERVER_TYPE="lighttpd"
+                        ;;
+                    5)
+                        WEB_SERVER_INSTALLED=false
+                        WEB_SERVER_TYPE=""
+                        ;;
+                    *)
+                        log "用户选择退出安装"
+                        exit 1
+                        ;;
+                esac
+                ;;
+            2)
                 read -rp "是否将系统时区修改为亚洲/上海? (y/n): " answer
                 if [[ ! "$answer" =~ ^[Nn]$ ]]; then
                     TIMEZONE_SHANGHAI=true
@@ -353,7 +437,7 @@ ask_user_config() {
                     TIMEZONE_SHANGHAI=false
                 fi
                 ;;
-            2)
+            3)
                 read -rp "是否禁用 swap? (y/n): " answer
                 if [[ ! "$answer" =~ ^[Nn]$ ]]; then
                     SWAP_DISABLED=true
@@ -361,7 +445,7 @@ ask_user_config() {
                     SWAP_DISABLED=false
                 fi
                 ;;
-            3)
+            4)
                 if [ "$SUPPORTED_SYSTEM" = true ]; then
                     read -rp "是否更换 apt 软件源? (y/n): " answer
                     if [[ ! "$answer" =~ ^[Nn]$ ]]; then
@@ -394,7 +478,7 @@ ask_user_config() {
                     echo "Armbian 系统不提供换源功能"
                 fi
                 ;;
-            4)
+            5)
                 read -rp "是否安装 Docker? (y/n): " answer
                 if [[ ! "$answer" =~ ^[Nn]$ ]]; then
                     DOCKER_INSTALLED=true
@@ -418,18 +502,6 @@ ask_user_config() {
                     fi
                 else
                     DOCKER_INSTALLED=false
-                fi
-                ;;
-            5)
-                read -rp "是否修改 Apache 端口以避免与其他反向代理软件冲突? (y/n): " answer
-                if [[ ! "$answer" =~ ^[Nn]$ ]]; then
-                    MODIFY_APACHE_PORT=true
-                    read -rp "请输入新的 Apache 端口 (默认为 8080): " answer
-                    if [[ -n "$answer" ]] && [[ "$answer" =~ ^[0-9]+$ ]]; then
-                        APACHE_PORT="$answer"
-                    fi
-                else
-                    MODIFY_APACHE_PORT=false
                 fi
                 ;;
             6)
@@ -498,7 +570,7 @@ ask_user_config() {
                 fi
                 ;;
             10)
-                echo "重新配置 LAN 网卡"
+                echo "重新配置 LAN 网桥"
                 config_lan_interface
                 ;;
             done)
@@ -722,11 +794,13 @@ perform_installation() {
     create_systemd_service
     
     # 6. 检查并安装 webserver
-    if ! dpkg -l | grep -q apache2; then
-        log "检测到系统未安装 web server 环境, 将自动安装 Apache2"
-        install_webserver
-    else
-        log "检测到系统已安装 web server 环境"
+    if [ "$WEB_SERVER_INSTALLED" = true ]; then
+        if ! dpkg -l | grep -q "$WEB_SERVER_TYPE" && ! command -v "$WEB_SERVER_TYPE" >/dev/null 2>&1; then
+            log "检测到系统未安装 $WEB_SERVER_TYPE, 将自动安装"
+            install_webserver
+        else
+            log "检测到系统已安装 $WEB_SERVER_TYPE"
+        fi
     fi
     
     # 7. 安装 Docker
@@ -737,7 +811,11 @@ perform_installation() {
     
     # 8. 修改 Apache 端口
     if [ "$MODIFY_APACHE_PORT" = true ]; then
-        modify_apache_port
+        if [ "$WEB_SERVER_TYPE" = "apache2" ] || [ -z "$WEB_SERVER_TYPE" ]; then
+            modify_apache_port
+        else
+            log "警告: 当前Web Server类型为 $WEB_SERVER_TYPE，无法修改Apache端口"
+        fi
     fi
     
     # 9. 安装 ppp
@@ -979,9 +1057,25 @@ EOF
 
 # 安装 webserver
 install_webserver() {
-    log "安装 Apache2"
+    log "安装 Web Server: $WEB_SERVER_TYPE"
     apt_update
-    apt_install "apache2"
+    
+    case "$WEB_SERVER_TYPE" in
+        "apache2")
+            apt_install "apache2"
+            ;;
+        "nginx")
+            apt_install "nginx"
+            ;;
+        "lighttpd")
+            apt_install "lighttpd"
+            ;;
+        *)
+            log "未知的 Web Server 类型: $WEB_SERVER_TYPE"
+            apt_install "apache2"
+            WEB_SERVER_TYPE="apache2"
+            ;;
+    esac
 }
 
 # 安装 Docker
@@ -1102,19 +1196,6 @@ EOF
     log "Docker 配置完成"
 }
 
-# 修改 Apache 端口
-modify_apache_port() {
-    log "修改 Apache 端口为 $APACHE_PORT"
-    
-    # 修改端口配置
-    sed -i "s/Listen 80/Listen $APACHE_PORT/" /etc/apache2/ports.conf
-    sed -i "s/:80>/:$APACHE_PORT>/" /etc/apache2/sites-available/000-default.conf
-    
-    # 重启 Apache
-    systemctl restart apache2
-    
-    log "Apache 端口修改完成"
-}
 
 # 处理 apt 换源选择的通用函数
 handle_apt_mirror_choice() {
@@ -1219,13 +1300,49 @@ apt_update() {
             done
             
             if [ $retry -eq $max_retry ]; then
-                echo "apt update 失败, 是否再次尝试3次？(y/n) 或输入 'm' 尝试换源: "
+                echo "apt update 失败, 是否再次尝试3次？(y/n) 或输入 'm' 选择镜像源: "
                 read -r user_choice
                 user_choice=$(echo "$user_choice" | tr '[:upper:]' '[:lower:]')
                 
                 # 如果用户选择换源
                 if [ "$user_choice" = "m" ]; then
-                    user_choice=$(handle_apt_mirror_choice)
+                    if [ "$USE_CUSTOM_MIRROR" = true ]; then
+                        echo "可选镜像源:"
+                        echo "1) 中科大 (默认)"
+                        echo "2) 清华大学"
+                        echo "3) 阿里云"
+                        echo "4) 网易(不支持Alpine)"
+                        echo "5) 腾讯"
+                        echo "6) 华为"
+                        read -rp "请选择 (1-6, 默认为1): " mirror_choice
+                        case "$mirror_choice" in
+                            1|"") 
+                                MIRROR_SOURCE="ustc"
+                                ;;
+                            2) 
+                                MIRROR_SOURCE="tsinghua"
+                                ;;
+                            3) 
+                                MIRROR_SOURCE="aliyun"
+                                ;;
+                            4) 
+                                MIRROR_SOURCE="netease"
+                                ;;
+                            5)
+                                MIRROR_SOURCE="tencent"
+                                ;;
+                            6)
+                                MIRROR_SOURCE="huawei"
+                                ;;
+                            *)
+                                MIRROR_SOURCE="ustc"
+                                ;;
+                        esac
+                        change_apt_mirror
+                    else
+                        echo "当前未启用换源功能，无法切换镜像源"
+                    fi
+                    user_choice="y"  # 重置选择以便继续循环
                     retry=0  # 重置重试计数
                 fi
             fi
@@ -1261,13 +1378,49 @@ apt_install() {
         done
         
         if [ $retry -eq $max_retry ]; then
-            echo "软件包 $packages 安装失败, 是否再次尝试3次？(y/n) 或输入 'm' 尝试换源: "
+            echo "软件包 $packages 安装失败, 是否再次尝试3次？(y/n) 或输入 'm' 选择镜像源: "
             read -r user_choice
             user_choice=$(echo "$user_choice" | tr '[:upper:]' '[:lower:]')
             
             # 如果用户选择换源
             if [ "$user_choice" = "m" ]; then
-                user_choice=$(handle_apt_mirror_choice)
+                if [ "$USE_CUSTOM_MIRROR" = true ]; then
+                    echo "可选镜像源:"
+                    echo "1) 中科大 (默认)"
+                    echo "2) 清华大学"
+                    echo "3) 阿里云"
+                    echo "4) 网易(不支持Alpine)"
+                    echo "5) 腾讯"
+                    echo "6) 华为"
+                    read -rp "请选择 (1-6, 默认为1): " mirror_choice
+                    case "$mirror_choice" in
+                        1|"") 
+                            MIRROR_SOURCE="ustc"
+                            ;;
+                        2) 
+                            MIRROR_SOURCE="tsinghua"
+                            ;;
+                        3) 
+                            MIRROR_SOURCE="aliyun"
+                            ;;
+                        4) 
+                            MIRROR_SOURCE="netease"
+                            ;;
+                        5)
+                            MIRROR_SOURCE="tencent"
+                            ;;
+                        6)
+                            MIRROR_SOURCE="huawei"
+                            ;;
+                        *)
+                            MIRROR_SOURCE="ustc"
+                            ;;
+                    esac
+                    change_apt_mirror
+                else
+                    echo "当前未启用换源功能，无法切换镜像源"
+                fi
+                user_choice="y"  # 重置选择以便继续循环
                 retry=0  # 重置重试计数
             fi
         fi
@@ -1774,6 +1927,3 @@ finish_installation() {
 
     log "安装完成"
 }
-
-# 调用主函数
-main "$@"
