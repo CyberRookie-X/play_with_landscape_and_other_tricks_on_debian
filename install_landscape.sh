@@ -10,6 +10,7 @@ INSTALL_LOG=""
 LANDSCAPE_DIR=""
 WEB_SERVER_INSTALLED=false
 WEB_SERVER_TYPE=""
+WEB_SERVER_PREINSTALLED=false
 TIMEZONE_SHANGHAI=false
 SWAP_DISABLED=false
 USE_CUSTOM_MIRROR=false
@@ -193,6 +194,9 @@ ask_user_config() {
             WEB_SERVER_TYPE="lighttpd"
         fi
         log "检测到系统已安装 web server: $WEB_SERVER_TYPE"
+        # 当检测到已安装web server时，不再询问用户
+        # 设置一个标志，表示web server是系统预装的
+        WEB_SERVER_PREINSTALLED=true
     fi
     
     # 询问是否修改时区为中国上海
@@ -214,16 +218,15 @@ ask_user_config() {
         echo "1) 中科大 (默认)"
         echo "2) 清华大学"
         echo "3) 阿里云"
-        echo "4) 网易(不支持Alpine)"
-        echo "5) 腾讯"
-        echo "6) 华为"
-        echo "7) 上海交通大学"
-        echo "8) 浙江大学"
-        echo "9) 华中科技大学"
-        echo "10) 南京大学"
-        echo "11) 哈尔滨工业大学"
+        echo "4) 腾讯"
+        echo "5) 华为"
+        echo "6) 上海交通大学"
+        echo "7) 浙江大学"
+        echo "8) 华中科技大学"
+        echo "9) 南京大学"
+        echo "10) 哈尔滨工业大学"
         echo "0) 不换源"
-        read -rp "请选择 (0-11, 默认为1): " answer
+        read -rp "请选择 (0-10, 默认为1): " answer
         case "$answer" in
             1|"") 
                 USE_CUSTOM_MIRROR=true
@@ -237,35 +240,31 @@ ask_user_config() {
                 USE_CUSTOM_MIRROR=true
                 MIRROR_SOURCE="aliyun"
                 ;;
-            4) 
-                USE_CUSTOM_MIRROR=true
-                MIRROR_SOURCE="netease"
-                ;;
-            5)
+            4)
                 USE_CUSTOM_MIRROR=true
                 MIRROR_SOURCE="tencent"
                 ;;
-            6)
+            5)
                 USE_CUSTOM_MIRROR=true
                 MIRROR_SOURCE="huawei"
                 ;;
-            7)
+            6)
                 USE_CUSTOM_MIRROR=true
                 MIRROR_SOURCE="sjtu"
                 ;;
-            8)
+            7)
                 USE_CUSTOM_MIRROR=true
                 MIRROR_SOURCE="zju"
                 ;;
-            9)
+            8)
                 USE_CUSTOM_MIRROR=true
                 MIRROR_SOURCE="hust"
                 ;;
-            10)
+            9)
                 USE_CUSTOM_MIRROR=true
                 MIRROR_SOURCE="nju"
                 ;;
-            11)
+            10)
                 USE_CUSTOM_MIRROR=true
                 MIRROR_SOURCE="hit"
                 ;;
@@ -384,7 +383,7 @@ ask_user_config() {
                 "ustc") mirror_name="中科大" ;;
                 "tsinghua") mirror_name="清华大学" ;;
                 "aliyun") mirror_name="阿里云" ;;
-                "netease") mirror_name="网易(不支持Alpine)" ;;
+                "netease") mirror_name="网易" ;;
                 "tencent") mirror_name="腾讯" ;;
                 "huawei") mirror_name="华为" ;;
                 "sjtu") mirror_name="上海交通大学" ;;
@@ -395,9 +394,14 @@ ask_user_config() {
             esac
             echo "   镜像源: $mirror_name"
         fi
-        echo "4. 安装 Web Server: $([ "$WEB_SERVER_INSTALLED" = true ] && echo "是" || echo "否")"
-        if [ "$WEB_SERVER_INSTALLED" = true ]; then
-            echo "   Web Server 类型: $WEB_SERVER_TYPE"
+        # 只有当web server不是预装时才显示web server安装选项
+        if [ "$WEB_SERVER_PREINSTALLED" != true ]; then
+            echo "4. 安装 Web Server: $([ "$WEB_SERVER_INSTALLED" = true ] && echo "是" || echo "否")"
+            if [ "$WEB_SERVER_INSTALLED" = true ]; then
+                echo "   Web Server 类型: $WEB_SERVER_TYPE"
+            fi
+        else
+            echo "4. 检测到系统已预装 Web Server: $WEB_SERVER_TYPE"
         fi
         echo "5. 安装 Docker(含compose): $([ "$DOCKER_INSTALLED" = true ] && echo "是" || echo "否")"
         if [ "$DOCKER_INSTALLED" = true ]; then
@@ -425,44 +429,10 @@ ask_user_config() {
         
         read -rp "是否需要修改配置? (输入编号修改对应配置, 输入 'done' 完成配置): " config_choice
         case "$config_choice" in
-            1)
-                echo "Landscape Router 需要 web server 环境才能正常运行"
-                echo "缺少 web server 可能会导致主机失联问题"
-                echo ""
-                echo "本脚本中 web server 环境 检测/安装 的功能未经验证"
-                echo "建议自行处理后, 再执行安装脚本"
-                echo ""
-                echo "请选择要安装的 Web Server:"
-                echo "1) 退出安装脚本, 自行处理 (推荐)(默认)"
-                echo "2) Apache2"
-                echo "3) Nginx"
-                echo "4) Lighttpd"
-                echo "5) 不安装 web server"
-                read -rp "请选择 (1-5, 默认为 1): " webserver_choice
-                case "$webserver_choice" in
-                    2)
-                        WEB_SERVER_INSTALLED=true
-                        WEB_SERVER_TYPE="apache2"
-                        ;;
-                    3)
-                        WEB_SERVER_INSTALLED=true
-                        WEB_SERVER_TYPE="nginx"
-                        ;;
-                    4)
-                        WEB_SERVER_INSTALLED=true
-                        WEB_SERVER_TYPE="lighttpd"
-                        ;;
-                    5)
-                        WEB_SERVER_INSTALLED=false
-                        WEB_SERVER_TYPE=""
-                        ;;
-                    *)
-                        log "用户选择退出安装"
-                        exit 1
-                        ;;
-                esac
+            done)
+                config_confirmed=true
                 ;;
-            2)
+            1)
                 read -rp "是否将系统时区修改为亚洲/上海? (y/n): " answer
                 if [[ ! "$answer" =~ ^[Nn]$ ]]; then
                     TIMEZONE_SHANGHAI=true
@@ -470,7 +440,7 @@ ask_user_config() {
                     TIMEZONE_SHANGHAI=false
                 fi
                 ;;
-            3)
+            2)
                 read -rp "是否禁用 swap? (y/n): " answer
                 if [[ ! "$answer" =~ ^[Nn]$ ]]; then
                     SWAP_DISABLED=true
@@ -478,7 +448,7 @@ ask_user_config() {
                     SWAP_DISABLED=false
                 fi
                 ;;
-            4)
+            3)
                 # 检查是否为支持换源的系统 (Debian, Ubuntu, Linux Mint, Armbian)
                 if grep -q "Debian" /etc/os-release || grep -q "Ubuntu" /etc/os-release || grep -q "Linux Mint" /etc/os-release || grep -q "Armbian" /etc/os-release; then
                     read -rp "是否更换 apt 软件源? (y/n): " answer
@@ -490,26 +460,24 @@ ask_user_config() {
                         echo "1) 中科大 (默认)"
                         echo "2) 清华大学"
                         echo "3) 阿里云"
-                        echo "4) 网易(不支持Alpine)"
-                        echo "5) 腾讯"
-                        echo "6) 华为"
-                        echo "7) 上海交通大学"
-                        echo "8) 浙江大学"
-                        echo "9) 华中科技大学"
-                        echo "10) 南京大学"
-                        echo "11) 哈尔滨工业大学"
-                        read -rp "请选择 (1-11, 默认为1): " answer
+                        echo "4) 腾讯"
+                        echo "5) 华为"
+                        echo "6) 上海交通大学"
+                        echo "7) 浙江大学"
+                        echo "8) 华中科技大学"
+                        echo "9) 南京大学"
+                        echo "10) 哈尔滨工业大学"
+                        read -rp "请选择 (1-10, 默认为1): " answer
                         case "$answer" in
                             2) MIRROR_SOURCE="tsinghua" ;;
                             3) MIRROR_SOURCE="aliyun" ;;
-                            4) MIRROR_SOURCE="netease" ;;
-                            5) MIRROR_SOURCE="tencent" ;;
-                            6) MIRROR_SOURCE="huawei" ;;
-                            7) MIRROR_SOURCE="sjtu" ;;
-                            8) MIRROR_SOURCE="zju" ;;
-                            9) MIRROR_SOURCE="hust" ;;
-                            10) MIRROR_SOURCE="nju" ;;
-                            11) MIRROR_SOURCE="hit" ;;
+                            4) MIRROR_SOURCE="tencent" ;;
+                            5) MIRROR_SOURCE="huawei" ;;
+                            6) MIRROR_SOURCE="sjtu" ;;
+                            7) MIRROR_SOURCE="zju" ;;
+                            8) MIRROR_SOURCE="hust" ;;
+                            9) MIRROR_SOURCE="nju" ;;
+                            10) MIRROR_SOURCE="hit" ;;
                             *) MIRROR_SOURCE="ustc" ;;
                         esac
                     else
@@ -518,6 +486,48 @@ ask_user_config() {
                 else
                     echo "当前系统不支持自动换源功能"
                     echo "仅支持 Debian、Ubuntu、Linux Mint 和 Armbian 系统换源"
+                fi
+                ;;
+            4)
+                # 只有当web server不是预装时才允许修改web server配置
+                if [ "$WEB_SERVER_PREINSTALLED" != true ]; then
+                    echo "Landscape Router 需要 web server 环境才能正常运行"
+                    echo "缺少 web server 可能会导致主机失联问题"
+                    echo ""
+                    echo "本脚本中 web server 环境 检测/安装 的功能未经验证"
+                    echo "建议自行处理后, 再执行安装脚本"
+                    echo ""
+                    echo "请选择要安装的 Web Server:"
+                    echo "1) 退出安装脚本, 自行处理 (推荐)(默认)"
+                    echo "2) Apache2"
+                    echo "3) Nginx"
+                    echo "4) Lighttpd"
+                    echo "5) 不安装 web server"
+                    read -rp "请选择 (1-5, 默认为 1): " webserver_choice
+                    case "$webserver_choice" in
+                        2)
+                            WEB_SERVER_INSTALLED=true
+                            WEB_SERVER_TYPE="apache2"
+                            ;;
+                        3)
+                            WEB_SERVER_INSTALLED=true
+                            WEB_SERVER_TYPE="nginx"
+                            ;;
+                        4)
+                            WEB_SERVER_INSTALLED=true
+                            WEB_SERVER_TYPE="lighttpd"
+                            ;;
+                        5)
+                            WEB_SERVER_INSTALLED=false
+                            WEB_SERVER_TYPE=""
+                            ;;
+                        *)
+                            log "用户选择退出安装"
+                            exit 1
+                            ;;
+                    esac
+                else
+                    echo "系统已预装 web server ($WEB_SERVER_TYPE)，无法修改此配置"
                 fi
                 ;;
             5)
@@ -545,9 +555,6 @@ ask_user_config() {
                 else
                     DOCKER_INSTALLED=false
                 fi
-                ;;
-            *)
-                echo "无效的选择，请重新输入"
                 ;;
             6)
                 read -rp "是否安装 ppp 用于 pppoe 拨号? (y/n): " answer
@@ -617,9 +624,6 @@ ask_user_config() {
             10)
                 echo "重新配置 LAN 网桥"
                 config_lan_interface
-                ;;
-            done)
-                config_confirmed=true
                 ;;
             *)
                 echo "无效选择, 请重新输入"
@@ -719,12 +723,11 @@ config_lan_interface() {
         if [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
             IFS='.' read -r -a ip_parts <<< "$ip"
             
-            if [ "${ip_parts[0]}" -eq 127 ] && [ "${ip_parts[1]}" -le 255 ] && [ "${ip_parts[2]}" -le 255 ] && [ "${ip_parts[3]}" -le 255 ]; then
-                stat=0
-            elif [ "${ip_parts[0]}" -ge 1 ] && [ "${ip_parts[0]}" -le 255 ] && \
-                 [ "${ip_parts[1]}" -ge 0 ] && [ "${ip_parts[1]}" -le 255 ] && \
-                 [ "${ip_parts[2]}" -ge 0 ] && [ "${ip_parts[2]}" -le 255 ] && \
-                 [ "${ip_parts[3]}" -ge 1 ] && [ "${ip_parts[3]}" -le 254 ]; then
+            # 检查每个部分是否为0-255之间的有效值
+            if [ "${ip_parts[0]}" -ge 0 ] && [ "${ip_parts[0]}" -le 255 ] && \
+               [ "${ip_parts[1]}" -ge 0 ] && [ "${ip_parts[1]}" -le 255 ] && \
+               [ "${ip_parts[2]}" -ge 0 ] && [ "${ip_parts[2]}" -le 255 ] && \
+               [ "${ip_parts[3]}" -ge 0 ] && [ "${ip_parts[3]}" -le 255 ]; then
                 stat=0
             fi
         fi
@@ -774,12 +777,18 @@ config_lan_interface() {
             local start_octets=(${dhcp_start//./ })
             local end_octets=(${dhcp_end//./ })
             
-            if [ "${end_octets[3]}" -le "${start_octets[3]}" ]; then
-                echo "DHCP 结束地址必须大于起始地址"
-            elif [ $((end_octets[3] - start_octets[3])) -gt 100 ]; then
-                echo "DHCP 地址范围不应超过 100 个地址"
+            # 检查是否在同一子网
+            if [ "${start_octets[0]}" -eq "${end_octets[0]}" ] && \
+               [ "${start_octets[1]}" -eq "${end_octets[1]}" ] && \
+               [ "${start_octets[2]}" -eq "${end_octets[2]}" ]; then
+                # 检查结束地址是否大于起始地址
+                if [ "${end_octets[3]}" -gt "${start_octets[3]}" ]; then
+                    break
+                else
+                    echo "DHCP 结束地址必须大于起始地址"
+                fi
             else
-                break
+                echo "DHCP 起始和结束地址必须在同一子网"
             fi
         else
             echo "输入的 IP 地址无效, 请输入有效的 IP 地址 (例如: 192.168.88.200) "
@@ -838,32 +847,25 @@ perform_installation() {
     # 6. 创建 systemd 服务
     create_systemd_service
     
-    # 6. 检查并安装 webserver
+    # 7. 检查并安装 webserver
+    # 当系统已安装web server时，不再执行安装
     if [ "$WEB_SERVER_INSTALLED" = true ] && [ -n "$WEB_SERVER_TYPE" ]; then
         if ! dpkg -l | grep -q "$WEB_SERVER_TYPE" && ! command -v "$WEB_SERVER_TYPE" >/dev/null 2>&1; then
             log "检测到系统未安装 $WEB_SERVER_TYPE, 将自动安装"
             install_webserver
         else
-            log "检测到系统已安装 $WEB_SERVER_TYPE"
+            log "检测到系统已安装 $WEB_SERVER_TYPE，跳过安装"
         fi
     elif [ "$WEB_SERVER_INSTALLED" = true ] && [ -z "$WEB_SERVER_TYPE" ]; then
         log "用户选择不安装 web server, 跳过安装步骤"
     fi
     
-    # 7. 安装 Docker
+    # 8. 安装 Docker
     if [ "$DOCKER_INSTALLED" = true ]; then
         install_docker
         configure_docker
     fi
     
-    # 8. 修改 Apache 端口
-    if [ "$MODIFY_APACHE_PORT" = true ]; then
-        if [ "$WEB_SERVER_TYPE" = "apache2" ] || [ -z "$WEB_SERVER_TYPE" ]; then
-            modify_apache_port
-        else
-            log "警告: 当前Web Server类型为 $WEB_SERVER_TYPE, 无法修改Apache端口"
-        fi
-    fi
     
     # 9. 安装 ppp
     if [ "$INSTALL_PPP" = true ]; then
@@ -899,6 +901,7 @@ disable_swap() {
     
     log "swap (虚拟内存)  已禁用"
 }
+
 
 # 换源
 change_apt_mirror() {
@@ -940,16 +943,28 @@ change_apt_mirror() {
         else
             # 如果没有 UBUNTU_CODENAME，尝试从 VERSION 中提取
             local version_desc=$(grep "VERSION=" /etc/os-release | cut -d'=' -f2 | tr -d '"')
-            # 这里简化处理，实际应该根据 Linux Mint 版本映射到 Ubuntu 代号
-            # 从 VERSION 中提取 Ubuntu 代号
-            local ubuntu_codename=$(grep "UBUNTU_CODENAME" /etc/os-release | cut -d'=' -f2)
-            if [ -n "$ubuntu_codename" ]; then
-                version_codename="$ubuntu_codename"
+            # 从版本描述中提取Ubuntu代号，例如从 "21.2 (Victoria)" 提取 "Victoria"
+            # 或者从 "20.3 (Una)" 提取 "focal" (因为Linux Mint 20.x基于Ubuntu 20.04/focal)
+            if [[ $version_desc =~ \((.*)\) ]]; then
+                local mint_codename="${BASH_REMATCH[1],,}"  # 转换为小写
+                
+                # 根据Linux Mint代号映射到Ubuntu代号
+                case "$mint_codename" in
+                    "vanessa"|"vera"|"victoria"|"virginia") 
+                        version_codename="jammy"  # Ubuntu 22.04
+                        ;;
+                    "una"|"uma"|"ulyssa"|"ulyana"|"julia")
+                        version_codename="focal"  # Ubuntu 20.04
+                        ;;
+                    "tricia"|"tina"|"tessa"|"tara"|"ulyana")
+                        version_codename="bionic" # Ubuntu 18.04
+                        ;;
+                    *)
+                        version_codename="focal"  # 默认使用 focal
+                        ;;
+                esac
             else
-                # 如果没有 UBUNTU_CODENAME，尝试从 VERSION 中提取
-                local version_desc=$(grep "VERSION=" /etc/os-release | cut -d'=' -f2 | tr -d '"')
-                # 这里简化处理，实际应该根据 Linux Mint 版本映射到 Ubuntu 代号
-                version_codename="focal"  # 默认 focal，实际应该有更精确的映射
+                version_codename="focal"  # 默认使用 focal
             fi
         fi
     elif grep -q "Armbian" /etc/os-release; then
@@ -992,14 +1007,6 @@ change_apt_mirror() {
                 "ubuntu") mirror_url="https://mirrors.aliyun.com/ubuntu/" ;;
                 "linuxmint") mirror_url="https://mirrors.aliyun.com/linuxmint/" ;;
                 "armbian") mirror_url="https://mirrors.aliyun.com/armbian/" ;;
-            esac
-            ;;
-        "netease")
-            case "$system_type" in
-                "debian") mirror_url="https://mirrors.163.com/debian/" ;;
-                "ubuntu") mirror_url="https://mirrors.163.com/ubuntu/" ;;
-                "linuxmint") mirror_url="https://mirrors.163.com/linuxmint/" ;;
-                # 网易没有 Armbian 镜像源
             esac
             ;;
         "tencent")
@@ -1067,7 +1074,6 @@ change_apt_mirror() {
     
     local timestamp
     timestamp=$(date +"%Y_%m_%d-%H_%M_%S-%3N")
-    INSTALL_LOG="/tmp/install-$timestamp.log"
 
     # 备份原源，仅在第一次换源时进行
     if [ "$APT_SOURCE_BACKED_UP" = false ] && [ -f "/etc/apt/sources.list" ]; then
@@ -1087,47 +1093,22 @@ change_apt_mirror() {
             # 针对不同镜像源，Debian/Armbian 安全更新使用专门的URL
             local security_mirror_url="$mirror_url"
             case "$MIRROR_SOURCE" in
-                "aliyun")
-                    security_mirror_url="https://mirrors.aliyun.com/debian-security/"
-                    ;;
-                "ustc")
-                    security_mirror_url="https://mirrors.ustc.edu.cn/debian-security/"
-                    ;;
-                "tsinghua")
-                    security_mirror_url="https://mirrors.tuna.tsinghua.edu.cn/debian-security/"
-                    ;;
-                "tencent")
-                    security_mirror_url="https://mirrors.cloud.tencent.com/debian-security/"
-                    ;;
-                "huawei")
-                    security_mirror_url="https://mirrors.huaweicloud.com/debian-security/"
-                    ;;
-                "sjtu")
-                    security_mirror_url="https://mirror.sjtu.edu.cn/debian-security/"
-                    ;;
-                "zju")
-                    security_mirror_url="https://mirrors.zju.edu.cn/debian-security/"
-                    ;;
-                "hust")
-                    security_mirror_url="https://mirrors.hust.edu.cn/debian-security/"
-                    ;;
-                "nju")
-                    security_mirror_url="https://mirrors.nju.edu.cn/debian-security/"
-                    ;;
-                "hit")
-                    security_mirror_url="https://mirrors.hit.edu.cn/debian-security/"
-                    ;;
-                "netease")
-                    # 网易镜像源使用不同的安全更新结构
-                    security_mirror_url="${mirror_url}debian-security/"
+                "tencent"|"huawei"|"sjtu"|"zju"|"hust"|"nju"|"hit")
+                    # 腾讯、华为、高校镜像站等使用独立的安全更新路径
+                    security_mirror_url="https://${MIRROR_SOURCE}.debian.org/debian-security/"
                     ;;
                 *)
-                    security_mirror_url="${mirror_url}security/"
+                    # 默认使用镜像站的debian-security子路径
+                    security_mirror_url="${mirror_url}debian-security/"
                     ;;
             esac
-                    security_mirror_url="${mirror_url}security/"
-                    ;;
-            esac
+            
+            # 特别处理 Debian 12 (bookworm) 及以上版本的安全更新源
+            if [ "$system_type" = "debian" ] || [ "$system_type" = "armbian" ]; then
+                if [[ "$version_codename" > "bullseye" ]]; then
+                    security_mirror_url="https://security.debian.org/debian-security"
+                fi
+            fi
             
             # 写入新源
             cat > /etc/apt/sources.list << EOF
@@ -1155,19 +1136,20 @@ EOF
             # 针对不同镜像源，Ubuntu/Linux Mint 安全更新使用专门的URL
             local ubuntu_security_mirror_url="$mirror_url"
             case "$MIRROR_SOURCE" in
-                "aliyun")
-                    # 阿里云Ubuntu安全更新使用 mirrors.aliyun.com/ubuntu/
-                    ubuntu_security_mirror_url="$mirror_url"
-                    ;;
-                "ustc")
-                    # 中科大镜像站将 security.ubuntu.com 重定向到 mirrors.ustc.edu.cn
-                    ubuntu_security_mirror_url="$mirror_url"
+                "tencent"|"huawei"|"sjtu"|"zju"|"hust"|"nju"|"hit")
+                    # 腾讯、华为、高校镜像站等使用独立的安全更新路径
+                    ubuntu_security_mirror_url="https://${MIRROR_SOURCE}.ubuntu.com/ubuntu-security/"
                     ;;
                 *)
-                    # 其他镜像源通常使用镜像站自己的路径
-                    ubuntu_security_mirror_url="${mirror_url}security/"
+                    # 默认使用镜像站的ubuntu-security子路径
+                    ubuntu_security_mirror_url="${mirror_url}ubuntu-security/"
                     ;;
             esac
+            
+            # 特别处理 Ubuntu 22.04 (jammy) 及以上版本的安全更新源
+            if [[ "$version_codename" > "focal" ]]; then
+                ubuntu_security_mirror_url="https://security.ubuntu.com/ubuntu"
+            fi
             
             # 写入新源
             cat > /etc/apt/sources.list << EOF
@@ -1427,28 +1409,25 @@ apt_update() {
                             3) 
                                 MIRROR_SOURCE="aliyun"
                                 ;;
-                            4) 
-                                MIRROR_SOURCE="netease"
-                                ;;
-                            5)
+                            4)
                                 MIRROR_SOURCE="tencent"
                                 ;;
-                            6)
+                            5)
                                 MIRROR_SOURCE="huawei"
                                 ;;
-                            7)
+                            6)
                                 MIRROR_SOURCE="sjtu"
                                 ;;
-                            8)
+                            7)
                                 MIRROR_SOURCE="zju"
                                 ;;
-                            9)
+                            8)
                                 MIRROR_SOURCE="hust"
                                 ;;
-                            10)
+                            9)
                                 MIRROR_SOURCE="nju"
                                 ;;
-                            11)
+                            10)
                                 MIRROR_SOURCE="hit"
                                 ;;
                             *)
@@ -1506,15 +1485,14 @@ apt_install() {
                     echo "1) 中科大 (默认)"
                     echo "2) 清华大学"
                     echo "3) 阿里云"
-                    echo "4) 网易(不支持Alpine)"
-                    echo "5) 腾讯"
-                    echo "6) 华为"
-                    echo "7) 上海交通大学"
-                    echo "8) 浙江大学"
-                    echo "9) 华中科技大学"
-                    echo "10) 南京大学"
-                    echo "11) 哈尔滨工业大学"
-                    read -rp "请选择 (1-11, 默认为1): " mirror_choice
+                    echo "4) 腾讯"
+                    echo "5) 华为"
+                    echo "6) 上海交通大学"
+                    echo "7) 浙江大学"
+                    echo "8) 华中科技大学"
+                    echo "9) 南京大学"
+                    echo "10) 哈尔滨工业大学"
+                    read -rp "请选择 (1-10, 默认为1): " mirror_choice
                     case "$mirror_choice" in
                         1|"") 
                             MIRROR_SOURCE="ustc"
@@ -1525,28 +1503,25 @@ apt_install() {
                         3) 
                             MIRROR_SOURCE="aliyun"
                             ;;
-                        4) 
-                            MIRROR_SOURCE="netease"
-                            ;;
-                        5)
+                        4)
                             MIRROR_SOURCE="tencent"
                             ;;
-                        6)
+                        5)
                             MIRROR_SOURCE="huawei"
                             ;;
-                        7)
+                        6)
                             MIRROR_SOURCE="sjtu"
                             ;;
-                        8)
+                        7)
                             MIRROR_SOURCE="zju"
                             ;;
-                        9)
+                        8)
                             MIRROR_SOURCE="hust"
                             ;;
-                        10)
+                        9)
                             MIRROR_SOURCE="nju"
                             ;;
-                        11)
+                        10)
                             MIRROR_SOURCE="hit"
                             ;;
                         *)
@@ -1850,7 +1825,6 @@ ExecStart=$LANDSCAPE_DIR/$binary_filename
 Restart=always
 User=root
 LimitMEMLOCK=infinity
-
 
 [Install]
 WantedBy=multi-user.target
