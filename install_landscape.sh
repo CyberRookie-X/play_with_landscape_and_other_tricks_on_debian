@@ -252,7 +252,7 @@ ask_user_config() {
     fi
 
     # 询问是否安装 Docker
-    read -rp "是否安装 Docker? (y/n): " answer
+    read -rp "是否安装 Docker(含compose)? (y/n): " answer
     if [[ ! "$answer" =~ ^[Nn]$ ]]; then
         DOCKER_INSTALLED=true
         
@@ -367,7 +367,7 @@ ask_user_config() {
         if [ "$WEB_SERVER_INSTALLED" = true ]; then
             echo "   Web Server 类型: $WEB_SERVER_TYPE"
         fi
-        echo "5. 安装 Docker: $([ "$DOCKER_INSTALLED" = true ] && echo "是" || echo "否")"
+        echo "5. 安装 Docker(含compose): $([ "$DOCKER_INSTALLED" = true ] && echo "是" || echo "否")"
         if [ "$DOCKER_INSTALLED" = true ]; then
             echo "   Docker 镜像源: $DOCKER_MIRROR"
             echo "   Docker IPv6 支持: $([ "$DOCKER_ENABLE_IPV6" = true ] && echo "是" || echo "否")"
@@ -480,7 +480,7 @@ ask_user_config() {
                 fi
                 ;;
             5)
-                read -rp "是否安装 Docker? (y/n): " answer
+                read -rp "是否安装 Docker(含compose)? (y/n): " answer
                 if [[ ! "$answer" =~ ^[Nn]$ ]]; then
                     DOCKER_INSTALLED=true
                     
@@ -1101,7 +1101,7 @@ install_webserver() {
 
 # 安装 Docker
 install_docker() {
-    log "安装 Docker"
+    log "安装 Docker(含compose)"
     
     # 检查 curl 是否已安装, 未安装则安装
     if ! command -v curl &> /dev/null; then
@@ -1119,7 +1119,7 @@ install_docker() {
     while [ "$user_choice" != "n" ]; do
         retry=0
         while [ $retry -lt $max_retry ]; do
-            log "正在安装 Docker 耗时较长 请稍候 (尝试 $((retry+1))/$max_retry)"
+            log "正在安装 Docker(含compose) 耗时较长 请稍候 (尝试 $((retry+1))/$max_retry)"
             
             # 根据选择的镜像源安装 Docker
             case "$DOCKER_MIRROR" in
@@ -1144,11 +1144,11 @@ install_docker() {
             esac
             
             retry=$((retry+1))
-            log "Docker 安装失败"
+            log "Docker(含compose) 安装失败"
         done
         
         if [ $retry -eq $max_retry ]; then
-            echo "Docker 安装失败, 请选择操作:"
+            echo "Docker(含compose) 安装失败, 请选择操作:"
             echo "  r) 重试一次"
             echo "  m) 重新选择镜像源再试"
             echo "  n) 退出安装"
@@ -1184,7 +1184,7 @@ install_docker() {
         fi
     done
     
-    log "错误: Docker 安装失败"
+    log "错误: Docker(含compose) 安装失败"
     exit 1
 }
 
