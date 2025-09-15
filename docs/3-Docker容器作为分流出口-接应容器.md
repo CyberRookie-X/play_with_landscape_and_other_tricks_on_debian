@@ -216,11 +216,11 @@ docker inspect --format='Entrypoint: {{.Config.Entrypoint}} Cmd: {{.Config.Cmd}}
 
 ```docker
 # docker run 中的 entrypoint
---entrypoint /land/redirect_pkg_handler.sh /app/lucky -c /goodluck/lucky.conf -runInDocker \
+--entrypoint /landscape/redirect_pkg_handler.sh /app/lucky -c /goodluck/lucky.conf -runInDocker \
 ```
 ```yaml
 # dompose 中的 entrypoint
-entrypoint: ["/land/redirect_pkg_handler.sh", "/app/lucky", "-c", "/goodluck/lucky.conf", "-runInDocker"]
+entrypoint: ["/landscape/redirect_pkg_handler.sh", "/app/lucky", "-c", "/goodluck/lucky.conf", "-runInDocker"]
 ```
 
 ## Docker 部署 单个 容器
@@ -233,13 +233,13 @@ docker run -d \
   --cap-add=BPF \
   --cap-add=PERFMON \
   --privileged \
-  --entrypoint /land/redirect_pkg_handler.sh /original/entrypoint original cmd args \ # 覆盖 原始 Entrypoint
+  --entrypoint /landscape/redirect_pkg_handler.sh /original/entrypoint original cmd args \ # 覆盖 原始 Entrypoint
   -p 外部端口:内部端口 \
   # -e REDIRECT_PKG_HANDLER_WRAPPER_REGION=cn \ # 为 alipne 容器 更换随机中国源
   # -e REDIRECT_PKG_HANDLER_WRAPPER_MIRROR=mirrors.nwafu.edu.cn \ # 为 alipne 容器 更换指定源
   -v /home/worker_program-1/config:/config \ # 挂载配置文件目录
-  -v /root/.landscape-router/redirect_pkg_handler-x86_64-musl:/land/redirect_pkg_handler-x86_64-musl \ # 挂载handler 
-  -v /root/.landscape-router/redirect_pkg_handler.sh:/land/redirect_pkg_handler.sh \ # 挂载包装脚本
+  -v /root/.landscape-router/redirect_pkg_handler-x86_64-musl:/landscape/redirect_pkg_handler-x86_64-musl \ # 挂载handler 
+  -v /root/.landscape-router/redirect_pkg_handler.sh:/landscape/redirect_pkg_handler.sh \ # 挂载包装脚本
   -v /root/.landscape-router/unix_link/:/ld_unix_link/ \ # 必要映射
   some-image:latest # 修改成你需要的镜像
 ```
@@ -281,11 +281,11 @@ services:
     # encironment:
     #   - REDIRECT_PKG_HANDLER_WRAPPER_REGION=cn \ # 为 alipne 容器换源，从 中科大/清华/阿里/网易 中随机选一个
     #   - REDIRECT_PKG_HANDLER_WRAPPER_MIRROR=mirrors.nwafu.edu.cn \ # 为 alipne 容器更换指定源，如西北林业大学源
-    entrypoint: ["/land/redirect_pkg_handler.sh", "/original/entrypoint", "original", "cmd", "args"] # 覆盖 原始 Entrypoint
+    entrypoint: ["/landscape/redirect_pkg_handler.sh", "/original/entrypoint", "original", "cmd", "args"] # 覆盖 原始 Entrypoint
     volumes:
       - /home/worker_program-1/config:/config  # 挂载配置文件目录
-      - /root/.landscape-router/redirect_pkg_handler-x86_64-musl:/land/redirect_pkg_handler-x86_64-musl  # 挂载handler 
-      - /root/.landscape-router/redirect_pkg_handler.sh:/land/redirect_pkg_handler.sh # 挂载包装脚本
+      - /root/.landscape-router/redirect_pkg_handler-x86_64-musl:/landscape/redirect_pkg_handler-x86_64-musl  # 挂载handler 
+      - /root/.landscape-router/redirect_pkg_handler.sh:/landscape/redirect_pkg_handler.sh # 挂载包装脚本
       - /root/.landscape-router/unix_link/:/ld_unix_link/ # 必要映射
     image: some-image:latest # 修改成你需要的镜像
 
@@ -312,11 +312,11 @@ services:
     # encironment:
     #   - REDIRECT_PKG_HANDLER_WRAPPER_REGION=cn \ 为 alipne 容器换源，从 中科大/清华/阿里/网易 中随机选一个
     #   - REDIRECT_PKG_HANDLER_WRAPPER_MIRROR=mirrors.nwafu.edu.cn \ # 为 alipne 容器更换指定源，如西北林业大学源
-    entrypoint: ["/land/redirect_pkg_handler.sh", "/original/entrypoint", "original", "cmd", "args"] # 覆盖 原始 Entrypoint
+    entrypoint: ["/landscape/redirect_pkg_handler.sh", "/original/entrypoint", "original", "cmd", "args"] # 覆盖 原始 Entrypoint
     volumes:
       - /home/worker_program-1/config:/config  # 挂载配置文件目录
-      - /root/.landscape-router/redirect_pkg_handler-x86_64-musl:/land/redirect_pkg_handler-x86_64-musl  # 挂载handler 
-      - /root/.landscape-router/redirect_pkg_handler.sh:/land/redirect_pkg_handler.sh # 挂载包装脚本
+      - /root/.landscape-router/redirect_pkg_handler-x86_64-musl:/landscape/redirect_pkg_handler-x86_64-musl  # 挂载handler 
+      - /root/.landscape-router/redirect_pkg_handler.sh:/landscape/redirect_pkg_handler.sh # 挂载包装脚本
       - /root/.landscape-router/unix_link/:/ld_unix_link/ # 必要映射
     image: some-image:latest # 修改成你需要的镜像
 

@@ -32,9 +32,9 @@
 # 1、从 dockerfile 或 docker inspect 找到 镜像原始的 ENTRYPOINT 和 CMD
 # 2、下载 redirect_pkg_handler-XXXXXXXX （从github下载后，无需修改该其文件名） 和 redirect_pkg_handler.sh 到 landscape Router 所在主机中，赋予可执行权限
 # 3、在 docker run、docker-compose.yml 或 Dockerfile 中将本脚本设置为 ENTRYPOINT，并将原始镜像的 ENTRYPOINT和 CMD 作为参数传递
-# 4、将 redirect_pkg_handler-XXXXXXXX （从github下载后，无需修改该其文件名） 和 redirect_pkg_handler.sh 挂载到 容器 /land 目录下
+# 4、将 redirect_pkg_handler-XXXXXXXX （从github下载后，无需修改该其文件名） 和 redirect_pkg_handler.sh 挂载到 容器 /landscape 目录下
 
-# 例如: ENTRYPOINT ["/land/redirect_pkg_handler.sh", "/original/entrypoint", "original", "cmd", "args"]
+# 例如: ENTRYPOINT ["/landscape/redirect_pkg_handler.sh", "/original/entrypoint", "original", "cmd", "args"]
 
 
 
@@ -43,7 +43,7 @@
 # services:
 #   my-service:
 #     image: some-image:latest
-#     entrypoint: ["/land/redirect_pkg_handler.sh", "/original/entrypoint", "original", "cmd", "args"]
+#     entrypoint: ["/landscape/redirect_pkg_handler.sh", "/original/entrypoint", "original", "cmd", "args"]
 #     # 其他配置...
 
 # 示例2
@@ -52,7 +52,7 @@
 #   my-service:
 #     image: some-image:latest
 #     entrypoint: 
-#       - "/land/redirect_pkg_handler.sh"
+#       - "/landscape/redirect_pkg_handler.sh"
 #       - "/docker-entrypoint.sh"  # 原始镜像的 ENTRYPOINT
 #       - "nginx"                  # 原始镜像的 CMD
 #       - "-g"                     # 原始镜像的 CMD 参数
@@ -97,7 +97,7 @@ main() {
 
     # 执行原始的ENTRYPOINT和CMD
     # 使用方式: 在docker-compose.yml或Dockerfile中将本脚本设置为ENTRYPOINT，并将原始镜像的ENTRYPOINT和CMD作为参数传递
-    # 例如: ENTRYPOINT ["/land/redirect_pkg_handler", "/original/entrypoint", "original", "cmd", "args"]
+    # 例如: ENTRYPOINT ["/landscape/redirect_pkg_handler", "/original/entrypoint", "original", "cmd", "args"]
     if [ -n "$ORIGINAL_ENTRYPOINT_CMD" ]; then
         log "Executing original entrypoint: $ORIGINAL_ENTRYPOINT_CMD"
         exec "$ORIGINAL_ENTRYPOINT_CMD"
@@ -144,11 +144,11 @@ simple_system_handler() {
     case "$ARCH" in
         x86_64)
             log "Starting x86_64 handler in background"
-            /land/redirect_pkg_handler-x86_64 &
+            /landscape/redirect_pkg_handler-x86_64 &
             ;;
         aarch64)
             log "Starting aarch64 handler in background"
-            /land/redirect_pkg_handler-aarch64 &
+            /landscape/redirect_pkg_handler-aarch64 &
             ;;
         *)
             log "Unsupported architecture: $ARCH"
@@ -499,11 +499,11 @@ start_alpine_handler() {
     case "$ARCH" in
         x86_64)
             log "Starting x86_64 musl handler in background"
-            /land/redirect_pkg_handler-x86_64-musl &
+            /landscape/redirect_pkg_handler-x86_64-musl &
             ;;
         aarch64)
             log "Starting aarch64 musl handler in background"
-            /land/redirect_pkg_handler-aarch64-musl &
+            /landscape/redirect_pkg_handler-aarch64-musl &
             ;;
         *)
             log "Unsupported architecture: $ARCH"
