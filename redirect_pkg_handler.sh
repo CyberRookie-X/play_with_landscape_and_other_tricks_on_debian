@@ -72,7 +72,7 @@ ORIGINAL_ENTRYPOINT_CMD="$@"
 ARCH=$(uname -m)
 
 # 定义可用的镜像源列表
-MIRRORS="mirrors.ustc.edu.cn mirrors.aliyun.com mirrors.tuna.tsinghua.edu.cn mirrors.cloud.tencent.com repo.huaweicloud.com"
+MIRRORS="mirrors.ustc.edu.cn mirrors.aliyun.com mirrors.tuna.tsinghua.edu.cn mirrors.cloud.tencent.com repo.huaweicloud.com mirrors.sjtug.sjtu.edu.cn mirrors.zju.edu.cn mirrors.hust.edu.cn mirrors.nju.edu.cn mirrors.hit.edu.cn"
 
 # ==================== 主函数 ====================
 

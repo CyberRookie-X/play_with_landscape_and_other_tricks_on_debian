@@ -22,7 +22,6 @@ LAN_CONFIG=""
 GITHUB_MIRROR=""
 USE_GITHUB_MIRROR=false
 MAX_RETRY=10
-IS_ARMBIAN=false
 ADMIN_USER="root"
 ADMIN_PASS="root"
 TEMP_PASS=""
@@ -209,8 +208,8 @@ ask_user_config() {
     fi
 
     # 询问是否换源 (仅对支持的系统进行询问)
-    # 检查是否为支持换源的系统 (Debian, Ubuntu, Linux Mint)
-    if grep -q "Debian" /etc/os-release || grep -q "Ubuntu" /etc/os-release || grep -q "Linux Mint" /etc/os-release; then
+    # 检查是否为支持换源的系统 (Debian, Ubuntu, Linux Mint, Armbian)
+    if grep -q "Debian" /etc/os-release || grep -q "Ubuntu" /etc/os-release || grep -q "Linux Mint" /etc/os-release || grep -q "Armbian" /etc/os-release; then
         echo "请选择要使用的 apt 软件源镜像 (默认使用中科大源):"
         echo "1) 中科大 (默认)"
         echo "2) 清华大学"
@@ -218,8 +217,13 @@ ask_user_config() {
         echo "4) 网易(不支持Alpine)"
         echo "5) 腾讯"
         echo "6) 华为"
+        echo "7) 上海交通大学"
+        echo "8) 浙江大学"
+        echo "9) 华中科技大学"
+        echo "10) 南京大学"
+        echo "11) 哈尔滨工业大学"
         echo "0) 不换源"
-        read -rp "请选择 (0-6, 默认为1): " answer
+        read -rp "请选择 (0-11, 默认为1): " answer
         case "$answer" in
             1|"") 
                 USE_CUSTOM_MIRROR=true
@@ -245,13 +249,33 @@ ask_user_config() {
                 USE_CUSTOM_MIRROR=true
                 MIRROR_SOURCE="huawei"
                 ;;
+            7)
+                USE_CUSTOM_MIRROR=true
+                MIRROR_SOURCE="sjtu"
+                ;;
+            8)
+                USE_CUSTOM_MIRROR=true
+                MIRROR_SOURCE="zju"
+                ;;
+            9)
+                USE_CUSTOM_MIRROR=true
+                MIRROR_SOURCE="hust"
+                ;;
+            10)
+                USE_CUSTOM_MIRROR=true
+                MIRROR_SOURCE="nju"
+                ;;
+            11)
+                USE_CUSTOM_MIRROR=true
+                MIRROR_SOURCE="hit"
+                ;;
             *)
                 USE_CUSTOM_MIRROR=false
                 ;;
         esac
     else
         echo "当前系统不支持自动换源功能"
-        echo "仅支持 Debian、Ubuntu 和 Linux Mint 系统换源"
+        echo "仅支持 Debian、Ubuntu、Linux Mint 和 Armbian 系统换源"
     fi
 
     # 询问是否安装 Docker
@@ -363,6 +387,11 @@ ask_user_config() {
                 "netease") mirror_name="网易(不支持Alpine)" ;;
                 "tencent") mirror_name="腾讯" ;;
                 "huawei") mirror_name="华为" ;;
+                "sjtu") mirror_name="上海交通大学" ;;
+                "zju") mirror_name="浙江大学" ;;
+                "hust") mirror_name="华中科技大学" ;;
+                "nju") mirror_name="南京大学" ;;
+                "hit") mirror_name="哈尔滨工业大学" ;;
             esac
             echo "   镜像源: $mirror_name"
         fi
@@ -450,7 +479,8 @@ ask_user_config() {
                 fi
                 ;;
             4)
-                if [ "$SUPPORTED_SYSTEM" = true ]; then
+                # 检查是否为支持换源的系统 (Debian, Ubuntu, Linux Mint, Armbian)
+                if grep -q "Debian" /etc/os-release || grep -q "Ubuntu" /etc/os-release || grep -q "Linux Mint" /etc/os-release || grep -q "Armbian" /etc/os-release; then
                     read -rp "是否更换 apt 软件源? (y/n): " answer
                     if [[ ! "$answer" =~ ^[Nn]$ ]]; then
                         USE_CUSTOM_MIRROR=true
@@ -463,23 +493,31 @@ ask_user_config() {
                         echo "4) 网易(不支持Alpine)"
                         echo "5) 腾讯"
                         echo "6) 华为"
-                        read -rp "请选择 (1-6, 默认为1): " answer
+                        echo "7) 上海交通大学"
+                        echo "8) 浙江大学"
+                        echo "9) 华中科技大学"
+                        echo "10) 南京大学"
+                        echo "11) 哈尔滨工业大学"
+                        read -rp "请选择 (1-11, 默认为1): " answer
                         case "$answer" in
                             2) MIRROR_SOURCE="tsinghua" ;;
                             3) MIRROR_SOURCE="aliyun" ;;
                             4) MIRROR_SOURCE="netease" ;;
                             5) MIRROR_SOURCE="tencent" ;;
                             6) MIRROR_SOURCE="huawei" ;;
+                            7) MIRROR_SOURCE="sjtu" ;;
+                            8) MIRROR_SOURCE="zju" ;;
+                            9) MIRROR_SOURCE="hust" ;;
+                            10) MIRROR_SOURCE="nju" ;;
+                            11) MIRROR_SOURCE="hit" ;;
                             *) MIRROR_SOURCE="ustc" ;;
                         esac
                     else
                         USE_CUSTOM_MIRROR=false
                     fi
-                elif [ "$IS_ARMBIAN" = false ]; then
-                    echo "当前系统不支持自动换源功能"
-                    echo "仅支持 Debian、Ubuntu 和 Linux Mint 系统换源"
                 else
-                    echo "Armbian 系统不提供换源功能"
+                    echo "当前系统不支持自动换源功能"
+                    echo "仅支持 Debian、Ubuntu、Linux Mint 和 Armbian 系统换源"
                 fi
                 ;;
             5)
@@ -507,6 +545,9 @@ ask_user_config() {
                 else
                     DOCKER_INSTALLED=false
                 fi
+                ;;
+            *)
+                echo "无效的选择，请重新输入"
                 ;;
             6)
                 read -rp "是否安装 ppp 用于 pppoe 拨号? (y/n): " answer
@@ -865,12 +906,12 @@ change_apt_mirror() {
     
     # 检查是否为支持的系统类型
     local is_supported=false
-    if grep -q "Debian" /etc/os-release || grep -q "Ubuntu" /etc/os-release || grep -q "Linux Mint" /etc/os-release; then
+    if grep -q "Debian" /etc/os-release || grep -q "Ubuntu" /etc/os-release || grep -q "Linux Mint" /etc/os-release || grep -q "Armbian" /etc/os-release; then
         is_supported=true
     fi
     
     if [ "$is_supported" = false ]; then
-        log "警告: 不支持的系统类型，仅支持 Debian、Ubuntu 和 Linux Mint"
+        log "警告: 不支持的系统类型，仅支持 Debian、Ubuntu、Linux Mint 和 Armbian"
         log "提示: 不支持小众发行版换源，建议小众发行版自行换源"
         return 0
     fi
@@ -911,6 +952,19 @@ change_apt_mirror() {
                 version_codename="focal"  # 默认 focal，实际应该有更精确的映射
             fi
         fi
+    elif grep -q "Armbian" /etc/os-release; then
+        system_type="armbian"
+        system_version=$(grep "VERSION_ID" /etc/os-release | cut -d'=' -f2 | tr -d '"')
+        version_codename=$(grep "VERSION_CODENAME" /etc/os-release | cut -d'=' -f2)
+        # 如果没有 VERSION_CODENAME，尝试从其他字段获取
+        if [ -z "$version_codename" ]; then
+            # Armbian 通常基于 Debian，尝试获取 Debian 版本代号
+            version_codename=$(grep "DEBIAN_VERSION" /etc/os-release | cut -d'=' -f2 | tr -d '"')
+        fi
+        # 如果仍然为空，则使用默认值
+        if [ -z "$version_codename" ]; then
+            version_codename="bullseye"  # 默认使用 bullseye
+        fi
     fi
     
     # 确定使用的镜像源URL
@@ -921,6 +975,7 @@ change_apt_mirror() {
                 "debian") mirror_url="https://mirrors.ustc.edu.cn/debian/" ;;
                 "ubuntu") mirror_url="https://mirrors.ustc.edu.cn/ubuntu/" ;;
                 "linuxmint") mirror_url="https://mirrors.ustc.edu.cn/linuxmint/" ;;
+                "armbian") mirror_url="https://mirrors.ustc.edu.cn/armbian/" ;;
             esac
             ;;
         "tsinghua")
@@ -928,6 +983,7 @@ change_apt_mirror() {
                 "debian") mirror_url="https://mirrors.tuna.tsinghua.edu.cn/debian/" ;;
                 "ubuntu") mirror_url="https://mirrors.tuna.tsinghua.edu.cn/ubuntu/" ;;
                 "linuxmint") mirror_url="https://mirrors.tuna.tsinghua.edu.cn/linuxmint/" ;;
+                "armbian") mirror_url="https://mirrors.tuna.tsinghua.edu.cn/armbian/" ;;
             esac
             ;;
         "aliyun")
@@ -935,6 +991,7 @@ change_apt_mirror() {
                 "debian") mirror_url="https://mirrors.aliyun.com/debian/" ;;
                 "ubuntu") mirror_url="https://mirrors.aliyun.com/ubuntu/" ;;
                 "linuxmint") mirror_url="https://mirrors.aliyun.com/linuxmint/" ;;
+                "armbian") mirror_url="https://mirrors.aliyun.com/armbian/" ;;
             esac
             ;;
         "netease")
@@ -942,6 +999,7 @@ change_apt_mirror() {
                 "debian") mirror_url="https://mirrors.163.com/debian/" ;;
                 "ubuntu") mirror_url="https://mirrors.163.com/ubuntu/" ;;
                 "linuxmint") mirror_url="https://mirrors.163.com/linuxmint/" ;;
+                # 网易没有 Armbian 镜像源
             esac
             ;;
         "tencent")
@@ -949,6 +1007,7 @@ change_apt_mirror() {
                 "debian") mirror_url="https://mirrors.cloud.tencent.com/debian/" ;;
                 "ubuntu") mirror_url="https://mirrors.cloud.tencent.com/ubuntu/" ;;
                 "linuxmint") mirror_url="https://mirrors.cloud.tencent.com/linuxmint/" ;;
+                "armbian") mirror_url="https://mirrors.cloud.tencent.com/armbian/" ;;
             esac
             ;;
         "huawei")
@@ -956,6 +1015,47 @@ change_apt_mirror() {
                 "debian") mirror_url="https://mirrors.huaweicloud.com/repository/debian/" ;;
                 "ubuntu") mirror_url="https://mirrors.huaweicloud.com/repository/ubuntu/" ;;
                 "linuxmint") mirror_url="https://mirrors.huaweicloud.com/repository/linuxmint/" ;;
+                "armbian") mirror_url="https://mirrors.huaweicloud.com/repository/armbian/" ;;
+            esac
+            ;;
+        "sjtu")
+            case "$system_type" in
+                "debian") mirror_url="https://mirror.sjtu.edu.cn/debian/" ;;
+                "ubuntu") mirror_url="https://mirror.sjtu.edu.cn/ubuntu/" ;;
+                "linuxmint") mirror_url="https://mirror.sjtu.edu.cn/linuxmint/" ;;
+                "armbian") mirror_url="https://mirror.sjtu.edu.cn/armbian/" ;;
+            esac
+            ;;
+        "zju")
+            case "$system_type" in
+                "debian") mirror_url="https://mirrors.zju.edu.cn/debian/" ;;
+                "ubuntu") mirror_url="https://mirrors.zju.edu.cn/ubuntu/" ;;
+                "linuxmint") mirror_url="https://mirrors.zju.edu.cn/linuxmint/" ;;
+                "armbian") mirror_url="https://mirrors.zju.edu.cn/armbian/" ;;
+            esac
+            ;;
+        "hust")
+            case "$system_type" in
+                "debian") mirror_url="https://mirrors.hust.edu.cn/debian/" ;;
+                "ubuntu") mirror_url="https://mirrors.hust.edu.cn/ubuntu/" ;;
+                "linuxmint") mirror_url="https://mirrors.hust.edu.cn/linuxmint/" ;;
+                "armbian") mirror_url="https://mirrors.hust.edu.cn/armbian/" ;;
+            esac
+            ;;
+        "nju")
+            case "$system_type" in
+                "debian") mirror_url="https://mirrors.nju.edu.cn/debian/" ;;
+                "ubuntu") mirror_url="https://mirrors.nju.edu.cn/ubuntu/" ;;
+                "linuxmint") mirror_url="https://mirrors.nju.edu.cn/linuxmint/" ;;
+                "armbian") mirror_url="https://mirrors.nju.edu.cn/armbian/" ;;
+            esac
+            ;;
+        "hit")
+            case "$system_type" in
+                "debian") mirror_url="https://mirrors.hit.edu.cn/debian/" ;;
+                "ubuntu") mirror_url="https://mirrors.hit.edu.cn/ubuntu/" ;;
+                "linuxmint") mirror_url="https://mirrors.hit.edu.cn/linuxmint/" ;;
+                "armbian") mirror_url="https://mirrors.hit.edu.cn/armbian/" ;;
             esac
             ;;
     esac
@@ -978,13 +1078,13 @@ change_apt_mirror() {
     
     # 根据系统类型生成对应的源列表
     case "$system_type" in
-        "debian")
+        "debian"|"armbian")
             # 如果无法获取版本代号，则使用通用代号
             if [ -z "$version_codename" ]; then
                 version_codename="stable"
             fi
             
-            # 针对不同镜像源，Debian 安全更新使用专门的URL
+            # 针对不同镜像源，Debian/Armbian 安全更新使用专门的URL
             local security_mirror_url="$mirror_url"
             case "$MIRROR_SOURCE" in
                 "aliyun")
@@ -1002,11 +1102,29 @@ change_apt_mirror() {
                 "huawei")
                     security_mirror_url="https://mirrors.huaweicloud.com/debian-security/"
                     ;;
+                "sjtu")
+                    security_mirror_url="https://mirror.sjtu.edu.cn/debian-security/"
+                    ;;
+                "zju")
+                    security_mirror_url="https://mirrors.zju.edu.cn/debian-security/"
+                    ;;
+                "hust")
+                    security_mirror_url="https://mirrors.hust.edu.cn/debian-security/"
+                    ;;
+                "nju")
+                    security_mirror_url="https://mirrors.nju.edu.cn/debian-security/"
+                    ;;
+                "hit")
+                    security_mirror_url="https://mirrors.hit.edu.cn/debian-security/"
+                    ;;
                 "netease")
                     # 网易镜像源使用不同的安全更新结构
                     security_mirror_url="${mirror_url}debian-security/"
                     ;;
                 *)
+                    security_mirror_url="${mirror_url}security/"
+                    ;;
+            esac
                     security_mirror_url="${mirror_url}security/"
                     ;;
             esac
@@ -1293,7 +1411,12 @@ apt_update() {
                         echo "4) 网易(不支持Alpine)"
                         echo "5) 腾讯"
                         echo "6) 华为"
-                        read -rp "请选择 (1-6, 默认为1): " mirror_choice
+                        echo "7) 上海交通大学"
+                        echo "8) 浙江大学"
+                        echo "9) 华中科技大学"
+                        echo "10) 南京大学"
+                        echo "11) 哈尔滨工业大学"
+                        read -rp "请选择 (1-11, 默认为1): " mirror_choice
                         case "$mirror_choice" in
                             1|"") 
                                 MIRROR_SOURCE="ustc"
@@ -1312,6 +1435,21 @@ apt_update() {
                                 ;;
                             6)
                                 MIRROR_SOURCE="huawei"
+                                ;;
+                            7)
+                                MIRROR_SOURCE="sjtu"
+                                ;;
+                            8)
+                                MIRROR_SOURCE="zju"
+                                ;;
+                            9)
+                                MIRROR_SOURCE="hust"
+                                ;;
+                            10)
+                                MIRROR_SOURCE="nju"
+                                ;;
+                            11)
+                                MIRROR_SOURCE="hit"
                                 ;;
                             *)
                                 MIRROR_SOURCE="ustc"
@@ -1371,7 +1509,12 @@ apt_install() {
                     echo "4) 网易(不支持Alpine)"
                     echo "5) 腾讯"
                     echo "6) 华为"
-                    read -rp "请选择 (1-6, 默认为1): " mirror_choice
+                    echo "7) 上海交通大学"
+                    echo "8) 浙江大学"
+                    echo "9) 华中科技大学"
+                    echo "10) 南京大学"
+                    echo "11) 哈尔滨工业大学"
+                    read -rp "请选择 (1-11, 默认为1): " mirror_choice
                     case "$mirror_choice" in
                         1|"") 
                             MIRROR_SOURCE="ustc"
@@ -1390,6 +1533,21 @@ apt_install() {
                             ;;
                         6)
                             MIRROR_SOURCE="huawei"
+                            ;;
+                        7)
+                            MIRROR_SOURCE="sjtu"
+                            ;;
+                        8)
+                            MIRROR_SOURCE="zju"
+                            ;;
+                        9)
+                            MIRROR_SOURCE="hust"
+                            ;;
+                        10)
+                            MIRROR_SOURCE="nju"
+                            ;;
+                        11)
+                            MIRROR_SOURCE="hit"
                             ;;
                         *)
                             MIRROR_SOURCE="ustc"
