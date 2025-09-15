@@ -1217,43 +1217,6 @@ EOF
     log "Docker 配置完成"
 }
 
-
-# 处理 apt 换源选择的通用函数
-# handle_apt_mirror_choice() {
-#     log "用户选择换源操作"
-#     if [ "$USE_CUSTOM_MIRROR" = false ]; then
-#         echo "当前未配置自定义镜像源，无法换源。"
-#         echo "请选择: "
-#         echo "1) 再次尝试3次"
-#         echo "2) 退出安装 (输入除1以外的任意字符)"
-#         read -r user_choice
-#         
-#         if [ "$user_choice" != "1" ]; then
-#             log "用户选择退出安装"
-#             exit 1
-#         else
-#             user_choice="y"
-#         fi
-#         echo "$user_choice"  # 返回用户选择
-#     else
-#         # 根据当前镜像源切换到下一个可用镜像源
-#         local next_mirror=""
-#         case "$MIRROR_SOURCE" in
-#             "ustc") next_mirror="tsinghua" ;;
-#             "tsinghua") next_mirror="aliyun" ;;
-#             "aliyun") next_mirror="tencent" ;;
-#             "tencent") next_mirror="huawei" ;;
-#             "huawei") next_mirror="netease" ;;
-#             "netease") next_mirror="ustc" ;;
-#             *) next_mirror="ustc" ;;
-#         esac
-#         
-#         MIRROR_SOURCE="$next_mirror"
-#         change_apt_mirror
-#         echo "y"  # 返回用户选择以便继续循环
-#     fi
-# }
-
 # 处理 GitHub 镜像加速选择的通用函数
 handle_github_mirror_choice() {
     local binary_name="$1"  # 传入正在下载的文件名
