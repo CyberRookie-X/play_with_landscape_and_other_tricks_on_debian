@@ -134,6 +134,16 @@ check_system() {
         exit 1
     fi
     
+    # 检查是否安装了 curl 或 wget
+    if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
+        log "错误: 系统中未找到 curl 或 wget，至少需要安装其中一个工具"
+        exit 1
+    elif command -v curl >/dev/null 2>&1; then
+        log "检测到系统已安装 curl"
+    elif command -v wget >/dev/null 2>&1; then
+        log "检测到系统已安装 wget"
+    fi
+    
     log "系统环境检查完成"
 }
 
@@ -533,6 +543,11 @@ ask_user_config() {
             5)
                 read -rp "是否安装 Docker(含compose)? (y/n): " answer
                 if [[ ! "$answer" =~ ^[Nn]$ ]]; then
+                    # 检查是否已安装 curl，如未安装则提醒会自动安装
+                    if ! command -v curl &> /dev/null; then
+                        echo "注意: 系统未安装 curl，安装 Docker 时将自动安装 curl"
+                    fi
+                    
                     DOCKER_INSTALLED=true
                     
                     echo "请选择 Docker 镜像源:"
@@ -1590,7 +1605,7 @@ install_landscape_router() {
         log "curl 已安装"
     fi
     
-        # 根据架构确定二进制文件名
+    # 根据架构确定二进制文件名
     local binary_filename=""
     local system_arch
     system_arch=$(uname -m)
@@ -1616,14 +1631,20 @@ install_landscape_router() {
         retry=0
         while [ $retry -lt $max_retry ]; do
             log "正在下载 $binary_filename  耗时较长 请稍候 (尝试 $((retry+1))/$max_retry)"
-            if curl -fsSL -o "$LANDSCAPE_DIR/$binary_filename" "$binary_url"; then
-                log "$binary_filename 下载成功"
-                break
-            else
-                retry=$((retry+1))
-                log "下载失败, 等待 5 秒后重试"
-                sleep 5
+            if command -v wget >/dev/null 2>&1; then
+                if wget -O "$LANDSCAPE_DIR/$binary_filename" "$binary_url"; then
+                    log "$binary_filename 下载成功"
+                    break
+                fi
+            elif command -v curl >/dev/null 2>&1; then
+                if curl -fSL --progress-bar -o "$LANDSCAPE_DIR/$binary_filename" "$binary_url"; then
+                    log "$binary_filename 下载成功"
+                    break
+                fi
             fi
+            retry=$((retry+1))
+            log "下载失败, 等待 5 秒后重试"
+            sleep 5
         done
         
         if [ $retry -eq $max_retry ]; then
@@ -1691,14 +1712,20 @@ install_landscape_router() {
         retry=0
         while [ $retry -lt $max_retry ]; do
             log "正在下载 static.zip 耗时较长 请稍候(尝试 $((retry+1))/$max_retry)"
-            if curl -fsSL -o "/tmp/static.zip" "$static_url"; then
-                log "static.zip 下载成功"
-                break
-            else
-                retry=$((retry+1))
-                log "下载失败, 等待 5 秒后重试"
-                sleep 5
+            if command -v wget >/dev/null 2>&1; then
+                if wget -O /tmp/static.zip "$static_url"; then
+                    log "static.zip 下载成功"
+                    break
+                fi
+            elif command -v curl >/dev/null 2>&1; then
+                if curl -fSL --progress-bar -o /tmp/static.zip "$static_url"; then
+                    log "static.zip 下载成功"
+                    break
+                fi
             fi
+            retry=$((retry+1))
+            log "下载失败, 等待 5 秒后重试"
+            sleep 5
         done
         
         if [ $retry -eq $max_retry ]; then
