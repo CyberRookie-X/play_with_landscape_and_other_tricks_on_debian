@@ -14,7 +14,7 @@ WEB_SERVER_PREINSTALLED=false
 TIMEZONE_SHANGHAI=false
 SWAP_DISABLED=false
 USE_CUSTOM_MIRROR=false
-MIRROR_SOURCE="ustc"  # 默认使用中国科学技术大学源
+MIRROR_SOURCE="aliyun"  # 默认使用阿里云源
 SUPPORTED_SYSTEM=false  # 是否为支持换源的系统
 DOCKER_INSTALLED=false
 DOCKER_MIRROR="aliyun"
@@ -104,7 +104,16 @@ check_system() {
         log "Landscape Router 需要 web server 环境才能正常运行"
         log "缺少 web server 可能会导致主机失联问题"
     else
-        log "检测到系统已安装 web server 环境"
+        WEB_SERVER_PREINSTALLED=true
+        # 确定已安装的web server类型
+        if dpkg -l | grep -q apache2; then
+            WEB_SERVER_TYPE="apache2"
+        elif command -v nginx >/dev/null 2>&1; then
+            WEB_SERVER_TYPE="nginx"
+        elif command -v lighttpd >/dev/null 2>&1; then
+            WEB_SERVER_TYPE="lighttpd"
+        fi
+        log "检测到系统已安装 web server 环境: $WEB_SERVER_TYPE"
     fi
     
     # 检查内核版本 (需要 > 6.9) 
@@ -157,57 +166,7 @@ ask_user_config() {
     echo ""
     
     # 检查web server环境
-    if ! dpkg -l | grep -q apache2 && ! command -v nginx >/dev/null 2>&1 && ! command -v lighttpd >/dev/null 2>&1; then
-        echo "警告: 系统中未检测到 web server 环境 (如 apache2, nginx, lighttpd)"
-        echo "Landscape Router 需要 web server 环境才能正常运行"
-        echo "缺少 web server 可能会导致主机失联问题"
-        echo ""
-        echo "本脚本中 web server 环境 检测/安装 的功能未经验证"
-        echo "建议自行处理后, 再执行安装脚本"
-        echo ""
-        echo "请选择要安装的 Web Server:"
-        echo "1) 退出安装脚本, 自行处理 (推荐)(默认)"
-        echo "2) Apache2"
-        echo "3) Nginx"
-        echo "4) Lighttpd"
-        echo "5) 不安装 web server "
-        read -rp "请选择 (1-5, 默认为1): " webserver_choice
-        case "$webserver_choice" in
-            2)
-                WEB_SERVER_INSTALLED=true
-                WEB_SERVER_TYPE="apache2"
-                ;;
-            3)
-                WEB_SERVER_INSTALLED=true
-                WEB_SERVER_TYPE="nginx"
-                ;;
-            4)
-                WEB_SERVER_INSTALLED=true
-                WEB_SERVER_TYPE="lighttpd"
-                ;;
-            5)
-                WEB_SERVER_INSTALLED=false
-                WEB_SERVER_TYPE=""
-                ;;
-            *)
-                log "用户选择退出安装"
-                exit 1
-                ;;
-        esac
-    else
-        WEB_SERVER_INSTALLED=true
-        if dpkg -l | grep -q apache2; then
-            WEB_SERVER_TYPE="apache2"
-        elif command -v nginx >/dev/null 2>&1; then
-            WEB_SERVER_TYPE="nginx"
-        elif command -v lighttpd >/dev/null 2>&1; then
-            WEB_SERVER_TYPE="lighttpd"
-        fi
-        log "检测到系统已安装 web server: $WEB_SERVER_TYPE"
-        # 当检测到已安装web server时，不再询问用户
-        # 设置一个标志，表示web server是系统预装的
-        WEB_SERVER_PREINSTALLED=true
-    fi
+    ask_webserver
     
     # 询问是否修改时区为中国上海
     read -rp "是否将系统时区修改为亚洲/上海? (y/n): " answer
@@ -231,16 +190,7 @@ ask_user_config() {
         DOCKER_INSTALLED=true
         
         # 询问 Docker 镜像源
-        echo "请选择 Docker 镜像源:"
-        echo "1) 阿里云 (默认)"
-        echo "2) Azure 中国云"
-        echo "3) 官方源 (国外)"
-        read -rp "请选择 (1-3, 默认为1): " answer
-        case "$answer" in
-            2) DOCKER_MIRROR="azure" ;;
-            3) DOCKER_MIRROR="official" ;;
-            *) DOCKER_MIRROR="aliyun" ;;
-        esac
+        ask_docker_mirror
         
         # 询问是否为 Docker 开启 IPv6
         read -rp "是否为 Docker 开启 IPv6 支持? (y/n): " answer
@@ -256,29 +206,7 @@ ask_user_config() {
     fi
 
     # 询问是否使用 GitHub 镜像加速
-    echo "请选择 GitHub 镜像加速地址 (默认启用 https://ghfast.top):"
-    echo "0) 不使用加速"
-    echo "1) https://ghfast.top (默认)"
-    echo "2) 自定义地址"
-    read -rp "请选择 (0-2, 默认为1): " answer
-    case "$answer" in
-        0)
-            USE_GITHUB_MIRROR=false
-            ;;
-        2)
-            read -rp "请输入 GitHub 镜像加速地址: " custom_mirror
-            if [ -n "$custom_mirror" ]; then
-                USE_GITHUB_MIRROR=true
-                GITHUB_MIRROR="$custom_mirror"
-            else
-                USE_GITHUB_MIRROR=false
-            fi
-            ;;
-        *)
-            USE_GITHUB_MIRROR=true
-            GITHUB_MIRROR="https://ghfast.top"
-            ;;
-    esac
+    ask_github_mirror
     
     # 询问 Landscape 安装路径
     while true; do
@@ -401,45 +329,7 @@ ask_user_config() {
                 ;;
             4)
                 # 只有当web server不是预装时才允许修改web server配置
-                if [ "$WEB_SERVER_PREINSTALLED" != true ]; then
-                    echo "Landscape Router 需要 web server 环境才能正常运行"
-                    echo "缺少 web server 可能会导致主机失联问题"
-                    echo ""
-                    echo "本脚本中 web server 环境 检测/安装 的功能未经验证"
-                    echo "建议自行处理后, 再执行安装脚本"
-                    echo ""
-                    echo "请选择要安装的 Web Server:"
-                    echo "1) 退出安装脚本, 自行处理 (推荐)(默认)"
-                    echo "2) Apache2"
-                    echo "3) Nginx"
-                    echo "4) Lighttpd"
-                    echo "5) 不安装 web server"
-                    read -rp "请选择 (1-5, 默认为 1): " webserver_choice
-                    case "$webserver_choice" in
-                        2)
-                            WEB_SERVER_INSTALLED=true
-                            WEB_SERVER_TYPE="apache2"
-                            ;;
-                        3)
-                            WEB_SERVER_INSTALLED=true
-                            WEB_SERVER_TYPE="nginx"
-                            ;;
-                        4)
-                            WEB_SERVER_INSTALLED=true
-                            WEB_SERVER_TYPE="lighttpd"
-                            ;;
-                        5)
-                            WEB_SERVER_INSTALLED=false
-                            WEB_SERVER_TYPE=""
-                            ;;
-                        *)
-                            log "用户选择退出安装"
-                            exit 1
-                            ;;
-                    esac
-                else
-                    echo "系统已预装 web server ($WEB_SERVER_TYPE)，无法修改此配置"
-                fi
+                ask_webserver
                 ;;
             5)
                 read -rp "是否安装 Docker(含compose)? (y/n): " answer
@@ -451,16 +341,7 @@ ask_user_config() {
                     
                     DOCKER_INSTALLED=true
                     
-                    echo "请选择 Docker 镜像源:"
-                    echo "1) 阿里云 (默认)"
-                    echo "2) Azure 中国云"
-                    echo "3) 官方源 (国外)"
-                    read -rp "请选择 (1-3, 默认为1): " answer
-                    case "$answer" in
-                        2) DOCKER_MIRROR="azure" ;;
-                        3) DOCKER_MIRROR="official" ;;
-                        *) DOCKER_MIRROR="aliyun" ;;
-                    esac
+                    ask_docker_mirror
                     
                     read -rp "是否为 Docker 开启 IPv6 支持? (y/n): " answer
                     if [[ ! "$answer" =~ ^[Nn]$ ]]; then
@@ -481,29 +362,7 @@ ask_user_config() {
                 fi
                 ;;
             7)
-                echo "请选择 GitHub 镜像加速地址 (默认启用 https://ghfast.top):"
-                echo "0) 不使用加速"
-                echo "1) https://ghfast.top (默认)"
-                echo "2) 自定义地址"
-                read -rp "请选择 (0-2, 默认为1): " answer
-                case "$answer" in
-                    0)
-                        USE_GITHUB_MIRROR=false
-                        ;;
-                    2)
-                        read -rp "请输入 GitHub 镜像加速地址: " custom_mirror
-                        if [ -n "$custom_mirror" ]; then
-                            USE_GITHUB_MIRROR=true
-                            GITHUB_MIRROR="$custom_mirror"
-                        else
-                            USE_GITHUB_MIRROR=false
-                        fi
-                        ;;
-                    *)
-                        USE_GITHUB_MIRROR=true
-                        GITHUB_MIRROR="https://ghfast.top"
-                        ;;
-                esac
+                ask_github_mirror
                 ;;
             8)
                 while true; do
@@ -554,54 +413,139 @@ ask_user_config() {
 
 ask_apt_mirror() { 
 
-# 询问是否换源 (仅对支持的系统进行询问)
-# 检查是否为支持换源的系统 (Debian, Ubuntu, Linux Mint, Armbian, Raspbian)
-if grep -q "Debian" /etc/os-release || grep -q "Ubuntu" /etc/os-release || grep -q "Linux Mint" /etc/os-release || grep -q "Armbian" /etc/os-release || grep -q "Raspbian" /etc/os-release || grep -q "Raspberry Pi OS" /etc/os-release; then
-    USE_CUSTOM_MIRROR=true
-    
-    # 询问使用哪个镜像源
-    echo "请选择要使用的镜像源:"
-    echo "0) 不换源"
-    echo "1) 阿里云（默认）"
-    echo "2) 清华大学"
-    echo "3) 上海交通大学"
-    echo "4) 浙江大学"
-    echo "5) 中国科学技术大学"
-    echo "6) 南京大学"
-    echo "7) 哈尔滨工业大学"
-    read -rp "请选择 (0-7, 默认为 1 阿里云 ): " answer
-    case "$answer" in
-        1|"") 
-            MIRROR_SOURCE="aliyun"
-            ;;
-        2) 
-            MIRROR_SOURCE="tsinghua"
-            ;;
-        3) 
-            MIRROR_SOURCE="sjtu"
-            ;;
-        4)
-            MIRROR_SOURCE="zju"
-            ;;
-        5)
-            MIRROR_SOURCE="ustc"
-            ;;
-        6)
-            MIRROR_SOURCE="nju"
-            ;;
-        7)
-            MIRROR_SOURCE="hit"
-            ;;
-        *)
-            USE_CUSTOM_MIRROR=false
-            ;;
-    esac
-else
-    echo "当前系统不支持自动换源功能"
-    echo "仅支持 Debian、Ubuntu、Linux Mint、Armbian 和 Raspbian 系统换源"
-fi
+    # 询问是否换源 (仅对支持的系统进行询问)
+    # 检查是否为支持换源的系统 (Debian, Ubuntu, Linux Mint, Armbian, Raspbian)
+    if grep -q "Debian" /etc/os-release || grep -q "Ubuntu" /etc/os-release || grep -q "Linux Mint" /etc/os-release || grep -q "Armbian" /etc/os-release || grep -q "Raspbian" /etc/os-release || grep -q "Raspberry Pi OS" /etc/os-release; then
+        USE_CUSTOM_MIRROR=true
+        
+        # 询问使用哪个镜像源
+        echo "请选择要使用的镜像源:"
+        echo "0) 不换源"
+        echo "1) 阿里云（默认）"
+        echo "2) 清华大学"
+        echo "3) 上海交通大学"
+        echo "4) 浙江大学"
+        echo "5) 中国科学技术大学"
+        echo "6) 南京大学"
+        echo "7) 哈尔滨工业大学"
+        read -rp "请选择 (0-7, 默认为 1 阿里云 ): " answer
+        case "$answer" in
+            1|"") 
+                MIRROR_SOURCE="aliyun"
+                ;;
+            2) 
+                MIRROR_SOURCE="tsinghua"
+                ;;
+            3) 
+                MIRROR_SOURCE="sjtu"
+                ;;
+            4)
+                MIRROR_SOURCE="zju"
+                ;;
+            5)
+                MIRROR_SOURCE="ustc"
+                ;;
+            6)
+                MIRROR_SOURCE="nju"
+                ;;
+            7)
+                MIRROR_SOURCE="hit"
+                ;;
+            *)
+                USE_CUSTOM_MIRROR=false
+                ;;
+        esac
+    else
+        echo "当前系统不支持自动换源功能"
+        echo "仅支持 Debian、Ubuntu、Linux Mint、Armbian 和 Raspbian 系统换源"
+    fi
 
 }
+
+ask_webserver() { 
+    # 只有当web server不是预装时才允许修改web server配置
+    if [ "$WEB_SERVER_PREINSTALLED" != true ]; then
+        echo "Landscape Router 需要 web server 环境才能正常运行"
+        echo "缺少 web server 可能会导致主机失联问题"
+        echo ""
+        echo "本脚本中 web server 环境 检测/安装 的功能未经验证"
+        echo "建议自行处理后, 再执行安装脚本"
+        echo ""
+        echo "请选择要安装的 Web Server:"
+        echo "1) 退出安装脚本, 自行处理 (推荐)(默认)"
+        echo "2) Apache2"
+        echo "3) Nginx"
+        echo "4) Lighttpd"
+        echo "5) 继续安装脚本，不安装 web server"
+        read -rp "请选择 (1-5, 默认为 1): " webserver_choice
+        case "$webserver_choice" in
+            2)
+                WEB_SERVER_INSTALLED=true
+                WEB_SERVER_TYPE="apache2"
+                ;;
+            3)
+                WEB_SERVER_INSTALLED=true
+                WEB_SERVER_TYPE="nginx"
+                ;;
+            4)
+                WEB_SERVER_INSTALLED=true
+                WEB_SERVER_TYPE="lighttpd"
+                ;;
+            5)
+                WEB_SERVER_INSTALLED=false
+                WEB_SERVER_TYPE=""
+                ;;
+            *)
+                log "用户选择退出安装"
+                exit 1
+                ;;
+        esac
+    else
+        echo "系统已预装 web server ($WEB_SERVER_TYPE)，无法修改此配置"
+    fi
+
+}
+
+ask_docker_mirror() {
+    echo "请选择 Docker 镜像源:"
+    echo "1) 阿里云 (默认)"
+    echo "2) Azure 中国云"
+    echo "3) 官方源 (国外)"
+    read -rp "请选择 (1-3, 默认为1): " answer
+    case "$answer" in
+        2) DOCKER_MIRROR="azure" ;;
+        3) DOCKER_MIRROR="official" ;;
+        *) DOCKER_MIRROR="aliyun" ;;
+    esac
+}
+
+ask_github_mirror() { 
+    echo "请选择 GitHub 镜像加速地址 (默认启用 https://ghfast.top):"
+    echo "0) 不使用加速"
+    echo "1) https://ghfast.top (默认)"
+    echo "2) 自定义地址"
+    read -rp "请选择 (0-2, 默认为1): " answer
+    case "$answer" in
+        0)
+            USE_GITHUB_MIRROR=false
+            ;;
+        2)
+            read -rp "请输入 GitHub 镜像加速地址: " custom_mirror
+            if [ -n "$custom_mirror" ]; then
+                USE_GITHUB_MIRROR=true
+                GITHUB_MIRROR="$custom_mirror"
+            else
+                USE_GITHUB_MIRROR=false
+            fi
+            ;;
+        *)
+            USE_GITHUB_MIRROR=true
+            GITHUB_MIRROR="https://ghfast.top"
+            ;;
+    esac
+}
+
+
 
 # 配置 LAN 网卡
 config_lan_interface() {
@@ -822,7 +766,8 @@ perform_installation() {
         else
             log "检测到系统已安装 $WEB_SERVER_TYPE，跳过安装"
         fi
-    elif [ "$WEB_SERVER_INSTALLED" = true ] && [ -z "$WEB_SERVER_TYPE" ]; then
+    # elif [ "$WEB_SERVER_INSTALLED" = true ] && [ -z "$WEB_SERVER_TYPE" ]; then
+    else
         log "用户选择不安装 web server, 跳过安装步骤"
     fi
     
@@ -1123,7 +1068,7 @@ install_docker() {
     fi
     
     local retry=0
-    local max_retry=1
+    local max_retry=3
     local user_choice=""
     
     while [ "$user_choice" != "n" ]; do
@@ -1173,16 +1118,7 @@ install_docker() {
                     ;;
                 "m")
                     # 重新选择镜像源
-                    echo "请选择 Docker 镜像源:"
-                    echo "1) 阿里云 (默认)"
-                    echo "2) Azure 中国云"
-                    echo "3) 官方源 (国外)"
-                    read -rp "请选择 (1-3, 默认为1): " mirror_choice
-                    case "$mirror_choice" in
-                        2) DOCKER_MIRROR="azure" ;;
-                        3) DOCKER_MIRROR="official" ;;
-                        *) DOCKER_MIRROR="aliyun" ;;
-                    esac
+                    ask_docker_mirror
                     user_choice="y"  # 重置选择以便继续循环
                     retry=0  # 重置重试计数
                     ;;
@@ -1225,44 +1161,6 @@ EOF
     systemctl restart docker
     
     log "Docker 配置完成"
-}
-
-# 处理 GitHub 镜像加速选择的通用函数
-handle_github_mirror_choice() {
-    local binary_name="$1"  # 传入正在下载的文件名
-    log "用户选择使用 GitHub 镜像加速"
-    if [ "$USE_GITHUB_MIRROR" = false ]; then
-        echo "请选择 GitHub 镜像加速地址:"
-        echo "1) https://ghfast.top"
-        echo "2) 自定义地址"
-        echo "3) 取消并再次尝试3次"
-        read -rp "请选择 (1-3): " mirror_choice
-        
-        case "$mirror_choice" in
-            1)
-                USE_GITHUB_MIRROR=true
-                GITHUB_MIRROR="https://ghfast.top"
-                echo "1"  # 表示选择了镜像1
-                ;;
-            2)
-                read -rp "请输入 GitHub 镜像加速地址: " custom_mirror
-                if [ -n "$custom_mirror" ]; then
-                    USE_GITHUB_MIRROR=true
-                    GITHUB_MIRROR="$custom_mirror"
-                    echo "2"  # 表示选择了自定义镜像
-                else
-                    echo "输入的镜像地址为空，取消使用镜像加速"
-                    echo "3"  # 表示取消操作
-                fi
-                ;;
-            *)
-                echo "3"  # 表示取消操作
-                ;;
-        esac
-    else
-        echo "当前已配置 GitHub 镜像加速，无法进一步优化"
-        echo "y"  # 继续重试
-    fi
 }
 
 # 独立的 apt update 函数
@@ -1448,26 +1346,14 @@ install_landscape_router() {
             
             # 如果用户选择使用 GitHub 镜像加速
             if [ "$user_choice" = "m" ]; then
-                local mirror_result=""
-                mirror_result=$(handle_github_mirror_choice "$binary_filename")
+                ask_github_mirror
                 
-                case "$mirror_result" in
-                    "1")
-                        # 更新下载 URL
-                        binary_url="$GITHUB_MIRROR/https://github.com/ThisSeanZhang/landscape/releases/latest/download/$binary_filename"
-                        user_choice="y"  # 重置选择以便继续循环
-                        retry=0  # 重置重试计数
-                        ;;
-                    "2")
-                        # 更新下载 URL
-                        binary_url="$GITHUB_MIRROR/https://github.com/ThisSeanZhang/landscape/releases/latest/download/$binary_filename"
-                        user_choice="y"  # 重置选择以便继续循环
-                        retry=0  # 重置重试计数
-                        ;;
-                    *)
-                        user_choice="y"
-                        ;;
-                esac
+                if [ "$USE_GITHUB_MIRROR" = true ]; then
+                    # 更新下载 URL
+                    binary_url="$GITHUB_MIRROR/https://github.com/ThisSeanZhang/landscape/releases/latest/download/$binary_filename"
+                    user_choice="y"  # 重置选择以便继续循环
+                    retry=0  # 重置重试计数
+                fi
             fi
         else
             # 下载成功则跳出循环
@@ -1529,26 +1415,14 @@ install_landscape_router() {
             
             # 如果用户选择使用 GitHub 镜像加速
             if [ "$user_choice" = "m" ]; then
-                local mirror_result=""
-                mirror_result=$(handle_github_mirror_choice "static.zip")
+                ask_github_mirror
                 
-                case "$mirror_result" in
-                    "1")
-                        # 更新下载 URL
-                        static_url="$GITHUB_MIRROR/https://github.com/ThisSeanZhang/landscape/releases/latest/download/static.zip"
-                        user_choice="y"  # 重置选择以便继续循环
-                        retry=0  # 重置重试计数
-                        ;;
-                    "2")
-                        # 更新下载 URL
-                        static_url="$GITHUB_MIRROR/https://github.com/ThisSeanZhang/landscape/releases/latest/download/static.zip"
-                        user_choice="y"  # 重置选择以便继续循环
-                        retry=0  # 重置重试计数
-                        ;;
-                    *)
-                        user_choice="y"
-                        ;;
-                esac
+                if [ "$USE_GITHUB_MIRROR" = true ]; then
+                    # 更新下载 URL
+                    static_url="$GITHUB_MIRROR/https://github.com/ThisSeanZhang/landscape/releases/latest/download/static.zip"
+                    user_choice="y"  # 重置选择以便继续循环
+                    retry=0  # 重置重试计数
+                fi
             fi
         else
             # 下载成功则跳出循环
@@ -1791,6 +1665,7 @@ create_landscape_toml() {
     
     mkdir -p "$LANDSCAPE_DIR/etc/landscape"
     
+    # 不在日志中记录密码内容
     cat > "$LANDSCAPE_DIR/etc/landscape/landscape.toml" << EOF
 [auth]
 # 管理员账号、密码
