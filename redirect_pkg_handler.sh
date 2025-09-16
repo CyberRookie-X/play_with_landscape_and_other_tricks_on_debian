@@ -23,7 +23,7 @@
 # 4、对于 alpine，没有 libelf 和 libgcc 支持
 # 4.1 确定 是否处于 无法访问 alpine 官方源 的地区。通过 环境变量 REDIRECT_PKG_HANDLER_WRAPPER_REGION 或 本机 IP 归属地查询，确定 是否处于 无法访问 alpine 官方源 的地区
 # 4.2 对于 alpine 源不可用的 国家/地区，如中国，进行换源操作 
-# 4.3 采用 环境变量 REDIRECT_PKG_HANDLER_WRAPPER_MIRROR 给出的源 或者 从 中科大/清华/阿里/腾讯/华为 中随机选一个 能成功 apk update 的源
+# 4.3 采用 环境变量 REDIRECT_PKG_HANDLER_WRAPPER_MIRROR 给出的源 或者 从 中科大/清华/阿里/腾讯/华为/上交大/浙大/华科大/南大/哈工大 中随机选一个 能成功 apk update 的源
 # 4.4 安装 libelf 和 libgcc，配置防火墙，启动 redirect_pkg_handler ，等待 0.2 s，最后执行原始镜像的 ENTRYPOINT 和 CMD
 
 
