@@ -23,6 +23,7 @@ AUTO_REBOOT=false
 ACTION="stable"  # 默认动作
 SYSTEM_ARCH=""
 INIT_SYSTEM=""
+USE_MUSL=false
 
 # ========== 主函数 ==========
 
@@ -63,6 +64,11 @@ check_system_environment() {
   if [ "$SYSTEM_ARCH" != "x86_64" ] && [ "$SYSTEM_ARCH" != "aarch64" ]; then
     printf "不支持的系统架构: %s\n" "$SYSTEM_ARCH"
     exit 1
+  fi
+
+  # 检查是否使用 musl libc
+  if ldd --version 2>&1 | grep -q musl; then
+    USE_MUSL=true
   fi
 
   # 检查系统使用的初始化系统 (systemd 或 OpenRC)
@@ -154,11 +160,17 @@ show_help() {
   echo "  ./upgrade_landscape.sh stable       # 升级到最新稳定版"
   echo "  ./upgrade_landscape.sh beta         # 升级到最新 Beta 版"
   echo "  ./upgrade_landscape.sh stable cn    # 使用中国镜像升级到最新稳定版"
-  echo "  ./upgrade_landscape.sh stable reboot# 升级到最新稳定版并自动重启"
+  echo "  ./upgrade_landscape.sh stable reboot # 升级到最新稳定版并自动重启"
   echo "  ./upgrade_landscape.sh stable cn reboot  # 使用中国镜像升级到最新稳定版并自动重启"
   echo "  ./upgrade_landscape.sh -h           # 显示帮助信息"
   echo ""
   echo "当前系统初始化系统: $INIT_SYSTEM"
+  echo "当前系统架构: $SYSTEM_ARCH"
+  if [ "$USE_MUSL" = true ]; then
+    echo "系统类型: musl"
+  else
+    echo "系统类型: glibc"
+  fi
 }
 
 # 获取 Landscape Router 安装路径
@@ -192,8 +204,14 @@ get_landscape_dir() {
 check_landscape_installed() {
   local landscape_dir="$1"
   local system_arch="$2"
+  local use_musl="$3"
   
-  if [ ! -f "$landscape_dir/landscape-webserver-$system_arch" ]; then
+  local filename="landscape-webserver-$system_arch"
+  if [ "$use_musl" = true ] && [ "$system_arch" = "x86_64" ]; then
+    filename="landscape-webserver-x86_64-musl"
+  fi
+  
+  if [ ! -f "$landscape_dir/$filename" ]; then
     printf "错误: 未检测到已安装的 Landscape Router\n" >&2
     return 1
   fi
@@ -204,11 +222,14 @@ check_landscape_installed() {
 get_download_info() {
   local version_type="$1"
   local system_arch="$2"
+  local use_musl="$3"
   
   local download_url=""
   local filename=""
   
-  if [ "$system_arch" = "aarch64" ]; then
+  if [ "$use_musl" = true ] && [ "$system_arch" = "x86_64" ]; then
+    filename="landscape-webserver-x86_64-musl"
+  elif [ "$system_arch" = "aarch64" ]; then
     filename="landscape-webserver-aarch64"
   else
     filename="landscape-webserver-x86_64"
@@ -335,6 +356,7 @@ download_with_retry() {
   local output_file="$2"
   local max_retries=5
   local retry_count=0
+  local download_tool=""
   
   # 检查是否有wget或curl
   if command -v wget >/dev/null 2>&1; then
@@ -392,18 +414,23 @@ upgrade_landscape_version() {
   landscape_dir=$(get_landscape_dir) || exit 1
   
   # 检查是否已安装
-  check_landscape_installed "$landscape_dir" "$SYSTEM_ARCH" || exit 1
+  check_landscape_installed "$landscape_dir" "$SYSTEM_ARCH" "$USE_MUSL" || exit 1
   
   # 获取当前版本信息（仅适用于stable版本）
   local current_version=""
-  if [ "$version_type" = "stable" ] && [ -f "$landscape_dir/landscape-webserver-$SYSTEM_ARCH" ]; then
-    current_version=$("$landscape_dir/landscape-webserver-$SYSTEM_ARCH" --version 2>/dev/null)
+  local current_filename="landscape-webserver-$SYSTEM_ARCH"
+  if [ "$USE_MUSL" = true ] && [ "$SYSTEM_ARCH" = "x86_64" ]; then
+    current_filename="landscape-webserver-x86_64-musl"
+  fi
+  
+  if [ "$version_type" = "stable" ] && [ -f "$landscape_dir/$current_filename" ]; then
+    current_version=$("$landscape_dir/$current_filename" --version 2>/dev/null)
     printf "当前版本: %s\n" "$current_version"
   fi
   
   # 获取下载信息
   local download_info
-  download_info=$(get_download_info "$version_type" "$SYSTEM_ARCH")
+  download_info=$(get_download_info "$version_type" "$SYSTEM_ARCH" "$USE_MUSL")
   local download_url=$(echo "$download_info" | cut -d'|' -f1)
   local filename=$(echo "$download_info" | cut -d'|' -f2)
   
@@ -411,11 +438,21 @@ upgrade_landscape_version() {
   local static_download_url
   static_download_url=$(get_static_download_url "$version_type")
   
-  # 下载文件
-  local temp_dir=$(mktemp -d)
+  # 创建临时目录
+  local temp_dir
+  temp_dir=$(mktemp -d) || {
+    printf "错误: 无法创建临时目录\n" >&2
+    exit 1
+  }
+  
   printf "下载文件到临时目录: %s\n" "$temp_dir"
-  if ! download_with_retry "$download_url" "$temp_dir/$filename.new"; then
-    printf "%s\n" "下载失败"
+  
+  # 确保下载目录存在
+  mkdir -p "$temp_dir"
+  
+  # 下载可执行文件
+  if ! download_with_retry "$download_url" "$temp_dir/$filename"; then
+    printf "%s\n" "可执行文件下载失败"
     rm -rf "$temp_dir"
     exit 1
   fi
@@ -423,11 +460,11 @@ upgrade_landscape_version() {
   # 对于稳定版，检查是否降级
   if [ "$version_type" = "stable" ]; then
     # 为新下载的文件添加执行权限以获取版本信息
-    chmod +x "$temp_dir/$filename.new"
+    chmod +x "$temp_dir/$filename"
     
     # 获取新版本信息
     local new_version=""
-    new_version=$("$temp_dir/$filename.new" --version 2>/dev/null)
+    new_version=$("$temp_dir/$filename" --version 2>/dev/null)
     printf "最新版本: %s\n" "$new_version"
     
     # 比较版本，如果新版本小于等于当前版本，则不升级
@@ -478,17 +515,36 @@ upgrade_landscape_version() {
   printf "%s\n" "下载完成，正在停止 Landscape Router 服务..."
   control_landscape_service "stop"
   
+  # 设置下载文件的执行权限
+  chmod +x "$temp_dir/$filename"
+  
+  # 备份旧文件
+  local backup_file="$landscape_dir/$filename.bak"
+  if [ -f "$landscape_dir/$filename" ]; then
+    if ! mv "$landscape_dir/$filename" "$backup_file"; then
+      printf "%s\n" "文件备份失败"
+      control_landscape_service "start"
+      rm -rf "$temp_dir"
+      exit 1
+    fi
+  fi
+  
   # 替换可执行文件
-  if ! mv "$temp_dir/$filename.new" "$landscape_dir/$filename"; then
+  if ! mv "$temp_dir/$filename" "$landscape_dir/$filename"; then
     printf "%s\n" "文件替换失败"
-    # 尝试重启服务
+    # 尝试恢复备份
+    if [ -f "$backup_file" ]; then
+      mv "$backup_file" "$landscape_dir/$filename"
+    fi
     control_landscape_service "start"
     rm -rf "$temp_dir"
     exit 1
   fi
-
-  # 设置可执行文件权限
-  chmod 755 "$landscape_dir/landscape-webserver-$SYSTEM_ARCH"
+  
+  # 删除备份文件
+  if [ -f "$backup_file" ]; then
+    rm -f "$backup_file"
+  fi
   
   # 替换静态文件目录
   printf "%s\n" "正在更新 UI 静态文件..."
