@@ -6,7 +6,7 @@
 
 **本教程已适配中国大陆网络** 
 
-## 脚本安装 Landscape Router [链接](/docs/1-安装升级指南.md/#安装-landscape-router脚本方式)
+# 脚本安装 Landscape Router [链接](/docs/1-安装升级指南.md/#安装-landscape-router脚本方式)
 
 ## 核心特性
 * 分流控制（SIP-CIDR、QoS(dscp)、DIP、域名、Geo 匹配规则）
