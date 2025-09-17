@@ -233,15 +233,16 @@ docker run -d \
   --cap-add=BPF \
   --cap-add=PERFMON \
   --privileged \
-  --entrypoint /landscape/redirect_pkg_handler.sh /original/entrypoint original cmd args \ # 覆盖 原始 Entrypoint
-  -p 外部端口:内部端口 \
-  # -e REDIRECT_PKG_HANDLER_WRAPPER_REGION=cn \ # 为 alipne 容器 更换随机中国源
+  --entrypoint /landscape/redirect_pkg_handler.sh \ # 包装脚本
+  # -p 外部端口:内部端口 \
+  -e REDIRECT_PKG_HANDLER_WRAPPER_REGION=cn \ # 为 alipne 容器 更换随机中国源
   # -e REDIRECT_PKG_HANDLER_WRAPPER_MIRROR=mirrors.nwafu.edu.cn \ # 为 alipne 容器 更换指定源
   -v /home/worker_program-1/config:/config \ # 挂载配置文件目录
   -v /root/.landscape-router/redirect_pkg_handler-x86_64-musl:/landscape/redirect_pkg_handler-x86_64-musl \ # 挂载handler 
   -v /root/.landscape-router/redirect_pkg_handler.sh:/landscape/redirect_pkg_handler.sh \ # 挂载包装脚本
   -v /root/.landscape-router/unix_link/:/ld_unix_link/ \ # 必要映射
-  some-image:latest # 修改成你需要的镜像
+  some-image:latest \# 修改成你需要的镜像
+  /original/entrypoint original cmd args # 原 entrypoint 和 CMD
 ```
 ## compose 部署 多个 容器
 ```yaml
@@ -278,8 +279,8 @@ services:
     networks:
       worker_program-br:
         ipv4_address: 172.100.0.1
-    # encironment:
-    #   - REDIRECT_PKG_HANDLER_WRAPPER_REGION=cn \ # 为 alipne 容器换源，从 中科大/清华/阿里/网易 中随机选一个
+    encironment:
+      - REDIRECT_PKG_HANDLER_WRAPPER_REGION=cn \ # 为 alipne 容器换源，从 中科大/清华/阿里/网易 中随机选一个
     #   - REDIRECT_PKG_HANDLER_WRAPPER_MIRROR=mirrors.nwafu.edu.cn \ # 为 alipne 容器更换指定源，如西北林业大学源
     entrypoint: ["/landscape/redirect_pkg_handler.sh", "/original/entrypoint", "original", "cmd", "args"] # 覆盖 原始 Entrypoint
     volumes:
@@ -309,8 +310,8 @@ services:
     networks:
       worker_program-br:
         ipv4_address: 172.100.0.2
-    # encironment:
-    #   - REDIRECT_PKG_HANDLER_WRAPPER_REGION=cn \ 为 alipne 容器换源，从 中科大/清华/阿里/网易 中随机选一个
+    encironment:
+      - REDIRECT_PKG_HANDLER_WRAPPER_REGION=cn \ 为 alipne 容器换源，从 中科大/清华/阿里/网易 中随机选一个
     #   - REDIRECT_PKG_HANDLER_WRAPPER_MIRROR=mirrors.nwafu.edu.cn \ # 为 alipne 容器更换指定源，如西北林业大学源
     entrypoint: ["/landscape/redirect_pkg_handler.sh", "/original/entrypoint", "original", "cmd", "args"] # 覆盖 原始 Entrypoint
     volumes:
@@ -496,5 +497,3 @@ services:
       - /root/.landscape-router/unix_link/:/ld_unix_link/:ro # 必要映射
       - /home/worker_program/worker_program-2/:/app/server/
       # /home/worker_program/worker_program-2/ 目录下有 run.sh 启动脚本，config 配置文件，worker_program-2 二进制文件
-
-```
