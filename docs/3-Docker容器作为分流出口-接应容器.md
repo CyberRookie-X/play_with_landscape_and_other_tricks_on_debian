@@ -182,7 +182,8 @@ ghcr.nju.edu.cn
 填入非 CN/cn 值时，跳过 IP 归属地检测 和 换源; 填入 CN/cn 会跳过 IP 归属地检测，从 中科大/清华/阿里/腾讯/华为/上交大/浙大/华科大/南大/哈工大 中随机选取一个可以成功 update 的源
 2. REDIRECT_PKG_HANDLER_WRAPPER_MIRROR   
 填入 alpine 镜像源地址，如 西北农林大学镜像源  REDIRECT_PKG_HANDLER_WRAPPER_MIRROR=mirrors.nwafu.edu.cn
-
+3. ORIGINAL_ENTRYPOINT_CMD
+用于传入镜像原始的 entrypoint 或 CMD，当这个环境变量不为空时会被采用 ORIGINAL_ENTRYPOINT_CMD=/docker-entrypoint.sh nginx -g daemon off
 
 
 ## 获取容器镜像的 ENTRYPOINT、CMD
@@ -210,13 +211,16 @@ docker inspect --format='Entrypoint: {{.Config.Entrypoint}} Cmd: {{.Config.Cmd}}
 docker inspect --format='Entrypoint: {{.Config.Entrypoint}} Cmd: {{.Config.Cmd}}' gdy666/lucky
 
 ```
-下图是回显 
-
-![](/images/20.png)
+下面是回显 
+```shell
+root@debian:~# docker inspect --format='Entrypoint: {{.Config.Entrypoint}} Cmd: {{.Config.Cmd}}' gdy666/lucky
+Entrypoint: [/app/lucky] Cmd: [-c /goodluck/lucky.conf -runInDocker]
+```
 
 ```docker
 # docker run 中的 entrypoint
---entrypoint /landscape/redirect_pkg_handler.sh /app/lucky -c /goodluck/lucky.conf -runInDocker \
+--entrypoint /landscape/redirect_pkg_handler.sh \
+-e ORIGINAL_ENTRYPOINT_CMD=/docker-entrypoint.sh nginx -g daemon off \
 ```
 ```yaml
 # dompose 中的 entrypoint
@@ -227,22 +231,22 @@ entrypoint: ["/landscape/redirect_pkg_handler.sh", "/app/lucky", "-c", "/goodluc
 
 ```docker
 docker run -d \
-  --name worker_program-1 \
+  --name test-1 \
   --sysctl net.ipv4.conf.lo.accept_local=1 \
   --cap-add=NET_ADMIN \
   --cap-add=BPF \
   --cap-add=PERFMON \
   --privileged \
-  --entrypoint /landscape/redirect_pkg_handler.sh \ # 包装脚本
-  # -p 外部端口:内部端口 \
-  -e REDIRECT_PKG_HANDLER_WRAPPER_REGION=cn \ # 为 alipne 容器 更换随机中国源
-  # -e REDIRECT_PKG_HANDLER_WRAPPER_MIRROR=mirrors.nwafu.edu.cn \ # 为 alipne 容器 更换指定源
-  -v /home/worker_program-1/config:/config \ # 挂载配置文件目录
-  -v /root/.landscape-router/redirect_pkg_handler-x86_64-musl:/landscape/redirect_pkg_handler-x86_64-musl \ # 挂载handler 
-  -v /root/.landscape-router/redirect_pkg_handler.sh:/landscape/redirect_pkg_handler.sh \ # 挂载包装脚本
-  -v /root/.landscape-router/unix_link/:/ld_unix_link/ \ # 必要映射
-  some-image:latest \# 修改成你需要的镜像
-  /original/entrypoint original cmd args # 原 entrypoint 和 CMD
+  --entrypoint /landscape/redirect_pkg_handler.sh \
+  -p 外部端口:内部端口 \
+  -e REDIRECT_PKG_HANDLER_WRAPPER_REGION=cn \
+  -e REDIRECT_PKG_HANDLER_WRAPPER_MIRROR=mirrors.nwafu.edu.cn \
+  -v /home/worker_program-1/config:/config \
+  -v /root/.landscape-router/redirect_pkg_handler-x86_64-musl:/landscape/redirect_pkg_handler-x86_64-musl \
+  -v /root/.landscape-router/redirect_pkg_handler.sh:/landscape/redirect_pkg_handler.sh \
+  -v /root/.landscape-router/unix_link/:/ld_unix_link/ \
+  some-image:latest \
+  /original/entrypoint original cmd args
 ```
 ## compose 部署 多个 容器
 ```yaml

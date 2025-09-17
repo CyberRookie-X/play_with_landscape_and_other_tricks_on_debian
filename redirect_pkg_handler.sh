@@ -14,6 +14,8 @@
 # 填入非 CN/cn 值时，跳过 IP 归属地检测 和 换源; 填入 CN/cn 会跳过 IP 归属地检测，从中科大/清华/阿里/腾讯/华为 中随机选取一个可以成功 update 的源
 # 2. REDIRECT_PKG_HANDLER_WRAPPER_MIRROR   
 # 填入 alpine 镜像源地址，如 西北农林大学镜像源  REDIRECT_PKG_HANDLER_WRAPPER_MIRROR=mirrors.nwafu.edu.cn
+# 3. ORIGINAL_ENTRYPOINT_CMD
+# 用于传入镜像原始的 entrypoint 或 CMD，当这个环境变量不为空时会被采用 ORIGINAL_ENTRYPOINT_CMD=/docker-entrypoint.sh nginx -g daemon off;  # 原始镜像的 ENTRYPOINT 和 CMD
 
 
 # 脚本逻辑说明
@@ -58,6 +60,17 @@
 #       - "-g"                     # 原始镜像的 CMD 参数
 #       - "daemon off;"            # 原始镜像的 CMD 参数
 
+# 示例3（使用 ORIGINAL_ENTRYPOINT_CMD 环境变量）
+# version: '3.8'
+# services:
+#   my-service:
+#     image: some-image:latest
+#     environment:
+#       - ORIGINAL_ENTRYPOINT_CMD=/docker-entrypoint.sh nginx -g daemon off;  # 原始镜像的 ENTRYPOINT 和 CMD
+#     entrypoint: ["/landscape/redirect_pkg_handler.sh"]
+#     # 其他配置...
+
+
 
 # TODO
 # 1. 多容器时，丛书容器 如何保证本地 apk 与 最新 镜像兼容问题。通过 apk update 获取最新 apk 列表，然后对比 apk 列表，如果本地 apk 不是最新版，等待 主容器拉取最新版 apk
@@ -66,7 +79,12 @@
 # ==================== 全局变量定义 ====================
 
 # 保存原始的ENTRYPOINT和CMD
-ORIGINAL_ENTRYPOINT_CMD="$@"
+# 如果环境变量 ORIGINAL_ENTRYPOINT_CMD 不为空，则使用环境变量的值
+if [ -n "$ORIGINAL_ENTRYPOINT_CMD" ]; then
+    ORIGINAL_ENTRYPOINT_CMD="$ORIGINAL_ENTRYPOINT_CMD"
+else
+    ORIGINAL_ENTRYPOINT_CMD="$@"
+fi
 
 # 获取CPU架构
 ARCH=$(uname -m)
