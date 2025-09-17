@@ -1261,8 +1261,8 @@ create_landscape_dir() {
     log "创建 Landscape Router 目录: $LANDSCAPE_DIR"
     mkdir -p "$LANDSCAPE_DIR"
     
-    # 在 Landscape 目录下创建 script-log 目录
-    mkdir -p "$LANDSCAPE_DIR/script-log"
+    # 在 Landscape 目录下创建 script_log 目录
+    mkdir -p "$LANDSCAPE_DIR/script_log"
     
     # 将临时日志移动到 Landscape 目录下
     if [ -f "$INSTALL_LOG" ]; then
@@ -1270,13 +1270,13 @@ create_landscape_dir() {
         log_filename=$(basename "$INSTALL_LOG")
         
         # 先尝试直接移动日志文件
-        if ! mv "$INSTALL_LOG" "$LANDSCAPE_DIR/script-log/$log_filename" 2>/dev/null; then
+        if ! mv "$INSTALL_LOG" "$LANDSCAPE_DIR/script_log/$log_filename" 2>/dev/null; then
             # 如果直接移动失败, 尝试复制并清理原文件
-            cp "$INSTALL_LOG" "$LANDSCAPE_DIR/script-log/$log_filename" && rm -f "$INSTALL_LOG"
+            cp "$INSTALL_LOG" "$LANDSCAPE_DIR/script_log/$log_filename" && rm -f "$INSTALL_LOG"
         fi
         
         # 更新日志文件路径
-        INSTALL_LOG="$LANDSCAPE_DIR/script-log/$log_filename"
+        INSTALL_LOG="$LANDSCAPE_DIR/script_log/$log_filename"
         log "日志路径已更新到: $INSTALL_LOG"
     fi
     
