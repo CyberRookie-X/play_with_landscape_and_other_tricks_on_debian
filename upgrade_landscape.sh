@@ -1847,6 +1847,9 @@ perform_file_replacement() {
   
   # 替换redirect_pkg_handler相关文件
   replace_redirect_pkg_handler_files "$landscape_dir" "$temp_dir"
+  
+  # 将当前脚本复制到Landscape安装目录
+  copy_script_to_landscape_dir "$landscape_dir"
 }
 
 # 备份并替换可执行文件
@@ -2025,6 +2028,25 @@ replace_redirect_pkg_handler_x86_64_musl() {
       chmod +x "$landscape_dir/redirect_pkg_handler-x86_64-musl"
     fi
   fi
+}
+
+# 将当前脚本复制到Landscape安装目录
+copy_script_to_landscape_dir() {
+  local landscape_dir="$1"
+  local script_name=$(basename "$0")
+  
+  log "正在将 $script_name 复制到 $landscape_dir 目录..."
+  
+  # 复制当前脚本到Landscape安装目录
+  if cp "$0" "$landscape_dir/$script_name"; then
+    # 设置执行权限
+    chmod +x "$landscape_dir/$script_name"
+    log "成功将 $script_name 复制到 $landscape_dir 目录"
+  else
+    log "警告: 无法将 $script_name 复制到 $landscape_dir 目录"
+  fi
+}
+
 }
 
 # 替换redirect_pkg_handler aarch64版本
