@@ -229,6 +229,25 @@ entrypoint: ["/landscape/redirect_pkg_handler.sh", "/app/lucky", "-c", "/goodluc
 
 ## Docker 部署 单个 容器
 
+
+```shell
+worker_program-1
+/landscape/redirect_pkg_handler.sh
+REDIRECT_PKG_HANDLER_WRAPPER_REGION
+cn
+ORIGINAL_ENTRYPOINT_CMD
+/original/entrypoint original cmd args
+/home/worker_program-1/config
+/config
+/root/.landscape-router/redirect_pkg_handler-x86_64-musl
+/landscape/redirect_pkg_handler-x86_64-musl
+/root/.landscape-router/redirect_pkg_handler.sh
+/landscape/redirect_pkg_handler.sh
+/root/.landscape-router/unix_link/
+/ld_unix_link/
+```
+![](/images/21.png)
+
 ```docker
 docker run -d \
   --name test-1 \
