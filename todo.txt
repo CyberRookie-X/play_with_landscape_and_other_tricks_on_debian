@@ -31,7 +31,9 @@ docker 安装脚本使用了 curl ，免不了要安装 curl，所以 还是使�
 upgrade_landsacpe.sh
 
 A 高
-完善镜像加速？
+
+可能使用不同的命名方式
+gitee 完善镜像加速？
 
 
 B 低
