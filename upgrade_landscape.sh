@@ -492,41 +492,6 @@ control_landscape_service() {
   esac
 }
 
-# 控制Docker服务的函数
-control_docker_service() {
-  local action="$1"
-  case "$action" in
-    "start")
-      log "正在启动 Docker 服务..."
-      if [ "$INIT_SYSTEM" = "systemd" ]; then
-        systemctl start docker
-      else
-        rc-service docker start
-      fi
-      ;;
-    "stop")
-      log "正在停止 Docker 服务..."
-      if [ "$INIT_SYSTEM" = "systemd" ]; then
-        systemctl stop docker
-      else
-        rc-service docker stop
-      fi
-      ;;
-    "restart")
-      log "正在重启 Docker 服务..."
-      if [ "$INIT_SYSTEM" = "systemd" ]; then
-        systemctl restart docker
-      else
-        rc-service docker restart
-      fi
-      ;;
-    *)
-      log "未知的 Docker 服务操作: $action"
-      return 1
-      ;;
-  esac
-}
-
 # ========== 下载和URL处理函数 ==========
 
 # 获取下载URL和文件名
@@ -957,8 +922,33 @@ download_from_github_actions() {
         fi
       done
       ;;
-    "redirect_pkg_handler-"*)
-      for possible_name in "redirect_pkg_handler-x86_64" "redirect-x86_64" "handler-x86_64" "redirect_pkg_handler-x86_64-musl" "redirect-x86_64-musl" "handler-x86_64-musl" "redirect_pkg_handler-aarch64" "redirect-aarch64" "handler-aarch64" "redirect_pkg_handler-aarch64-musl" "redirect-aarch64-musl" "handler-aarch64-musl"; do
+    # 修复redirect_pkg_handler二进制文件的匹配逻辑
+    "redirect_pkg_handler-x86_64")
+      for possible_name in "redirect_pkg_handler-x86_64" "redirect-x86_64" "handler-x86_64"; do
+        if echo "$artifacts_response" | grep -q "\"name\": *\"$possible_name\""; then
+          final_artifact_name="$possible_name"
+          break
+        fi
+      done
+      ;;
+    "redirect_pkg_handler-x86_64-musl")
+      for possible_name in "redirect_pkg_handler-x86_64-musl" "redirect-x86_64-musl" "handler-x86_64-musl"; do
+        if echo "$artifacts_response" | grep -q "\"name\": *\"$possible_name\""; then
+          final_artifact_name="$possible_name"
+          break
+        fi
+      done
+      ;;
+    "redirect_pkg_handler-aarch64")
+      for possible_name in "redirect_pkg_handler-aarch64" "redirect-aarch64" "handler-aarch64"; do
+        if echo "$artifacts_response" | grep -q "\"name\": *\"$possible_name\""; then
+          final_artifact_name="$possible_name"
+          break
+        fi
+      done
+      ;;
+    "redirect_pkg_handler-aarch64-musl")
+      for possible_name in "redirect_pkg_handler-aarch64-musl" "redirect-aarch64-musl" "handler-aarch64-musl"; do
         if echo "$artifacts_response" | grep -q "\"name\": *\"$possible_name\""; then
           final_artifact_name="$possible_name"
           break
@@ -1733,20 +1723,6 @@ replace_files_with_rollback() {
       local target_path=$(echo "$task" | cut -d':' -f2)
       local source_path=$(echo "$task" | cut -d':' -f3)
       
-      # 检查是否是需要停止docker的文件类型
-      local need_stop_docker=false
-      if [[ "$file_type" == "binary_x86_64_musl" ]] || [[ "$file_type" == "binary_x86_64" ]] || [[ "$file_type" == "binary_aarch64" ]] || [[ "$file_type" == "binary_aarch64_musl" ]]; then
-        need_stop_docker=true
-      fi
-      
-      # 如果需要停止docker且docker正在运行，则停止docker
-      if [ "$need_stop_docker" = true ]; then
-        if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet docker 2>/dev/null; then
-          log "正在停止 Docker 服务以替换 $file_type..."
-          control_docker_service "stop"
-          log "Docker 服务已停止"
-        fi
-      fi
       
       # 单个文件重试机制
       local file_retry_count=0
@@ -1832,22 +1808,6 @@ replace_files_with_rollback() {
       log "所有文件替换成功"
       # 清理备份文件
       rm -rf "$backup_temp_dir"
-      
-      # 如果之前停止了docker服务，且没有指定自动重启，则启动docker和landscape服务
-      local docker_was_stopped=false
-      for task in "${replace_tasks[@]}"; do
-        local file_type=$(echo "$task" | cut -d':' -f1)
-        if [[ "$file_type" == "binary_x86_64_musl" ]] || [[ "$file_type" == "binary_x86_64" ]] || [[ "$file_type" == "binary_aarch64" ]] || [[ "$file_type" == "binary_aarch64_musl" ]]; then
-          docker_was_stopped=true
-          break
-        fi
-      done
-      
-      if [ "$docker_was_stopped" = true ] && [ "$AUTO_REBOOT" != true ]; then
-        log "正在启动 Docker 服务..."
-        control_docker_service "start"
-        log "Docker 服务已启动"
-      fi
       
       return 0
     else
