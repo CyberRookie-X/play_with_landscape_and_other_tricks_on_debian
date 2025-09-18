@@ -1147,15 +1147,15 @@ create_backup() {
   if command -v gzip >/dev/null 2>&1; then
     backup_file="$backup_dir/${backup_name}.tar.gz"
     log "使用压缩工具: gzip"
-    (cd "$temp_dir" && tar -cf - . | gzip -c > "$backup_file")
+    (cd "$temp_dir" && tar -cf "${backup_name}.tar" . && gzip -c "${backup_name}.tar" > "$backup_file" && rm -f "${backup_name}.tar")
   elif command -v bzip2 >/dev/null 2>&1; then
     backup_file="$backup_dir/${backup_name}.tar.bz2"
     log "使用压缩工具: bzip2"
-    (cd "$temp_dir" && tar -cf - . | bzip2 -c > "$backup_file")
+    (cd "$temp_dir" && tar -cf "${backup_name}.tar" . && bzip2 -c "${backup_name}.tar" > "$backup_file" && rm -f "${backup_name}.tar")
   elif command -v xz >/dev/null 2>&1; then
     backup_file="$backup_dir/${backup_name}.tar.xz"
     log "使用压缩工具: xz"
-    (cd "$temp_dir" && tar -cf - . | xz -c > "$backup_file")
+    (cd "$temp_dir" && tar -cf "${backup_name}.tar" . && xz -c "${backup_name}.tar" > "$backup_file" && rm -f "${backup_name}.tar")
   elif command -v zip >/dev/null 2>&1; then
     backup_file="$backup_dir/${backup_name}.zip"
     log "使用压缩工具: zip"
