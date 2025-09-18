@@ -32,6 +32,8 @@ upgrade_landsacpe.sh
 
 A 高
 
+替换 handler 表现不太正常，不明原因
+
 可能使用不同的命名方式
 gitee 完善镜像加速？
 

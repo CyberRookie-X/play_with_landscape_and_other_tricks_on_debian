@@ -492,6 +492,41 @@ control_landscape_service() {
   esac
 }
 
+# 控制Docker服务的函数
+control_docker_service() {
+  local action="$1"
+  case "$action" in
+    "start")
+      log "正在启动 Docker 服务..."
+      if [ "$INIT_SYSTEM" = "systemd" ]; then
+        systemctl start docker
+      else
+        rc-service docker start
+      fi
+      ;;
+    "stop")
+      log "正在停止 Docker 服务..."
+      if [ "$INIT_SYSTEM" = "systemd" ]; then
+        systemctl stop docker
+      else
+        rc-service docker stop
+      fi
+      ;;
+    "restart")
+      log "正在重启 Docker 服务..."
+      if [ "$INIT_SYSTEM" = "systemd" ]; then
+        systemctl restart docker
+      else
+        rc-service docker restart
+      fi
+      ;;
+    *)
+      log "未知的 Docker 服务操作: $action"
+      return 1
+      ;;
+  esac
+}
+
 # ========== 下载和URL处理函数 ==========
 
 # 获取下载URL和文件名
@@ -675,6 +710,7 @@ download_with_retry() {
     fi
   done
   
+  log "下载失败，已重试 $max_retries 次"
   return 1
 }
 
@@ -1540,7 +1576,7 @@ upgrade_landscape_version() {
     exit 1
   fi
   
-  # 对于稳定版，检查是否降级
+  # 对于稳定版，检查版本是否相同
   if [ "$version_type" = "stable" ]; then
     # 为新下载的文件添加执行权限以获取版本信息
     chmod +x "$temp_dir/$filename"
@@ -1556,20 +1592,11 @@ upgrade_landscape_version() {
     new_version=$("$temp_dir/$filename" --version 2>/dev/null)
     log "最新版本: $new_version"
     
-    # 比较版本，如果新版本小于等于当前版本，则不升级
-    if [ -n "$current_version" ] && [ -n "$new_version" ]; then
-      # 简单的版本比较（假设版本格式为 vX.Y.Z）
-      # 使用 sort -V 进行版本比较
-      local version_comparison=$(printf "%s\n%s" "$current_version" "$new_version" | sort -V | head -n1)
-      if [ "$version_comparison" = "$new_version" ] && [ "$current_version" != "$new_version" ]; then
-        log "检测到新版本 $new_version 比当前版本 $current_version 更旧，为防止降级，取消升级"
-        rm -rf "$temp_dir"
-        exit 1
-      elif [ "$current_version" = "$new_version" ]; then
-        log "当前已是最新稳定版，无需升级"
-        rm -rf "$temp_dir"
-        exit 1
-      fi
+    # 比较版本，如果版本相同则提示无需升级
+    if [ -n "$current_version" ] && [ "$current_version" = "$new_version" ]; then
+      log "当前已是最新稳定版，无需升级"
+      rm -rf "$temp_dir"
+      exit 1
     fi
   fi
   
@@ -1699,7 +1726,6 @@ replace_files_with_rollback() {
     log "第 $((retry_count + 1)) 次尝试替换文件..."
     
     local replace_success=true
-    local backup_list=()
     
     # 逐个替换文件
     for task in "${replace_tasks[@]}"; do
@@ -1707,63 +1733,98 @@ replace_files_with_rollback() {
       local target_path=$(echo "$task" | cut -d':' -f2)
       local source_path=$(echo "$task" | cut -d':' -f3)
       
-      log "正在替换 $file_type..."
-      
-      # 备份原文件（如果存在）
-      if [ -e "$target_path" ]; then
-        local backup_path="$backup_temp_dir/$(basename "$target_path").bak"
-        if ! cp -r "$target_path" "$backup_path" 2>/dev/null; then
-          log "错误: 无法备份 $file_type"
-          replace_success=false
-          break
-        fi
-        backup_list+=("$target_path:$backup_path")
+      # 检查是否是需要停止docker的文件类型
+      local need_stop_docker=false
+      if [[ "$file_type" == "binary_x86_64_musl" ]] || [[ "$file_type" == "binary_x86_64" ]] || [[ "$file_type" == "binary_aarch64" ]] || [[ "$file_type" == "binary_aarch64_musl" ]]; then
+        need_stop_docker=true
       fi
       
-      # 执行替换
-      if [ "$file_type" = "static" ]; then
-        # 替换静态文件目录
-        rm -rf "$target_path" 2>/dev/null || true
+      # 如果需要停止docker且docker正在运行，则停止docker
+      if [ "$need_stop_docker" = true ]; then
+        if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet docker 2>/dev/null; then
+          log "正在停止 Docker 服务以替换 $file_type..."
+          control_docker_service "stop"
+          log "Docker 服务已停止"
+        fi
+      fi
+      
+      # 单个文件重试机制
+      local file_retry_count=0
+      local file_replace_success=false
+      while [ $file_retry_count -lt $max_retries ]; do
+        log "正在替换 $file_type (尝试 $((file_retry_count + 1))/$max_retries)..."
         
-        # 查找包含index.html的目录
-        local static_source_dir=""
-        if [ -f "$source_path/index.html" ]; then
-          static_source_dir="$source_path"
-        else
-          for dir in "$source_path"/*/; do
-            if [ -d "$dir" ] && [ -f "$dir/index.html" ]; then
-              static_source_dir="$dir"
-              break
+        # 备份原文件（如果存在）
+        if [ -e "$target_path" ]; then
+          local backup_path="$backup_temp_dir/$(basename "$target_path").bak"
+          if ! cp -r "$target_path" "$backup_path" 2>/dev/null; then
+            log "警告: 无法备份 $file_type"
+          fi
+        fi
+        
+        # 执行替换
+        if [ "$file_type" = "static" ]; then
+          # 替换静态文件目录
+          rm -rf "$target_path" 2>/dev/null || true
+          
+          # 查找包含index.html的目录
+          local static_source_dir=""
+          if [ -f "$source_path/index.html" ]; then
+            static_source_dir="$source_path"
+          else
+            for dir in "$source_path"/*/; do
+              if [ -d "$dir" ] && [ -f "$dir/index.html" ]; then
+                static_source_dir="$dir"
+                break
+              fi
+            done
+          fi
+          
+          if [ -z "$static_source_dir" ]; then
+            log "错误: 未找到包含 index.html 的目录"
+          else
+            if cp -r "$static_source_dir" "$target_path" 2>/dev/null; then
+              file_replace_success=true
+              log "✓ $file_type 替换成功"
+            else
+              log "错误: 无法替换 $file_type"
             fi
-          done
+          fi
+        else
+          # 替换单个文件
+          if cp "$source_path" "$target_path" 2>/dev/null; then
+            file_replace_success=true
+            
+            # 设置执行权限（如果需要）
+            if [[ "$file_type" == "executable" ]] || [[ "$file_type" == "script" ]] || [[ "$file_type" == binary_* ]]; then
+              chmod +x "$target_path" 2>/dev/null || true
+            fi
+            
+            log "✓ $file_type 替换成功"
+          else
+            log "错误: 无法替换 $file_type"
+          fi
         fi
         
-        if [ -z "$static_source_dir" ]; then
-          log "错误: 未找到包含 index.html 的目录"
-          replace_success=false
+        # 如果文件替换成功，跳出重试循环
+        if [ "$file_replace_success" = true ]; then
           break
+        else
+          file_retry_count=$((file_retry_count + 1))
+          if [ $file_retry_count -lt $max_retries ]; then
+            local wait_time=$((file_retry_count * 2))
+            log "等待 $wait_time 秒后重试替换 $file_type..."
+            sleep $wait_time
+          fi
         fi
-        
-        if ! cp -r "$static_source_dir" "$target_path" 2>/dev/null; then
-          log "错误: 无法替换 $file_type"
-          replace_success=false
-          break
-        fi
-      else
-        # 替换单个文件
-        if ! cp "$source_path" "$target_path" 2>/dev/null; then
-          log "错误: 无法替换 $file_type"
-          replace_success=false
-          break
-        fi
-        
-        # 设置执行权限（如果需要）
-        if [[ "$file_type" == "executable" ]] || [[ "$file_type" == "script" ]] || [[ "$file_type" == binary_* ]]; then
-          chmod +x "$target_path" 2>/dev/null || true
-        fi
-      fi
+      done
       
-      log "✓ $file_type 替换成功"
+      # 如果单个文件替换失败，标记整体失败并跳出循环
+      if [ "$file_replace_success" = false ]; then
+        replace_success=false
+        log "文件 $file_type 替换失败，取消升级"
+        break
+      fi
     done
     
     # 检查替换结果
@@ -1771,26 +1832,44 @@ replace_files_with_rollback() {
       log "所有文件替换成功"
       # 清理备份文件
       rm -rf "$backup_temp_dir"
+      
+      # 如果之前停止了docker服务，且没有指定自动重启，则启动docker和landscape服务
+      local docker_was_stopped=false
+      for task in "${replace_tasks[@]}"; do
+        local file_type=$(echo "$task" | cut -d':' -f1)
+        if [[ "$file_type" == "binary_x86_64_musl" ]] || [[ "$file_type" == "binary_x86_64" ]] || [[ "$file_type" == "binary_aarch64" ]] || [[ "$file_type" == "binary_aarch64_musl" ]]; then
+          docker_was_stopped=true
+          break
+        fi
+      done
+      
+      if [ "$docker_was_stopped" = true ] && [ "$AUTO_REBOOT" != true ]; then
+        log "正在启动 Docker 服务..."
+        control_docker_service "start"
+        log "Docker 服务已启动"
+      fi
+      
       return 0
     else
-      log "文件替换失败，正在恢复原文件..."
+      log "文件替换失败，正在恢复已备份的文件..."
       
-      # 恢复备份文件
-      for backup_info in "${backup_list[@]}"; do
-        local original_path=$(echo "$backup_info" | cut -d':' -f1)
-        local backup_path=$(echo "$backup_info" | cut -d':' -f2)
+      # 恢复已备份的文件
+      for task in "${replace_tasks[@]}"; do
+        local file_type=$(echo "$task" | cut -d':' -f1)
+        local target_path=$(echo "$task" | cut -d':' -f2)
+        local backup_path="$backup_temp_dir/$(basename "$target_path").bak"
         
         if [ -e "$backup_path" ]; then
-          rm -rf "$original_path" 2>/dev/null || true
-          cp -r "$backup_path" "$original_path" 2>/dev/null || true
-          log "已恢复: $(basename "$original_path")"
+          rm -rf "$target_path" 2>/dev/null || true
+          cp -r "$backup_path" "$target_path" 2>/dev/null || true
+          log "已恢复: $(basename "$target_path")"
         fi
       done
       
       retry_count=$((retry_count + 1))
       if [ $retry_count -lt $max_retries ]; then
         local wait_time=$((retry_count * 2))
-        log "等待 $wait_time 秒后进行下一次尝试..."
+        log "等待 $wait_time 秒后进行下一次整体尝试..."
         sleep $wait_time
       fi
     fi
