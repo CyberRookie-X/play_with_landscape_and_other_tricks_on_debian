@@ -130,11 +130,11 @@ log() {
   timestamp=$(date +"%Y-%m-%d %H:%M:%S")
   
   # 输出到控制台
-  printf "[%s] %s\n" "$timestamp" "$message"
+  echo "[$timestamp] $message"
   
   # 输出到日志文件（如果可用）
   if [ -n "$UPGRADE_LOG" ] && [ -f "$UPGRADE_LOG" ]; then
-    printf "[%s] %s\n" "$timestamp" "$message" >> "$UPGRADE_LOG"
+    echo "[$timestamp] $message" >> "$UPGRADE_LOG"
   fi
 }
 
@@ -170,7 +170,7 @@ check_system_environment() {
   # 检查系统架构
   SYSTEM_ARCH=$(uname -m)
   if [ "$SYSTEM_ARCH" != "x86_64" ] && [ "$SYSTEM_ARCH" != "aarch64" ]; then
-    printf "不支持的系统架构: %s\n" "$SYSTEM_ARCH" >&2
+    echo "不支持的系统架构: $SYSTEM_ARCH" >&2
     exit 1
   fi
   
@@ -223,11 +223,11 @@ check_dependencies() {
   
   # 如果有缺失的依赖，报告并退出
   if [ ${#missing_deps[@]} -gt 0 ]; then
-    printf "错误: 缺少以下依赖项:\n" >&2
+    echo "错误: 缺少以下依赖项:" >&2
     for dep in "${missing_deps[@]}"; do
-      printf "  - %s\n" "$dep" >&2
+      echo "  - $dep" >&2
     done
-    printf "请安装缺少的依赖项后再运行此脚本。\n" >&2
+    echo "请安装缺少的依赖项后再运行此脚本。" >&2
     exit 1
   fi
 }
@@ -246,19 +246,19 @@ parse_arguments() {
       "--stable"|"--beta")
         local version_action="${arg#--}"
         ACTION="$version_action"
-        printf "设置动作: %s\n" "$ACTION" >&2
+        echo "设置动作: $ACTION" >&2
         ;;
       "--cn")
         USE_CN_MIRROR=true
-        printf "启用中国镜像加速\n" >&2
+        echo "启用中国镜像加速" >&2
         ;;
       "--reboot")
         AUTO_REBOOT=true
-        printf "启用自动重启\n" >&2
+        echo "启用自动重启" >&2
         ;;
       "--backup")
         CREATE_BACKUP=true
-        printf "启用备份功能\n" >&2
+        echo "启用备份功能" >&2
         ;;
       --backup=*)
         local count="${arg#--backup=}"
@@ -267,20 +267,20 @@ parse_arguments() {
         
         # 验证 BACKUP_COUNT 是数字
         if ! [[ "$BACKUP_COUNT" =~ ^[0-9]+$ ]] || [ "$BACKUP_COUNT" -lt 1 ]; then
-          printf "错误: --backup 参数必须是正整数\n" >&2
+          echo "错误: --backup 参数必须是正整数" >&2
           exit 1
         fi
-        printf "启用备份功能，保留 %s 个备份\n" "$BACKUP_COUNT" >&2
+        echo "启用备份功能，保留 $BACKUP_COUNT 个备份" >&2
         ;;
       "--rollback")
         ROLLBACK=true
-        printf "启用回滚功能\n" >&2
+        echo "启用回滚功能" >&2
         ;;
       "-h"|"--help")
         SHOW_HELP=true
         ;;
       *)
-        printf "忽略未知参数: %s\n" "$arg" >&2
+        echo "忽略未知参数: $arg" >&2
         ;;
     esac
     i=$((i+1))
@@ -289,35 +289,35 @@ parse_arguments() {
 
 # 显示帮助信息
 show_help() {
-  printf "%s\n" "Landscape Router 升级脚本"
-  printf "%s\n" "用法: ./upgrade_landscape.sh [--stable|--beta] [--cn] [--reboot] [--backup[=N]] [--rollback]"
-  printf "%s\n" "参数:"
-  printf "%s\n" "  --stable       - 升级到最新稳定版（默认）"
-  printf "%s\n" "  --beta         - 升级到最新 Beta 版"
-  printf "%s\n" "  --cn           - 使用中国镜像加速（可选）"
-  printf "%s\n" "  --reboot       - 升级完成后自动重启（可选）"
-  printf "%s\n" "  --backup       - 升级前进行备份"
-  printf "%s\n" "  --backup=N     - 升级前进行备份，并指定保留N个备份（默认stable保留1个，beta保留3个）"
-  printf "%s\n" "  --rollback     - 回滚到之前的备份版本（交互式）"
-  printf "%s\n" "  -h, --help     - 显示此帮助信息"
-  printf "%s\n" ""
-  printf "%s\n" "示例:"
-  printf "%s\n" "  ./upgrade_landscape.sh                    # 升级到最新稳定版"
-  printf "%s\n" "  ./upgrade_landscape.sh --stable           # 升级到最新稳定版"
-  printf "%s\n" "  ./upgrade_landscape.sh --beta             # 升级到最新 Beta 版"
-  printf "%s\n" "  ./upgrade_landscape.sh --stable --cn      # 使用中国镜像升级到最新稳定版"
-  printf "%s\n" "  ./upgrade_landscape.sh --stable --reboot  # 升级到最新稳定版并自动重启"
-  printf "%s\n" "  ./upgrade_landscape.sh --backup           # 升级前进行备份"
-  printf "%s\n" "  ./upgrade_landscape.sh --backup=5         # 升级前进行备份，保留最近5个备份"
-  printf "%s\n" "  ./upgrade_landscape.sh --rollback         # 回滚到之前的备份版本"
-  printf "%s\n" "  ./upgrade_landscape.sh -h                 # 显示帮助信息"
-  printf "%s\n" ""
-  printf "%s\n" "当前系统初始化系统: $INIT_SYSTEM"
-  printf "%s\n" "当前系统架构: $SYSTEM_ARCH"
+  echo "Landscape Router 升级脚本"
+  echo "用法: ./upgrade_landscape.sh [--stable|--beta] [--cn] [--reboot] [--backup[=N]] [--rollback]"
+  echo "参数:"
+  echo "  --stable       - 升级到最新稳定版（默认）"
+  echo "  --beta         - 升级到最新 Beta 版"
+  echo "  --cn           - 使用中国镜像加速（可选）"
+  echo "  --reboot       - 升级完成后自动重启（可选）"
+  echo "  --backup       - 升级前进行备份"
+  echo "  --backup=N     - 升级前进行备份，并指定保留N个备份（默认stable保留1个，beta保留3个）"
+  echo "  --rollback     - 回滚到之前的备份版本（交互式）"
+  echo "  -h, --help     - 显示此帮助信息"
+  echo ""
+  echo "示例:"
+  echo "  ./upgrade_landscape.sh                    # 升级到最新稳定版"
+  echo "  ./upgrade_landscape.sh --stable           # 升级到最新稳定版"
+  echo "  ./upgrade_landscape.sh --beta             # 升级到最新 Beta 版"
+  echo "  ./upgrade_landscape.sh --stable --cn      # 使用中国镜像升级到最新稳定版"
+  echo "  ./upgrade_landscape.sh --stable --reboot  # 升级到最新稳定版并自动重启"
+  echo "  ./upgrade_landscape.sh --backup           # 升级前进行备份"
+  echo "  ./upgrade_landscape.sh --backup=5         # 升级前进行备份，保留最近5个备份"
+  echo "  ./upgrade_landscape.sh --rollback         # 回滚到之前的备份版本"
+  echo "  ./upgrade_landscape.sh -h                 # 显示帮助信息"
+  echo ""
+  echo "当前系统初始化系统: $INIT_SYSTEM"
+  echo "当前系统架构: $SYSTEM_ARCH"
   if [ "$USE_MUSL" = true ]; then
-    printf "%s\n" "系统类型: musl"
+    echo "系统类型: musl"
   else
-    printf "%s\n" "系统类型: glibc"
+    echo "系统类型: glibc"
   fi
 }
 
@@ -330,25 +330,25 @@ get_landscape_dir() {
     local landscape_dir
     landscape_dir=$(grep -oP 'ExecStart=\K[^/]*(?=/landscape-webserver-)' /etc/systemd/system/landscape-router.service 2>/dev/null) || true
     if [ -z "$landscape_dir" ]; then
-      printf "错误: 无法从 landscape-router.service 中提取安装路径，升级终止\n" >&2
+      echo "错误: 无法从 landscape-router.service 中提取安装路径，升级终止" >&2
       return 1
     fi
-    printf "%s" "$landscape_dir"
+    echo "$landscape_dir"
   elif [ "$INIT_SYSTEM" = "openrc" ] && [ -f "/etc/init.d/landscape-router" ]; then
     # 从OpenRC启动脚本获取安装路径
     local landscape_dir
     landscape_dir=$(grep -oP 'command=\K[^/]*(?=/landscape-webserver-)' /etc/init.d/landscape-router 2>/dev/null) || true
     if [ -z "$landscape_dir" ]; then
-      printf "错误: 无法从 landscape-router 启动脚本中提取安装路径，升级终止\n" >&2
+      echo "错误: 无法从 landscape-router 启动脚本中提取安装路径，升级终止" >&2
       return 1
     fi
-    printf "%s" "$landscape_dir"
+    echo "$landscape_dir"
   else
     # 处理缺失的服务文件
     if [ "$INIT_SYSTEM" = "systemd" ]; then
-      printf "错误: 未找到 landscape-router.service 文件\n" >&2
+      echo "错误: 未找到 landscape-router.service 文件" >&2
     else
-      printf "错误: 未找到 landscape-router 启动脚本\n" >&2
+      echo "错误: 未找到 landscape-router 启动脚本" >&2
     fi
     return 1
   fi
@@ -984,7 +984,7 @@ handle_rollback_operation() {
   
   # 处理重启
   read -p "是否立即重启系统以应用回滚？(y/n): " -n 1 -r
-  printf "\n"
+  echo
   if [[ $REPLY =~ ^[Yy]$ ]]; then
     log "正在重启系统以应用回滚..."
     reboot
