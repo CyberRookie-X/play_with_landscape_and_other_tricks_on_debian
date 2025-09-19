@@ -247,25 +247,81 @@ check_alpine_dependencies() {
     fi
 }
 
+# 通用镜像源处理函数
+# 参数: $1 - 镜像源列表或单一镜像源
+#      $2 - 描述信息（用于日志）
+handle_mirrors_generic() {
+    MIRROR_SOURCE="$1"
+    DESCRIPTION="$2"
+    
+    log "Changing to mirror ($DESCRIPTION)"
+    # 备份原始源
+    cp /etc/apk/repositories /etc/apk/repositories.bak
+    
+    # 如果只有一个镜像源（直接指定），则直接使用
+    if [ "$(echo "$MIRROR_SOURCE" | wc -w)" -eq 1 ] && [ -n "$MIRROR_SOURCE" ]; then
+        log "Using specified mirror: $MIRROR_SOURCE"
+        sed -i "s/dl-cdn.alpinelinux.org/$MIRROR_SOURCE/g" /etc/apk/repositories
+        
+        # 尝试更新包列表
+        if apk update >/dev/null 2>&1; then
+            log "Successfully updated with specified mirror: $MIRROR_SOURCE"
+            return 0
+        else
+            log "Failed to update with specified mirror: $MIRROR_SOURCE"
+            # 恢复原始源配置
+            cp /etc/apk/repositories.bak /etc/apk/repositories
+            apk update >/dev/null 2>&1
+            return 1
+        fi
+    fi
+    
+    # 如果有多个镜像源，遍历尝试
+    AVAILABLE_MIRRORS="$MIRROR_SOURCE"
+    SELECTED_MIRROR=""
+    UPDATE_SUCCESS=false
+    
+    # 尝试不同的镜像源直到成功或没有更多源可尝试
+    while [ "$UPDATE_SUCCESS" = "false" ] && [ -n "$AVAILABLE_MIRRORS" ]; do
+        # 随机选择一个镜像源
+        MIRROR_COUNT=$(echo $AVAILABLE_MIRRORS | wc -w)
+        RANDOM_INDEX=$(( ( $(srand) % MIRROR_COUNT ) + 1 ))
+        SELECTED_MIRROR=$(echo $AVAILABLE_MIRRORS | cut -d' ' -f$RANDOM_INDEX)
+        
+        log "Trying mirror: $SELECTED_MIRROR"
+        # 使用sed命令替换默认源为选中的镜像源
+        sed -i "s/dl-cdn.alpinelinux.org/$SELECTED_MIRROR/g" /etc/apk/repositories
+        
+        # 尝试更新包列表
+        if apk update >/dev/null 2>&1; then
+            UPDATE_SUCCESS=true
+            log "Successfully updated with mirror: $SELECTED_MIRROR"
+        else
+            log "Failed to update with mirror: $SELECTED_MIRROR"
+            # 从可用镜像源列表中移除失败的源
+            AVAILABLE_MIRRORS=$(echo $AVAILABLE_MIRRORS | sed "s/$SELECTED_MIRROR//g" | tr -s ' ' | sed 's/^ *//;s/ *$//')
+            # 恢复原始源配置以便重试
+            cp /etc/apk/repositories.bak /etc/apk/repositories
+        fi
+    done
+    
+    # 如果所有镜像源都尝试失败，记录错误并恢复原始配置
+    if [ "$UPDATE_SUCCESS" = "false" ]; then
+        log "Failed to update with all mirrors, restoring original configuration"
+        cp /etc/apk/repositories.bak /etc/apk/repositories
+        # 恢复原始源后需要更新包索引
+        apk update >/dev/null 2>&1
+        return 1
+    fi
+    
+    return 0
+}
+
 # 处理镜像源（基于环境变量）
 handle_mirror_with_env_vars() {
     # 检查是否设置了镜像源环境变量
     if [ -n "$REDIRECT_PKG_HANDLER_WRAPPER_MIRROR" ]; then
-        log "Using mirror from environment variable: $REDIRECT_PKG_HANDLER_WRAPPER_MIRROR"
-        # 备份原始源
-        cp /etc/apk/repositories /etc/apk/repositories.bak
-        
-        # 直接使用环境变量指定的镜像源
-        sed -i "s/dl-cdn.alpinelinux.org/$REDIRECT_PKG_HANDLER_WRAPPER_MIRROR/g" /etc/apk/repositories
-        
-        # 更新包列表
-        if ! apk update >/dev/null 2>&1; then
-            log "Failed to update with specified mirror, restoring original configuration"
-            cp /etc/apk/repositories.bak /etc/apk/repositories
-            apk update >/dev/null 2>&1
-        else
-            log "Successfully updated with specified mirror"
-        fi
+        handle_mirrors_generic "$REDIRECT_PKG_HANDLER_WRAPPER_MIRROR" "from environment variable"
         return 0
     # 检查是否设置了区域环境变量
     elif [ -n "$REDIRECT_PKG_HANDLER_WRAPPER_REGION" ]; then
@@ -275,45 +331,7 @@ handle_mirror_with_env_vars() {
         # 支持大小写不敏感的CN/cn值
         if [ "$REGION_UPPER" = "CN" ]; then
             log "Region set to CN, skipping IP detection and using random mirror"
-            # 备份原始源
-            cp /etc/apk/repositories /etc/apk/repositories.bak
-            
-            # 创建镜像源列表副本用于尝试
-            AVAILABLE_MIRRORS="$MIRRORS"
-            SELECTED_MIRROR=""
-            UPDATE_SUCCESS=false
-            
-            # 尝试不同的镜像源直到成功或没有更多源可尝试
-            while [ "$UPDATE_SUCCESS" = "false" ] && [ -n "$AVAILABLE_MIRRORS" ]; do
-                # 随机选择一个镜像源
-                MIRROR_COUNT=$(echo $AVAILABLE_MIRRORS | wc -w)
-                RANDOM_INDEX=$(( ( $(srand) % MIRROR_COUNT ) + 1 ))
-                SELECTED_MIRROR=$(echo $AVAILABLE_MIRRORS | cut -d' ' -f$RANDOM_INDEX)
-                
-                log "Trying mirror: $SELECTED_MIRROR"
-                # 使用选中的镜像源
-                sed -i "s/dl-cdn.alpinelinux.org/$SELECTED_MIRROR/g" /etc/apk/repositories
-                
-                # 尝试更新包列表
-                if apk update >/dev/null 2>&1; then
-                    UPDATE_SUCCESS=true
-                    log "Successfully updated with mirror: $SELECTED_MIRROR"
-                else
-                    log "Failed to update with mirror: $SELECTED_MIRROR"
-                    # 从可用镜像源列表中移除失败的源
-                    AVAILABLE_MIRRORS=$(echo $AVAILABLE_MIRRORS | sed "s/$SELECTED_MIRROR//g" | tr -s ' ' | sed 's/^ *//;s/ *$//')
-                    # 恢复原始源配置以便重试
-                    cp /etc/apk/repositories.bak /etc/apk/repositories
-                fi
-            done
-            
-            # 如果所有镜像源都尝试失败，记录错误并恢复原始配置
-            if [ "$UPDATE_SUCCESS" = "false" ]; then
-                log "Failed to update with all mirrors, restoring original configuration"
-                cp /etc/apk/repositories.bak /etc/apk/repositories
-                # 恢复原始源后需要更新包索引
-                apk update >/dev/null 2>&1
-            fi
+            handle_mirrors_generic "$MIRRORS" "random from predefined list for CN region"
         else
             log "Region set to $REDIRECT_PKG_HANDLER_WRAPPER_REGION, skipping IP detection and mirror change"
             # 不换源，直接尝试更新一次以确保包管理器正常工作
@@ -499,46 +517,7 @@ detect_public_ip_country() {
 handle_mirror_by_ip() {
     # 只有当明确检测到中国大陆IP时才执行换源
     if [ "$PUBLIC_IP_COUNTRY" = "CN" ] || [ "$PUBLIC_IP_COUNTRY" = "China" ] || [ "$PUBLIC_IP_COUNTRY" = "中国" ]; then
-        log "Changing to mirror"
-        # 备份原始源
-        cp /etc/apk/repositories /etc/apk/repositories.bak
-        
-        # 创建镜像源列表副本用于尝试
-        AVAILABLE_MIRRORS="$MIRRORS"
-        SELECTED_MIRROR=""
-        UPDATE_SUCCESS=false
-        
-        # 尝试不同的镜像源直到成功或没有更多源可尝试
-        while [ "$UPDATE_SUCCESS" = "false" ] && [ -n "$AVAILABLE_MIRRORS" ]; do
-            # 随机选择一个镜像源
-            MIRROR_COUNT=$(echo $AVAILABLE_MIRRORS | wc -w)
-            RANDOM_INDEX=$(( ( $(srand) % MIRROR_COUNT ) + 1 ))
-            SELECTED_MIRROR=$(echo $AVAILABLE_MIRRORS | cut -d' ' -f$RANDOM_INDEX)
-            
-            log "Trying mirror: $SELECTED_MIRROR"
-            # 使用sed命令替换默认源为选中的镜像源
-            sed -i "s/dl-cdn.alpinelinux.org/$SELECTED_MIRROR/g" /etc/apk/repositories
-            
-            # 尝试更新包列表
-            if apk update >/dev/null 2>&1; then
-                UPDATE_SUCCESS=true
-                log "Successfully updated with mirror: $SELECTED_MIRROR"
-            else
-                log "Failed to update with mirror: $SELECTED_MIRROR"
-                # 从可用镜像源列表中移除失败的源
-                AVAILABLE_MIRRORS=$(echo $AVAILABLE_MIRRORS | sed "s/$SELECTED_MIRROR//g" | tr -s ' ' | sed 's/^ *//;s/ *$//')
-                # 恢复原始源配置以便重试
-                cp /etc/apk/repositories.bak /etc/apk/repositories
-            fi
-        done
-        
-        # 如果所有镜像源都尝试失败，记录错误并恢复原始配置
-        if [ "$UPDATE_SUCCESS" = "false" ]; then
-            log "Failed to update with all mirrors, restoring original configuration"
-            cp /etc/apk/repositories.bak /etc/apk/repositories
-            # 恢复原始源后需要更新包索引
-            apk update >/dev/null 2>&1
-        fi
+        handle_mirrors_generic "$MIRRORS" "based on IP location"
     else
         log "Not in China or failed to detect IP location, proceeding with default repositories"
         # 即使没有换源，也尝试更新一次以确保包管理器正常工作
