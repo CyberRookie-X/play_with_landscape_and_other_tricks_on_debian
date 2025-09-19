@@ -1636,7 +1636,6 @@ upgrade_landscape_version() {
   
   # 将当前脚本复制到Landscape安装目录，以备rollback时使用
   local script_name=$(basename "$0")
-  log "正在将 $script_name 复制到 $landscape_dir 目录..."
   
   # 复制当前脚本到Landscape安装目录
   if cp "$0" "$landscape_dir/$script_name"; then
