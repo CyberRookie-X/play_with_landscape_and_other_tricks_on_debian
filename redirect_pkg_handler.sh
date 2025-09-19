@@ -11,7 +11,7 @@
 # 两个环境变量同时存在时，MIRROR 生效，REGION 失效。
 #
 # 1. REDIRECT_PKG_HANDLER_WRAPPER_REGION    
-# 填入非 CN/cn 值时，跳过 IP 归属地检测 和 换源; 填入 CN/cn 会跳过 IP 归属地检测，从中科大/清华/阿里/腾讯/华为 中随机选取一个可以成功 update 的源
+# 填入非 CN/cn 值时，跳过 IP 归属地检测 和 换源; 填入 CN/cn 会跳过 IP 归属地检测，从 中科大/清华/阿里/腾讯/华为/上交大/浙大/华科大/南大/哈工大 中随机选取一个可以成功 update 的源
 # 2. REDIRECT_PKG_HANDLER_WRAPPER_MIRROR   
 # 填入 alpine 镜像源地址，如 西北农林大学镜像源  REDIRECT_PKG_HANDLER_WRAPPER_MIRROR=mirrors.nwafu.edu.cn
 # 3. ORIGINAL_ENTRYPOINT_CMD
@@ -120,7 +120,7 @@ fi
 # 获取CPU架构
 ARCH=$(uname -m)
 
-# 定义可用的镜像源列表
+# 定义可用的镜像源列表 中科大/清华/阿里/腾讯/华为/上交大/浙大/华科大/南大/哈工大
 MIRRORS="mirrors.ustc.edu.cn mirrors.aliyun.com mirrors.tuna.tsinghua.edu.cn mirrors.cloud.tencent.com repo.huaweicloud.com mirrors.sjtug.sjtu.edu.cn mirrors.zju.edu.cn mirrors.hust.edu.cn mirrors.nju.edu.cn mirrors.hit.edu.cn"
 
 # ==================== 主函数 ====================
@@ -172,9 +172,9 @@ detect_handler_directory() {
     return 0
 }
 
-# 日志函数，确保日志格式符合Docker规范，不依赖echo命令
+# 日志函数，确保日志格式符合Docker规范，BusyBox不支持纳秒
 log() {
-    printf "%s %s %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "[redirect_pkg_handler_wrapper_script]" "$1"
+    echo "$(date '+%Y-%m-%d %H:%M:%S.%N') [redirect_pkg_handler_wrapper] $1"
 }
 
 # 初始化随机种子
@@ -189,7 +189,7 @@ srand() {
         RANDOM_SEED=$((RANDOM_SEED + $$ + RANDOM_SEED * 1103515245 + 12345))
     fi
     RANDOM_SEED=$((RANDOM_SEED * 1103515245 + 12345))
-    printf "%d\n" $((RANDOM_SEED >> 16))
+    echo $((RANDOM_SEED >> 16))
 }
 
 # ==================== 非 Alpine 系统处理函数 ====================
@@ -326,7 +326,7 @@ handle_mirror_with_env_vars() {
     # 检查是否设置了区域环境变量
     elif [ -n "$REDIRECT_PKG_HANDLER_WRAPPER_REGION" ]; then
         # 使用POSIX内置的参数扩展将值转换为大写
-        REGION_UPPER=$(printf "%s" "$REDIRECT_PKG_HANDLER_WRAPPER_REGION" | tr '[:lower:]' '[:upper:]')
+        REGION_UPPER=$(echo "$REDIRECT_PKG_HANDLER_WRAPPER_REGION" | tr '[:lower:]' '[:upper:]')
         
         # 支持大小写不敏感的CN/cn值
         if [ "$REGION_UPPER" = "CN" ]; then
@@ -353,12 +353,12 @@ detect_public_ip_country() {
         if command -v wget >/dev/null 2>&1; then
             for i in 1 2 3 4; do
                 RESULT=$(wget -qO- --header="User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" --timeout=1 https://myip.ipip.net/ 2>/dev/null) || continue
-                printf "%s" "$RESULT" | grep -o '中国' >/dev/null && { printf "中国"; return; }
+                echo "$RESULT" | grep -o '中国' >/dev/null && { echo "中国"; return; }
             done
         elif command -v curl >/dev/null 2>&1; then
             for i in 1 2 3 4; do
                 RESULT=$(curl -s --connect-timeout 1 --max-time 1 -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" https://myip.ipip.net/ 2>/dev/null) || continue
-                printf "%s" "$RESULT" | grep -o '中国' >/dev/null && { printf "中国"; return; }
+                echo "$RESULT" | grep -o '中国' >/dev/null && { echo "中国"; return; }
             done
         fi
     }
@@ -367,12 +367,12 @@ detect_public_ip_country() {
         if command -v wget >/dev/null 2>&1; then
             for i in 1 2 3 4; do
                 RESULT=$(wget -qO- --header="User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" --timeout=1 http://ip-api.com/json/ 2>/dev/null) || continue
-                printf "%s" "$RESULT" | grep -o '"country":"[^"]*"' | cut -d'"' -f4 && return
+                echo "$RESULT" | grep -o '"country":"[^"]*"' | cut -d'"' -f4 && return
             done
         elif command -v curl >/dev/null 2>&1; then
             for i in 1 2 3 4; do
                 RESULT=$(curl -s --connect-timeout 1 --max-time 1 -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" http://ip-api.com/json/ 2>/dev/null) || continue
-                printf "%s" "$RESULT" | grep -o '"country":"[^"]*"' | cut -d'"' -f4 && return
+                echo "$RESULT" | grep -o '"country":"[^"]*"' | cut -d'"' -f4 && return
             done
         fi
     }
@@ -381,12 +381,12 @@ detect_public_ip_country() {
         if command -v wget >/dev/null 2>&1; then
             for i in 1 2 3 4; do
                 RESULT=$(wget -qO- --header="User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" --timeout=1 https://ip.sb/ 2>/dev/null) || continue
-                printf "%s" "$RESULT" | grep -o '"country":"[^"]*"' | cut -d'"' -f4 && return
+                echo "$RESULT" | grep -o '"country":"[^"]*"' | cut -d'"' -f4 && return
             done
         elif command -v curl >/dev/null 2>&1; then
             for i in 1 2 3 4; do
                 RESULT=$(curl -s --connect-timeout 1 --max-time 1 -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" https://ip.sb/ 2>/dev/null) || continue
-                printf "%s" "$RESULT" | grep -o '"country":"[^"]*"' | cut -d'"' -f4 && return
+                echo "$RESULT" | grep -o '"country":"[^"]*"' | cut -d'"' -f4 && return
             done
         fi
     }
@@ -395,12 +395,12 @@ detect_public_ip_country() {
         if command -v wget >/dev/null 2>&1; then
             for i in 1 2 3 4; do
                 RESULT=$(wget -qO- --header="User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" --timeout=1 http://ipwho.is/ 2>/dev/null) || continue
-                printf "%s" "$RESULT" | grep -o '"country":"[^"]*"' | cut -d'"' -f4 && return
+                echo "$RESULT" | grep -o '"country":"[^"]*"' | cut -d'"' -f4 && return
             done
         elif command -v curl >/dev/null 2>&1; then
             for i in 1 2 3 4; do
                 RESULT=$(curl -s --connect-timeout 1 --max-time 1 -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" http://ipwho.is/ 2>/dev/null) || continue
-                printf "%s" "$RESULT" | grep -o '"country":"[^"]*"' | cut -d'"' -f4 && return
+                echo "$RESULT" | grep -o '"country":"[^"]*"' | cut -d'"' -f4 && return
             done
         fi
     }
