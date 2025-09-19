@@ -716,17 +716,7 @@ download_from_github_actions() {
     while [ $retry_count -lt $max_retries ] && [ "$download_success" = false ]; do
       log "尝试下载 redirect_pkg_handler.sh，第 $((retry_count + 1)) 次尝试"
       
-      if command -v curl >/dev/null 2>&1; then
-        log "使用 curl 下载..."
-        # 不隐藏错误信息，直接输出到终端
-        if curl -L -o "$output_file" "$download_url"; then
-          download_success=true
-          log "使用 curl 下载成功"
-        else
-          local curl_exit_code=$?
-          log "使用 curl 下载失败，退出码: $curl_exit_code"
-        fi
-      elif command -v wget >/dev/null 2>&1; then
+      if command -v wget >/dev/null 2>&1; then
         log "使用 wget 下载..."
         # 不隐藏错误信息，直接输出到终端
         if wget -O "$output_file" "$download_url"; then
@@ -735,6 +725,16 @@ download_from_github_actions() {
         else
           local wget_exit_code=$?
           log "使用 wget 下载失败，退出码: $wget_exit_code"
+        fi
+      elif command -v curl >/dev/null 2>&1; then
+        log "使用 curl 下载..."
+        # 不隐藏错误信息，直接输出到终端
+        if curl -L -o "$output_file" "$download_url"; then
+          download_success=true
+          log "使用 curl 下载成功"
+        else
+          local curl_exit_code=$?
+          log "使用 curl 下载失败，退出码: $curl_exit_code"
         fi
       else
         log "错误: 系统中未找到 curl 或 wget 命令"
