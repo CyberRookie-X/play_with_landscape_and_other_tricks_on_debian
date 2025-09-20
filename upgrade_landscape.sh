@@ -1408,7 +1408,7 @@ handle_rollback_operation() {
   fi
 }
 
-# ========== 并发下载函数 ==========
+# ========== 串行下载函数 ==========
 
 # 串行下载多个文件
 download_files_serially() {

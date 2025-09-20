@@ -397,7 +397,6 @@ ask_user_config() {
                 fi
                 ;;
             10)
-                echo "重新配置 LAN 网桥"
                 config_lan_interface
                 ;;
             *)
@@ -549,7 +548,10 @@ ask_github_mirror() {
 
 # 配置 LAN 网卡
 config_lan_interface() {
-    echo "开始配置 LAN 网卡"
+    echo ""
+    echo "WAN 配置，请稍候在 UI 中进行"
+    echo ""
+    echo "现在开始配置 LAN 网桥"
     
     # 询问网桥名称
     read -rp "请输入要创建的 LAN 网桥名称 (默认为 lan1): " bridge_name
