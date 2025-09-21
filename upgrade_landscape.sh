@@ -168,6 +168,48 @@ cleanup_old_logs() {
   # 查找目录下所有文件，按修改时间排序（最新的在前）
   local log_files=()
   
+  # 兼容不同系统的stat命令
+  local stat_format="%Y"
+  if stat -c '%Y' "$log_dir" >/dev/null 2>&1; then
+    # GNU coreutils stat
+    stat_format="-c %Y"
+  elif stat -f '%m' "$log_dir" >/dev/null 2>&1; then
+    # BSD stat (macOS)
+    stat_format="-f %m"
+  else
+    # 使用 ls -t 作为备选方案
+    log "使用 ls -t 进行文件排序"
+    while IFS= read -r -d '' file; do
+      if [ -f "$file" ]; then
+        log_files+=("$file")
+      fi
+    done < <(find "$log_dir" -maxdepth 1 -type f -print0 | xargs -0 ls -1t 2>/dev/null | head -50 | tr '\n' '\0')
+    
+    # 计算需要删除的文件数量
+    local log_count=${#log_files[@]}
+    local to_remove=$((log_count - 16))
+    
+    log "找到 $log_count 个日志文件，需要删除 $to_remove 个旧日志"
+    
+    # 删除旧的日志文件
+    if [ $to_remove -gt 0 ]; then
+      local deleted_count=0
+      local i
+      for ((i=16; i<log_count; i++)); do
+        if [ -f "${log_files[$i]}" ]; then
+          if rm -f "${log_files[$i]}"; then
+            deleted_count=$((deleted_count + 1))
+            log "删除旧日志: $(basename "${log_files[$i]}")"
+          fi
+        fi
+      done
+      log "日志清理完成，已保留 16 个最新日志，删除了 $deleted_count 个旧日志"
+    else
+      log "日志数量未超过限制，无需清理"
+    fi
+    return 0
+  fi
+  
   # 使用 find 查找所有文件
   while IFS= read -r -d '' file; do
     if [ -f "$file" ]; then
@@ -183,20 +225,33 @@ cleanup_old_logs() {
     
     # 为每个文件生成 "时间戳<TAB>文件路径" 格式
     for f in "${log_files[@]}"; do
-      local timestamp=$(stat -c '%Y' "$f" 2>/dev/null || echo 0)
-      printf '%s\t%s\n' "$timestamp" "$f" >> "$temp_sort_file"
+      if [ -f "$f" ]; then
+        local timestamp
+        if [ "$stat_format" = "-c %Y" ]; then
+          timestamp=$(stat -c '%Y' "$f" 2>/dev/null || echo 0)
+        else
+          timestamp=$(stat -f '%m' "$f" 2>/dev/null || echo 0)
+        fi
+        printf '%s\t%s\n' "$timestamp" "$f" >> "$temp_sort_file"
+      fi
     done
     
-    # 按时间戳排序并提取文件路径
-    while IFS=$'\t' read -r timestamp filepath; do
-      sorted_files+=("$filepath")
-    done < <(sort -rn "$temp_sort_file")
+    # 检查临时文件是否有内容
+    if [ -s "$temp_sort_file" ]; then
+      # 按时间戳排序并提取文件路径
+      sorted_files=()
+      while IFS=$'\t' read -r timestamp filepath; do
+        if [ -n "$filepath" ] && [ -f "$filepath" ]; then
+          sorted_files+=("$filepath")
+        fi
+      done < <(sort -rn "$temp_sort_file")
+      
+      # 更新log_files数组
+      log_files=("${sorted_files[@]}")
+    fi
     
     # 清理临时文件
     rm -f "$temp_sort_file"
-    
-    # 更新log_files数组
-    log_files=("${sorted_files[@]}")
   fi
   
   # 计算需要删除的文件数量
@@ -808,21 +863,48 @@ download_from_github_actions() {
       auth_header="Authorization: Bearer $GITHUB_TOKEN"
     fi
     
-    # 使用GitHub API获取最新的工作流运行
-    if command -v curl >/dev/null 2>&1; then
-      if [ -n "$GITHUB_TOKEN" ]; then
-        response=$(curl -s -H "Accept: application/vnd.github.v3+json" -H "$auth_header" "$api_url")
+    # 使用GitHub API获取最新的工作流运行，带重试机制
+    local api_retry_count=0
+    local api_max_retries=3
+    local api_success=false
+    
+    while [ $api_retry_count -lt $api_max_retries ] && [ "$api_success" = false ]; do
+      log "尝试获取GitHub API数据，第 $((api_retry_count + 1)) 次尝试"
+      
+      if command -v curl >/dev/null 2>&1; then
+        if [ -n "$GITHUB_TOKEN" ]; then
+          response=$(curl -s -H "Accept: application/vnd.github.v3+json" -H "$auth_header" "$api_url")
+        else
+          response=$(curl -s -H "Accept: application/vnd.github.v3+json" "$api_url")
+        fi
+      elif command -v wget >/dev/null 2>&1; then
+        if [ -n "$GITHUB_TOKEN" ]; then
+          response=$(wget -qO- --header="Accept: application/vnd.github.v3+json" --header="$auth_header" "$api_url")
+        else
+          response=$(wget -qO- --header="Accept: application/vnd.github.v3+json" "$api_url")
+        fi
       else
-        response=$(curl -s -H "Accept: application/vnd.github.v3+json" "$api_url")
+        log "错误: 系统中未找到 curl 或 wget 命令"
+        return 1
       fi
-    elif command -v wget >/dev/null 2>&1; then
-      if [ -n "$GITHUB_TOKEN" ]; then
-        response=$(wget -qO- --header="Accept: application/vnd.github.v3+json" --header="$auth_header" "$api_url")
+      
+      # 检查API响应是否有效
+      if [ -n "$response" ] && echo "$response" | grep -q '"workflow_runs"'; then
+        api_success=true
+        log "GitHub API请求成功"
       else
-        response=$(wget -qO- --header="Accept: application/vnd.github.v3+json" "$api_url")
+        log "GitHub API请求失败或响应无效"
+        api_retry_count=$((api_retry_count + 1))
+        if [ $api_retry_count -lt $api_max_retries ]; then
+          local wait_time=$((api_retry_count * 2))
+          log "等待 ${wait_time}s 后重试..."
+          sleep $wait_time
+        fi
       fi
-    else
-      log "错误: 系统中未找到 curl 或 wget 命令"
+    done
+    
+    if [ "$api_success" = false ]; then
+      log "错误: GitHub API请求失败，已重试 $api_max_retries 次"
       return 1
     fi
     
@@ -845,18 +927,46 @@ download_from_github_actions() {
       local artifacts_url="https://api.github.com/repos/ThisSeanZhang/landscape/actions/runs/$run_id/artifacts"
       local current_artifacts_response=""
       
-      if command -v curl >/dev/null 2>&1; then
-        if [ -n "$GITHUB_TOKEN" ]; then
-          current_artifacts_response=$(curl -s -H "Accept: application/vnd.github.v3+json" -H "$auth_header" "$artifacts_url")
-        else
-          current_artifacts_response=$(curl -s -H "Accept: application/vnd.github.v3+json" "$artifacts_url")
+      # 为artifacts API请求添加重试机制
+      local artifacts_retry_count=0
+      local artifacts_max_retries=3
+      local artifacts_success=false
+      
+      while [ $artifacts_retry_count -lt $artifacts_max_retries ] && [ "$artifacts_success" = false ]; do
+        log "尝试获取 run_id $run_id 的 artifacts，第 $((artifacts_retry_count + 1)) 次尝试"
+        
+        if command -v curl >/dev/null 2>&1; then
+          if [ -n "$GITHUB_TOKEN" ]; then
+            current_artifacts_response=$(curl -s -H "Accept: application/vnd.github.v3+json" -H "$auth_header" "$artifacts_url")
+          else
+            current_artifacts_response=$(curl -s -H "Accept: application/vnd.github.v3+json" "$artifacts_url")
+          fi
+        elif command -v wget >/dev/null 2>&1; then
+          if [ -n "$GITHUB_TOKEN" ]; then
+            current_artifacts_response=$(wget -qO- --header="Accept: application/vnd.github.v3+json" --header="$auth_header" "$artifacts_url")
+          else
+            current_artifacts_response=$(wget -qO- --header="Accept: application/vnd.github.v3+json" "$artifacts_url")
+          fi
         fi
-      elif command -v wget >/dev/null 2>&1; then
-        if [ -n "$GITHUB_TOKEN" ]; then
-          current_artifacts_response=$(wget -qO- --header="Accept: application/vnd.github.v3+json" --header="$auth_header" "$artifacts_url")
+        
+        # 检查artifacts API响应是否有效
+        if [ -n "$current_artifacts_response" ]; then
+          artifacts_success=true
+          log "artifacts API请求成功"
         else
-          current_artifacts_response=$(wget -qO- --header="Accept: application/vnd.github.v3+json" "$artifacts_url")
+          log "artifacts API请求失败或响应为空"
+          artifacts_retry_count=$((artifacts_retry_count + 1))
+          if [ $artifacts_retry_count -lt $artifacts_max_retries ]; then
+            local wait_time=$((artifacts_retry_count * 2))
+            log "等待 ${wait_time}s 后重试..."
+            sleep $wait_time
+          fi
         fi
+      done
+      
+      if [ "$artifacts_success" = false ]; then
+        log "警告: run_id $run_id 的 artifacts API请求失败，跳过"
+        continue
       fi
       
       # 检查是否有任何artifacts
@@ -941,42 +1051,73 @@ download_from_github_actions() {
   
   log "开始下载artifact: $artifact_name (ID: $artifact_id)"
   
-  # 下载artifact
+  # 下载artifact，带重试机制
   local temp_zip="/tmp/${artifact_name}_artifact.zip"
   local auth_header=""
+  local max_retries=3
+  local retry_count=0
   
   if [ -n "$GITHUB_TOKEN" ]; then
     auth_header="Authorization: Bearer $GITHUB_TOKEN"
   fi
   
-  if command -v curl >/dev/null 2>&1; then
-    if ! curl -L -H "Accept: application/vnd.github.v3+json" -H "$auth_header" -o "$temp_zip" "$artifact_url"; then
-      log "错误: 下载artifact失败"
-      rm -f "$temp_zip"
-      return 1
-    fi
-  elif command -v wget >/dev/null 2>&1; then
-    if [ -n "$GITHUB_TOKEN" ]; then
-      if ! wget -O "$temp_zip" --header="Accept: application/vnd.github.v3+json" --header="$auth_header" "$artifact_url"; then
-        log "错误: 下载artifact失败"
-        rm -f "$temp_zip"
-        return 1
+  # 执行下载重试循环
+  while [ $retry_count -lt $max_retries ]; do
+    log "尝试下载 artifact，第 $((retry_count + 1)) 次尝试"
+    
+    local download_success=false
+    
+    if command -v curl >/dev/null 2>&1; then
+      if curl -L -H "Accept: application/vnd.github.v3+json" -H "$auth_header" -o "$temp_zip" "$artifact_url"; then
+        download_success=true
+        log "curl 下载 artifact 成功"
+      else
+        log "curl 下载 artifact 失败，退出码: $?"
+      fi
+    elif command -v wget >/dev/null 2>&1; then
+      if [ -n "$GITHUB_TOKEN" ]; then
+        if wget -O "$temp_zip" --header="Accept: application/vnd.github.v3+json" --header="$auth_header" "$artifact_url"; then
+          download_success=true
+          log "wget 下载 artifact 成功"
+        else
+          log "wget 下载 artifact 失败，退出码: $?"
+        fi
+      else
+        if wget -O "$temp_zip" --header="Accept: application/vnd.github.v3+json" "$artifact_url"; then
+          download_success=true
+          log "wget 下载 artifact 成功"
+        else
+          log "wget 下载 artifact 失败，退出码: $?"
+        fi
       fi
     else
-      if ! wget -O "$temp_zip" --header="Accept: application/vnd.github.v3+json" "$artifact_url"; then
-        log "错误: 下载artifact失败"
+      log "错误: 系统中未找到 curl 或 wget 命令"
+      return 1
+    fi
+    
+    # 验证下载的文件
+    if [ "$download_success" = true ]; then
+      if [ -f "$temp_zip" ] && [ -s "$temp_zip" ]; then
+        log "artifact 下载成功且文件非空"
+        break
+      else
+        log "artifact 下载文件不存在或为空，重新尝试"
+        download_success=false
         rm -f "$temp_zip"
-        return 1
       fi
     fi
-  else
-    log "错误: 系统中未找到 curl 或 wget 命令"
-    return 1
-  fi
+    
+    retry_count=$((retry_count + 1))
+    if [ $retry_count -lt $max_retries ]; then
+      local wait_time=$((retry_count * 2))
+      log "下载失败，等待 ${wait_time}s 后重试..."
+      sleep $wait_time
+    fi
+  done
   
-  # 验证下载的文件
+  # 最终检查下载结果
   if [ ! -f "$temp_zip" ] || [ ! -s "$temp_zip" ]; then
-    log "错误: 下载的文件不存在或为空"
+    log "错误: artifact 下载失败，已重试 $max_retries 次"
     rm -f "$temp_zip"
     return 1
   fi
@@ -1634,12 +1775,6 @@ upgrade_landscape_version() {
     exit 1
   fi
   
-  # 如果需要创建备份
-  if [ "$CREATE_BACKUP" = true ]; then
-    log "正在创建备份..."
-    create_backup "$landscape_dir" "$version_type" || exit 1
-  fi
-  
   # 创建临时目录
   local temp_dir
   temp_dir=$(mktemp -d) || {
@@ -1657,6 +1792,16 @@ upgrade_landscape_version() {
     log "文件下载失败"
     rm -rf "$temp_dir"
     exit 1
+  fi
+  
+  # 所有文件下载成功后，如果需要创建备份
+  if [ "$CREATE_BACKUP" = true ]; then
+    log "正在创建备份..."
+    create_backup "$landscape_dir" "$version_type" || {
+      log "备份创建失败"
+      rm -rf "$temp_dir"
+      exit 1
+    }
   fi
   
   # 解压static.zip
@@ -1726,6 +1871,7 @@ upgrade_landscape_version() {
   # 使用新的文件替换函数，带有重试和回滚机制
   if ! replace_files_with_rollback "$temp_dir" "$landscape_dir" "$filename"; then
     log "文件替换失败，已执行回滚操作"
+    log "正在启动 Landscape Router 服务..."
     control_landscape_service "start"
     rm -rf "$temp_dir"
     exit 1
@@ -1769,7 +1915,7 @@ replace_files_with_rollback() {
   
   log "开始文件替换操作..."
   
-  # 创建备份目录保存原文件
+  # 创建备份目录保存原文件（临时备份）
   local backup_temp_dir="$temp_dir/backup_for_rollback"
   mkdir -p "$backup_temp_dir"
   
@@ -1811,138 +1957,139 @@ replace_files_with_rollback() {
       ;;
   esac
   
-  # 执行文件替换操作
-  local retry_count=0
-  while [ $retry_count -lt $max_retries ]; do
-    log "第 $((retry_count + 1)) 次尝试替换文件..."
+  # 记录替换成功的文件列表，用于需要时回滚
+  local successfully_replaced=()
+  local failed_files=()
+  
+  # 逐个替换文件，串行处理
+  for task in "${replace_tasks[@]}"; do
+    local file_type=$(echo "$task" | cut -d':' -f1)
+    local target_path=$(echo "$task" | cut -d':' -f2)
+    local source_path=$(echo "$task" | cut -d':' -f3)
     
-    local replace_success=true
+    log "开始替换 $file_type..."
     
-    # 逐个替换文件
-    for task in "${replace_tasks[@]}"; do
-      local file_type=$(echo "$task" | cut -d':' -f1)
-      local target_path=$(echo "$task" | cut -d':' -f2)
-      local source_path=$(echo "$task" | cut -d':' -f3)
+    # 单个文件的重试机制
+    local file_retry_count=0
+    local file_replace_success=false
+    
+    while [ $file_retry_count -lt $max_retries ]; do
+      log "替换 $file_type (尝试 $((file_retry_count + 1))/$max_retries)..."
       
+      # 备份原文件（如果存在）
+      local backup_path="$backup_temp_dir/$(basename "$target_path").bak"
+      if [ -e "$target_path" ]; then
+        if ! cp -r "$target_path" "$backup_path" 2>/dev/null; then
+          log "警告: 无法备份 $file_type"
+        else
+          log "已备份 $file_type 到 $backup_path"
+        fi
+      fi
       
-      # 单个文件重试机制
-      local file_retry_count=0
-      local file_replace_success=false
-      while [ $file_retry_count -lt $max_retries ]; do
-        log "正在替换 $file_type (尝试 $((file_retry_count + 1))/$max_retries)..."
+      # 执行替换
+      local replace_result=false
+      if [ "$file_type" = "static" ]; then
+        # 替换静态文件目录
+        rm -rf "$target_path" 2>/dev/null || true
         
-        # 备份原文件（如果存在）
-        if [ -e "$target_path" ]; then
-          local backup_path="$backup_temp_dir/$(basename "$target_path").bak"
-          if ! cp -r "$target_path" "$backup_path" 2>/dev/null; then
-            log "警告: 无法备份 $file_type"
-          fi
+        # 查找包含index.html的目录
+        local static_source_dir=""
+        if [ -f "$source_path/index.html" ]; then
+          static_source_dir="$source_path"
+        else
+          for dir in "$source_path"/*/; do
+            if [ -d "$dir" ] && [ -f "$dir/index.html" ]; then
+              static_source_dir="$dir"
+              break
+            fi
+          done
         fi
         
-        # 执行替换
-        if [ "$file_type" = "static" ]; then
-          # 替换静态文件目录
-          rm -rf "$target_path" 2>/dev/null || true
-          
-          # 查找包含index.html的目录
-          local static_source_dir=""
-          if [ -f "$source_path/index.html" ]; then
-            static_source_dir="$source_path"
-          else
-            for dir in "$source_path"/*/; do
-              if [ -d "$dir" ] && [ -f "$dir/index.html" ]; then
-                static_source_dir="$dir"
-                break
-              fi
-            done
-          fi
-          
-          if [ -z "$static_source_dir" ]; then
-            log "错误: 未找到包含 index.html 的目录"
-          else
-            if cp -r "$static_source_dir" "$target_path" 2>/dev/null; then
-              file_replace_success=true
-              log "✓ $file_type 替换成功"
-            else
-              log "错误: 无法替换 $file_type"
-            fi
-          fi
+        if [ -z "$static_source_dir" ]; then
+          log "错误: 未找到包含 index.html 的目录"
         else
-          # 替换单个文件
-          if cp "$source_path" "$target_path" 2>/dev/null; then
-            file_replace_success=true
-            
-            # 设置执行权限（如果需要）
-            if [[ "$file_type" == "executable" ]] || [[ "$file_type" == "script" ]] || [[ "$file_type" == binary_* ]]; then
-              chmod +x "$target_path" 2>/dev/null || true
-            fi
-            
+          if cp -r "$static_source_dir" "$target_path" 2>/dev/null; then
+            replace_result=true
             log "✓ $file_type 替换成功"
           else
             log "错误: 无法替换 $file_type"
           fi
         fi
-        
-        # 如果文件替换成功，跳出重试循环
-        if [ "$file_replace_success" = true ]; then
-          break
-        else
-          file_retry_count=$((file_retry_count + 1))
-          if [ $file_retry_count -lt $max_retries ]; then
-            local wait_time=$((file_retry_count * 2))
-            log "等待 $wait_time 秒后重试替换 $file_type..."
-            sleep $wait_time
+      else
+        # 替换单个文件
+        if cp "$source_path" "$target_path" 2>/dev/null; then
+          replace_result=true
+          
+          # 设置执行权限（如果需要）
+          if [[ "$file_type" == "executable" ]] || [[ "$file_type" == "script" ]] || [[ "$file_type" == binary_* ]]; then
+            chmod +x "$target_path" 2>/dev/null || true
           fi
+          
+          log "✓ $file_type 替换成功"
+        else
+          log "错误: 无法替换 $file_type"
         fi
-      done
+      fi
       
-      # 如果单个文件替换失败，标记整体失败并跳出循环
-      if [ "$file_replace_success" = false ]; then
-        replace_success=false
-        log "文件 $file_type 替换失败，取消升级"
+      # 检查替换结果
+      if [ "$replace_result" = true ]; then
+        file_replace_success=true
+        successfully_replaced+=("$task")
         break
+      else
+        file_retry_count=$((file_retry_count + 1))
+        if [ $file_retry_count -lt $max_retries ]; then
+          local wait_time=$((file_retry_count * 2))
+          log "等待 $wait_time 秒后重试替换 $file_type..."
+          sleep $wait_time
+        fi
       fi
     done
     
-    # 检查替换结果
-    if [ "$replace_success" = true ]; then
-      log "所有文件替换成功"
-      # 清理备份文件
-      rm -rf "$backup_temp_dir"
-      
-      return 0
-    else
-      log "文件替换失败，正在恢复已备份的文件..."
-      
-      # 恢复已备份的文件
-      for task in "${replace_tasks[@]}"; do
-        local file_type=$(echo "$task" | cut -d':' -f1)
-        local target_path=$(echo "$task" | cut -d':' -f2)
-        local backup_path="$backup_temp_dir/$(basename "$target_path").bak"
-        
-        if [ -e "$backup_path" ]; then
-          rm -rf "$target_path" 2>/dev/null || true
-          cp -r "$backup_path" "$target_path" 2>/dev/null || true
-          log "已恢复: $(basename "$target_path")"
-        fi
-      done
-      
-      retry_count=$((retry_count + 1))
-      if [ $retry_count -lt $max_retries ]; then
-        local wait_time=$((retry_count * 2))
-        log "等待 $wait_time 秒后进行下一次整体尝试..."
-        sleep $wait_time
-      fi
+    # 如果单个文件替换最终失败，记录失败文件
+    if [ "$file_replace_success" = false ]; then
+      failed_files+=("$file_type")
+      log "文件 $file_type 替换最终失败，已重试 $max_retries 次"
     fi
   done
   
-  # 最终失败，执行完整回滚
-  log "错误: 文件替换经过 $max_retries 次尝试仍然失败，开始执行完整回滚..."
+  # 检查是否有失败的文件
+  if [ ${#failed_files[@]} -gt 0 ]; then
+    log "错误: 以下文件替换失败:"
+    for failed_file in "${failed_files[@]}"; do
+      log "  - $failed_file"
+    done
+    
+    log "正在恢复已备份的文件..."
+    
+    # 恢复所有已替换的文件
+    for task in "${successfully_replaced[@]}"; do
+      local file_type=$(echo "$task" | cut -d':' -f1)
+      local target_path=$(echo "$task" | cut -d':' -f2)
+      local backup_path="$backup_temp_dir/$(basename "$target_path").bak"
+      
+      if [ -e "$backup_path" ]; then
+        rm -rf "$target_path" 2>/dev/null || true
+        if cp -r "$backup_path" "$target_path" 2>/dev/null; then
+          log "已恢复: $(basename "$target_path")"
+        else
+          log "警告: 无法恢复 $(basename "$target_path")"
+        fi
+      fi
+    done
+    
+    # 执行完整系统回滚
+    log "正在执行完整系统回滚..."
+    perform_system_rollback "$landscape_dir"
+    
+    return 1
+  fi
   
-  # 执行完整系统回滚
-  perform_system_rollback "$landscape_dir"
+  log "所有文件替换成功"
+  # 清理临时备份文件
+  rm -rf "$backup_temp_dir"
   
-  return 1
+  return 0
 }
 
 # 执行完整系统回滚
