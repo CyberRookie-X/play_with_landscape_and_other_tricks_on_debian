@@ -884,85 +884,9 @@ download_from_github_actions() {
   else
     log "使用缓存的工作流数据，运行ID: $CACHED_WORKFLOW_RUN_ID"
   fi
-  # 确定匹配的artifact名称
-  local final_artifact_name=""
+
   local artifacts_response="$CACHED_ARTIFACTS_DATA"
   
-  # 根据文件名确定匹配的artifact名称
-  case "$file_name" in
-    "landscape-webserver-x86_64")
-      for possible_name in "landscape-webserver-x86_64" "landscape-x86_64" "webserver-x86_64" "landscape" "linux-x86_64"; do
-        if echo "$artifacts_response" | grep -q "\"name\": *\"$possible_name\""; then
-          final_artifact_name="$possible_name"
-          break
-        fi
-      done
-      ;;
-    "landscape-webserver-x86_64-musl")
-      for possible_name in "landscape-webserver-x86_64-musl" "landscape-x86_64-musl" "webserver-x86_64-musl" "linux-x86_64-musl"; do
-        if echo "$artifacts_response" | grep -q "\"name\": *\"$possible_name\""; then
-          final_artifact_name="$possible_name"
-          break
-        fi
-      done
-      ;;
-    "landscape-webserver-aarch64")
-      for possible_name in "landscape-webserver-aarch64" "landscape-aarch64" "webserver-aarch64" "linux-aarch64"; do
-        if echo "$artifacts_response" | grep -q "\"name\": *\"$possible_name\""; then
-          final_artifact_name="$possible_name"
-          break
-        fi
-      done
-      ;;
-    "static.zip")
-      for possible_name in "static.zip" "static" "web" "ui" "frontend" "assets"; do
-        if echo "$artifacts_response" | grep -q "\"name\": *\"$possible_name\""; then
-          final_artifact_name="$possible_name"
-          break
-        fi
-      done
-      ;;
-    # 修复redirect_pkg_handler二进制文件的匹配逻辑
-    "redirect_pkg_handler-x86_64")
-      for possible_name in "redirect_pkg_handler-x86_64" "redirect-x86_64" "handler-x86_64"; do
-        if echo "$artifacts_response" | grep -q "\"name\": *\"$possible_name\""; then
-          final_artifact_name="$possible_name"
-          break
-        fi
-      done
-      ;;
-    "redirect_pkg_handler-x86_64-musl")
-      for possible_name in "redirect_pkg_handler-x86_64-musl" "redirect-x86_64-musl" "handler-x86_64-musl"; do
-        if echo "$artifacts_response" | grep -q "\"name\": *\"$possible_name\""; then
-          final_artifact_name="$possible_name"
-          break
-        fi
-      done
-      ;;
-    "redirect_pkg_handler-aarch64")
-      for possible_name in "redirect_pkg_handler-aarch64" "redirect-aarch64" "handler-aarch64"; do
-        if echo "$artifacts_response" | grep -q "\"name\": *\"$possible_name\""; then
-          final_artifact_name="$possible_name"
-          break
-        fi
-      done
-      ;;
-    "redirect_pkg_handler-aarch64-musl")
-      for possible_name in "redirect_pkg_handler-aarch64-musl" "redirect-aarch64-musl" "handler-aarch64-musl"; do
-        if echo "$artifacts_response" | grep -q "\"name\": *\"$possible_name\""; then
-          final_artifact_name="$possible_name"
-          break
-        fi
-      done
-      ;;
-  esac
-  
-  if [ -z "$final_artifact_name" ]; then
-    log "错误: 未找到匹配的artifact"
-    return 1
-  fi
-  
-  artifact_name="$final_artifact_name"
   log "使用artifact: $artifact_name"
   
   # 解析artifact信息
@@ -1062,8 +986,16 @@ download_from_github_actions() {
     fi
   fi
   
+  # 如果仍未找到文件，尝试查找任何非zip文件（处理GitHub打包zip的情况）
+  if [ -z "$extracted_file" ] || [ ! -f "$extracted_file" ]; then
+    # GitHub打包的artifact zip中可能包含同名的可执行文件
+    extracted_file=$(find "$temp_dir" -type f -not -name "*.zip" -not -name "*.tar.gz" | head -1)
+  fi
+  
   if [ -z "$extracted_file" ] || [ ! -f "$extracted_file" ]; then
     log "错误: 在解压文件中未找到目标文件 $artifact_name"
+    log "解压目录内容:"
+    ls -la "$temp_dir" 2>/dev/null || echo "无法列出目录内容"
     rm -f "$temp_zip"
     rm -rf "$temp_dir"
     return 1
@@ -1147,15 +1079,15 @@ create_backup() {
   if command -v gzip >/dev/null 2>&1; then
     backup_file="$backup_dir/${backup_name}.tar.gz"
     log "使用压缩工具: gzip"
-    (cd "$temp_dir" && tar -cf "${backup_name}.tar" . && gzip -c "${backup_name}.tar" > "$backup_file" && rm -f "${backup_name}.tar")
+    (cd "$temp_dir" && tar -cf "${backup_name}.tar" --exclude="${backup_name}.tar" . && gzip -c "${backup_name}.tar" > "$backup_file" && rm -f "${backup_name}.tar")
   elif command -v bzip2 >/dev/null 2>&1; then
     backup_file="$backup_dir/${backup_name}.tar.bz2"
     log "使用压缩工具: bzip2"
-    (cd "$temp_dir" && tar -cf "${backup_name}.tar" . && bzip2 -c "${backup_name}.tar" > "$backup_file" && rm -f "${backup_name}.tar")
+    (cd "$temp_dir" && tar -cf "${backup_name}.tar" --exclude="${backup_name}.tar" . && bzip2 -c "${backup_name}.tar" > "$backup_file" && rm -f "${backup_name}.tar")
   elif command -v xz >/dev/null 2>&1; then
     backup_file="$backup_dir/${backup_name}.tar.xz"
     log "使用压缩工具: xz"
-    (cd "$temp_dir" && tar -cf "${backup_name}.tar" . && xz -c "${backup_name}.tar" > "$backup_file" && rm -f "${backup_name}.tar")
+    (cd "$temp_dir" && tar -cf "${backup_name}.tar" --exclude="${backup_name}.tar" . && xz -c "${backup_name}.tar" > "$backup_file" && rm -f "${backup_name}.tar")
   elif command -v zip >/dev/null 2>&1; then
     backup_file="$backup_dir/${backup_name}.zip"
     log "使用压缩工具: zip"
@@ -1163,7 +1095,7 @@ create_backup() {
   elif command -v tar >/dev/null 2>&1; then
     backup_file="$backup_dir/${backup_name}.tar"
     log "使用压缩工具: tar"
-    (cd "$temp_dir" && tar -cf "$backup_file" .)
+    (cd "$temp_dir" && tar -cf "$backup_file" --exclude="$(basename "$backup_file")" .)
   else
     log "错误: 系统中未找到支持的压缩工具，请安装 gzip、bzip2、xz、zip 或 tar 中的一种"
     rm -rf "$temp_dir"
