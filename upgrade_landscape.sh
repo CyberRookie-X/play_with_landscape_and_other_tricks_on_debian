@@ -793,10 +793,6 @@ download_from_github_actions() {
   
   # 确定需要下载的artifact名称
   local artifact_name="$file_name"
-  # 对于static.zip，artifact名称应该是static
-  if [ "$file_name" = "static.zip" ]; then
-    artifact_name="static.zip"
-  fi
   
   log "正在从GitHub Actions下载 $artifact_name..."
   
@@ -889,18 +885,47 @@ download_from_github_actions() {
   
   log "使用artifact: $artifact_name"
   
-  # 解析artifact信息
+  # 解析artifact信息 - 使用精确匹配
   local artifact_block
   artifact_block=$(echo "$artifacts_response" | awk -v name="$artifact_name" '
-    BEGIN { in_block=0; block=""; found=0 }
-    /"name":/ && $0 ~ name { in_block=1; found=1 }
-    in_block { block = block $0 "\n" }
-    in_block && /}/ { print block; exit }
+    BEGIN { in_block=0; block=""; found=0; brace_count=0 }
+    /"artifacts"/ { in_artifacts=1 }
+    in_artifacts && /{/ {
+      if (!in_block) {
+        block = $0 "\n"
+        brace_count = 1
+        in_block = 1
+      } else {
+        block = block $0 "\n"
+        brace_count++
+      }
+    }
+    in_block && /}/ {
+      block = block $0 "\n"
+      brace_count--
+      if (brace_count == 0) {
+        # 检查这个块是否包含我们要找的artifact名称（精确匹配）
+        if (block ~ "\"name\":[[:space:]]*\"" name "\"") {
+          print block
+          found = 1
+          exit
+        }
+        block = ""
+        in_block = 0
+      }
+    }
+    in_block && !/{/ && !/}/ {
+      block = block $0 "\n"
+    }
     END { if (!found) print "ARTIFACT_NOT_FOUND" }
   ')
   
   if [ -z "$artifact_block" ] || [ "$artifact_block" = "ARTIFACT_NOT_FOUND" ]; then
     log "错误: 在artifacts响应中未找到 $artifact_name"
+    log "可用的artifacts:"
+    echo "$artifacts_response" | grep -o '"name":[[:space:]]*"[^"]*"' | sed 's/"name":[[:space:]]*"//;s/"//' | while read -r artifact; do
+      log "  - $artifact"
+    done
     return 1
   fi
   
@@ -973,29 +998,48 @@ download_from_github_actions() {
   
   # 查找并复制目标文件
   local extracted_file=""
+  
+  log "正在查找目标文件: $artifact_name"
+  log "解压目录内容:"
+  ls -la "$temp_dir" 2>/dev/null || log "无法列出目录内容"
+  
+  # 优先精确匹配文件名
   if [ "$artifact_name" = "static" ]; then
-    extracted_file="$temp_dir/static.zip"
-  else
-    extracted_file="$temp_dir/$artifact_name"
-  fi
-  
-  if [ ! -f "$extracted_file" ]; then
-    extracted_file=$(find "$temp_dir" -name "$artifact_name" -type f | head -1)
-    if [ -z "$extracted_file" ] && [ "$artifact_name" = "static" ]; then
-      extracted_file=$(find "$temp_dir" -name "static.zip" -type f | head -1)
+    # 对于static artifact，查找static.zip文件
+    extracted_file=$(find "$temp_dir" -name "static.zip" -type f | head -1)
+    if [ -z "$extracted_file" ]; then
+      # 如果没找到static.zip，查找任何zip文件
+      extracted_file=$(find "$temp_dir" -name "*.zip" -type f | head -1)
     fi
-  fi
-  
-  # 如果仍未找到文件，尝试查找任何非zip文件（处理GitHub打包zip的情况）
-  if [ -z "$extracted_file" ] || [ ! -f "$extracted_file" ]; then
-    # GitHub打包的artifact zip中可能包含同名的可执行文件
-    extracted_file=$(find "$temp_dir" -type f -not -name "*.zip" -not -name "*.tar.gz" | head -1)
+  else
+    # 对于其他文件，精确匹配文件名
+    extracted_file=$(find "$temp_dir" -name "$artifact_name" -type f | head -1)
+    
+    # 如果精确匹配失败，尝试查找可执行文件
+    if [ -z "$extracted_file" ] && [[ "$artifact_name" == landscape-webserver-* ]]; then
+      # 查找landscape-webserver开头的可执行文件
+      extracted_file=$(find "$temp_dir" -name "landscape-webserver-*" -type f | head -1)
+    elif [ -z "$extracted_file" ] && [[ "$artifact_name" == redirect_pkg_handler-* ]]; then
+      # 查找redirect_pkg_handler开头的可执行文件
+      extracted_file=$(find "$temp_dir" -name "redirect_pkg_handler-*" -type f | head -1)
+    fi
   fi
   
   if [ -z "$extracted_file" ] || [ ! -f "$extracted_file" ]; then
     log "错误: 在解压文件中未找到目标文件 $artifact_name"
-    log "解压目录内容:"
-    ls -la "$temp_dir" 2>/dev/null || echo "无法列出目录内容"
+    log "期望的文件: $artifact_name"
+    log "解压目录中的所有文件:"
+    find "$temp_dir" -type f -exec ls -la {} \; 2>/dev/null || log "无法列出文件"
+    rm -f "$temp_zip"
+    rm -rf "$temp_dir"
+    return 1
+  fi
+  
+  log "找到目标文件: $extracted_file"
+  
+  # 验证文件内容
+  if ! validate_downloaded_file "$extracted_file" "$artifact_name"; then
+    log "错误: 下载的文件验证失败"
     rm -f "$temp_zip"
     rm -rf "$temp_dir"
     return 1
@@ -1014,6 +1058,76 @@ download_from_github_actions() {
   rm -rf "$temp_dir"
   
   log "成功下载并解压 $artifact_name"
+  return 0
+}
+
+# 验证下载的文件是否正确
+validate_downloaded_file() {
+  local file_path="$1"
+  local expected_name="$2"
+  
+  log "正在验证文件: $file_path (期望: $expected_name)"
+  
+  # 检查文件是否存在且非空
+  if [ ! -f "$file_path" ] || [ ! -s "$file_path" ]; then
+    log "验证失败: 文件不存在或为空"
+    return 1
+  fi
+  
+  local file_size=$(ls -lh "$file_path" 2>/dev/null | awk '{print $5}' || echo '未知')
+  log "文件大小: $file_size"
+  
+  # 根据文件类型进行不同的验证
+  case "$expected_name" in
+    "static")
+      # 验证static.zip文件
+      if ! file "$file_path" | grep -q "Zip archive"; then
+        log "验证失败: static文件不是有效的ZIP文件"
+        log "文件类型信息: $(file "$file_path")"
+        return 1
+      fi
+      # 尝试测试zip文件完整性
+      if command -v unzip >/dev/null 2>&1; then
+        if ! unzip -t "$file_path" >/dev/null 2>&1; then
+          log "验证失败: static.zip文件损坏"
+          return 1
+        fi
+      fi
+      log "static.zip文件验证成功"
+      ;;
+    landscape-webserver-*)
+      # 验证可执行文件
+      if ! file "$file_path" | grep -q "executable"; then
+        log "验证失败: landscape-webserver文件不是可执行文件"
+        log "文件类型信息: $(file "$file_path")"
+        return 1
+      fi
+      # 尝试获取版本信息（如果是有效的landscape程序）
+      chmod +x "$file_path" 2>/dev/null
+      local version_output
+      if version_output=$("$file_path" --version 2>/dev/null); then
+        log "landscape版本信息: $version_output"
+      else
+        log "警告: 无法获取版本信息，但文件格式正确"
+      fi
+      log "landscape-webserver文件验证成功"
+      ;;
+    redirect_pkg_handler-*)
+      # 验证redirect_pkg_handler二进制文件
+      if ! file "$file_path" | grep -q "executable"; then
+        log "验证失败: redirect_pkg_handler文件不是可执行文件"
+        log "文件类型信息: $(file "$file_path")"
+        return 1
+      fi
+      chmod +x "$file_path" 2>/dev/null
+      log "redirect_pkg_handler二进制文件验证成功"
+      ;;
+    *)
+      log "未知文件类型，跳过特殊验证"
+      ;;
+  esac
+  
+  log "文件验证完成: $expected_name"
   return 0
 }
 
@@ -1427,13 +1541,69 @@ download_files_serially() {
       return 1
     fi
     
-    # 验证文件是否下载成功
+    # 验证文件是否下载成功且内容正确
     if [ ! -f "$file_path" ] || [ ! -s "$file_path" ]; then
       log "错误: $file_desc 下载文件无效或为空"
       return 1
     fi
     
-    log "✓ $file_desc 下载成功"
+    # 根据文件类型进行额外验证
+    case "$file_desc" in
+      "static.zip")
+        # 验证ZIP文件
+        if ! file "$file_path" | grep -q "Zip archive"; then
+          log "错误: $file_desc 不是有效的ZIP文件"
+          log "文件类型信息: $(file "$file_path")"
+          rm -f "$file_path"  # 删除无效文件
+          return 1
+        fi
+        if command -v unzip >/dev/null 2>&1; then
+          if ! unzip -t "$file_path" >/dev/null 2>&1; then
+            log "错误: $file_desc ZIP文件损坏"
+            rm -f "$file_path"  # 删除损坏文件
+            return 1
+          fi
+        fi
+        ;;
+      "可执行文件")
+        # 验证可执行文件
+        if ! file "$file_path" | grep -q "executable"; then
+          log "错误: $file_desc 不是有效的可执行文件"
+          log "文件类型信息: $(file "$file_path")"
+          rm -f "$file_path"  # 删除无效文件
+          return 1
+        fi
+        chmod +x "$file_path" 2>/dev/null
+        ;;
+      redirect_pkg_handler-*)
+        # 验证redirect_pkg_handler二进制文件
+        if ! file "$file_path" | grep -q "executable"; then
+          log "错误: $file_desc 不是有效的可执行文件"
+          log "文件类型信息: $(file "$file_path")"
+          rm -f "$file_path"  # 删除无效文件
+          return 1
+        fi
+        chmod +x "$file_path" 2>/dev/null
+        ;;
+      "redirect_pkg_handler.sh")
+        # 验证shell脚本
+        if [ ! -s "$file_path" ]; then
+          log "错误: $file_desc 文件为空"
+          rm -f "$file_path"  # 删除空文件
+          return 1
+        fi
+        if ! head -1 "$file_path" 2>/dev/null | grep -q "^#!/"; then
+          log "错误: $file_desc 不是有效的shell脚本"
+          log "文件前几行内容:"
+          head -5 "$file_path" 2>/dev/null | while read -r line; do log "  $line"; done
+          rm -f "$file_path"  # 删除无效文件
+          return 1
+        fi
+        chmod +x "$file_path" 2>/dev/null
+        ;;
+    esac
+    
+    log "✓ $file_desc 下载并验证成功"
   done
   
   log "所有文件串行下载完成"

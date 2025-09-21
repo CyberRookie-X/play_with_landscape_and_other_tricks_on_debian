@@ -33,6 +33,9 @@ upgrade_landsacpe.sh
 
 A 高
 
+
+备份 放在 下载完成后
+
 测试 rollback
 测试 stable 升级
 
