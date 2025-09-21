@@ -180,7 +180,7 @@ check_system() {
     # 对于非支持的系统，询问是否继续
     if [ "$supported_system" = false ]; then
         echo "警告: 检测到您的系统为 $system_name ($system_id)。"
-        echo "警告: 此系统与 Landscape Router 可能存在兼容性问题。"
+        echo "警告: 此系统未经测试，可能存在兼容性问题。"
         read -rp "是否继续安装? (y/n): " answer
         if [[ "$answer" =~ ^[Nn]$ ]]; then
             log "用户选择退出安装"
