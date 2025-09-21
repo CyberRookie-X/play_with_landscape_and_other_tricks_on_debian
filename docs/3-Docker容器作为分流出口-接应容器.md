@@ -166,6 +166,7 @@ ghcr.nju.edu.cn
 * 解压并上传到 Landscape Router 安装路径下
 * 为 包装脚本 和 handler 赋予可执行权限,如 755
 
+**安装脚本已包含这两个文件**  
 
 包装脚本 [下载连接](https://raw.githubusercontent.com/CyberRookie-X/Install_landscape_on_debian12_and_manage_compose_by_dpanel/main/redirect_pkg_handler.sh) | redirect_pkg_handler [下载连接](https://github.com/ThisSeanZhang/landscape/releases)  
 

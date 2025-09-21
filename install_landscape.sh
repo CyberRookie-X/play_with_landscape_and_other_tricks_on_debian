@@ -152,8 +152,41 @@ check_system() {
     elif command -v wget >/dev/null 2>&1; then
         log "检测到系统已安装 wget"
     fi
-    
+
     log "系统环境检查完成"
+
+    # 检查系统发行版
+    local system_id=""
+    local system_name=""
+    if [ -f "/etc/os-release" ]; then
+        system_id=$(grep "^ID=" /etc/os-release | cut -d'=' -f2 | tr -d '"' | tr '[:upper:]' '[:lower:]')
+        system_name=$(grep "^NAME=" /etc/os-release | cut -d'=' -f2 | tr -d '"' | tr '[:upper:]' '[:lower:]')
+    fi
+    
+    # 检查是否为支持的系统
+    local supported_system=false
+    case "$system_id" in
+        "debian"|"armbian"|"raspbian")
+            supported_system=true
+            ;;
+        *)
+            # 检查名称中是否包含支持的系统名
+            if echo "$system_name" | grep -qE "(debian|armbian|raspbian)"; then
+                supported_system=true
+            fi
+            ;;
+    esac
+    
+    # 对于非支持的系统，询问是否继续
+    if [ "$supported_system" = false ]; then
+        echo "警告: 检测到您的系统为 $system_name ($system_id)。"
+        echo "警告: 此系统与 Landscape Router 可能存在兼容性问题。"
+        read -rp "是否继续安装? (y/n): " answer
+        if [[ "$answer" =~ ^[Nn]$ ]]; then
+            log "用户选择退出安装"
+            exit 0
+        fi
+    fi
 }
 
 # 询问用户配置

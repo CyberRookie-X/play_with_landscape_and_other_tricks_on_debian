@@ -2,6 +2,7 @@ install_landsacpe.sh
 
 A 高
 
+询问 handler，并下载 handler.sh
 增加 redirect.sh 下载
 
 选择询问 在 landscape 中被使用的网卡，设为 manual。要怎么做才好呢？
