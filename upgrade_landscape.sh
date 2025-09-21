@@ -1911,7 +1911,7 @@ replace_files_with_rollback() {
   local temp_dir="$1"
   local landscape_dir="$2"
   local filename="$3"
-  local max_retries=3
+  local max_retries=5
   
   log "开始文件替换操作..."
   
