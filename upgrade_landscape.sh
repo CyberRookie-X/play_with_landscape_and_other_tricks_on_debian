@@ -43,6 +43,7 @@ UPGRADE_LOG=""  # 升级日志文件路径
 LANDSCAPE_DIR=""  # Landscape安装目录全局变量
 CURRENT_VERSION=""  # 当前版本号全局变量
 GITHUB_TOKEN=""  # GitHub Token全局变量
+DOCKER_STOPPED_BY_SCRIPT=false  # 跟踪脚本是否停止了Docker服务，也用于标记 Docker 的状态
 
 # API响应缓存变量
 CACHED_WORKFLOW_DATA=""  # 缓存的工作流列表响应
@@ -69,7 +70,7 @@ main() {
   
   # 获取当前版本号
   get_current_version
-  
+
   # 处理回滚操作
   if [ "$ROLLBACK" = true ]; then
     handle_rollback_operation
@@ -518,6 +519,12 @@ control_landscape_service() {
   case "$action" in
     "start")
       log "正在启动 Landscape Router 服务..."
+      # 如果脚本之前停止了Docker服务，则在启动Landscape服务时也启动Docker服务
+      if [ "$DOCKER_STOPPED_BY_SCRIPT" = true ]; then
+        log "检测到脚本之前停止了Docker服务，正在同时启动Docker服务..."
+        control_docker_service "start"
+      fi
+      
       if [ "$INIT_SYSTEM" = "systemd" ]; then
         systemctl start landscape-router
       else
@@ -534,6 +541,12 @@ control_landscape_service() {
       ;;
     "restart")
       log "正在重启 Landscape Router 服务..."
+      # 如果脚本之前停止了Docker服务，则在重启Landscape服务时也启动Docker服务
+      if [ "$DOCKER_STOPPED_BY_SCRIPT" = true ]; then
+        log "检测到脚本之前停止了Docker服务，正在同时启动Docker服务..."
+        control_docker_service "start"
+      fi
+      
       if [ "$INIT_SYSTEM" = "systemd" ]; then
         systemctl restart landscape-router
       else
@@ -542,6 +555,47 @@ control_landscape_service() {
       ;;
     *)
       log "未知的服务操作: $action"
+      return 1
+      ;;
+  esac
+}
+
+# 控制Docker服务的函数
+control_docker_service() {
+  local action="$1"
+  case "$action" in
+    "start")
+      log "正在启动 Docker 服务..."
+      if [ "$INIT_SYSTEM" = "systemd" ]; then
+        systemctl start docker
+      else
+        rc-service docker start
+      fi
+      # 取消 Docker 标记，表示 Docker 已启动
+      DOCKER_STOPPED_BY_SCRIPT=false
+      ;;
+    "stop")
+      log "正在停止 Docker 服务..."
+      if [ "$INIT_SYSTEM" = "systemd" ]; then
+        systemctl stop docker
+      else
+        rc-service docker stop
+      fi
+      # 记录脚本停止了Docker服务
+      DOCKER_STOPPED_BY_SCRIPT=true
+      ;;
+    "restart")
+      log "正在重启 Docker 服务..."
+      if [ "$INIT_SYSTEM" = "systemd" ]; then
+        systemctl restart docker
+      else
+        rc-service docker restart
+      fi
+      # 取消 Docker 标记，表示 Docker 已启动
+      DOCKER_STOPPED_BY_SCRIPT=false
+      ;;
+    *)
+      log "未知的 Docker 服务操作: $action"
       return 1
       ;;
   esac
@@ -1526,7 +1580,10 @@ handle_rollback_operation() {
   
   # 停止服务
   control_landscape_service "stop"
-  
+  # 停止 docker 服务
+  control_docker_service "stop"
+  DOCKER_STOPPED_BY_SCRIPT=true
+
   # 创建临时目录
   local temp_dir
   temp_dir=$(mktemp -d) || {
@@ -1589,6 +1646,7 @@ handle_rollback_operation() {
   else
     log "正在启动 Landscape Router 服务..."
     control_landscape_service "start"
+    control_docker_service "start"
     log "回滚操作已成功完成，但系统尚未重启。"
     log "注意：Landscape Router 的某些功能可能无法正常工作。"
     log "重要提示：请在方便的时候尽快手动执行重启，以确保回滚完全生效。"
@@ -1613,7 +1671,7 @@ download_files_serially() {
   
   local static_download_url
   static_download_url=$(get_static_download_url "$version_type")
-  
+
   local redirect_pkg_handler_script_url
   log "正在获取 redirect_pkg_handler.sh 下载URL..."
   # 对于 redirect_pkg_handler.sh，无论什么版本都使用 github_actions
@@ -1960,6 +2018,7 @@ replace_files_with_rollback() {
   # 记录替换成功的文件列表，用于需要时回滚
   local successfully_replaced=()
   local failed_files=()
+  local docker_stopped=false
   
   # 逐个替换文件，串行处理
   for task in "${replace_tasks[@]}"; do
@@ -1975,6 +2034,19 @@ replace_files_with_rollback() {
     
     while [ $file_retry_count -lt $max_retries ]; do
       log "替换 $file_type (尝试 $((file_retry_count + 1))/$max_retries)..."
+      
+      # 对于redirect_pkg_handler相关的二进制文件（除了redirect_pkg_handler.sh），
+      # 如果第一次失败，停止Docker服务后再尝试
+      if [[ "$file_type" == "binary_"* ]] && [ $file_retry_count -eq 3 ] && [ "$file_replace_success" = false ]; then
+        if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet docker 2>/dev/null; then
+          log "$file_type替换失败，正在停止Docker服务以重试..."
+          control_docker_service "stop"
+          docker_stopped=true
+          # 标记Docker服务是由脚本停止的
+          DOCKER_STOPPED_BY_SCRIPT=true
+          log "Docker服务已停止"
+        fi
+      fi
       
       # 备份原文件（如果存在）
       local backup_path="$backup_temp_dir/$(basename "$target_path").bak"
@@ -2086,6 +2158,18 @@ replace_files_with_rollback() {
   fi
   
   log "所有文件替换成功"
+  
+  # 根据是否停止了Docker服务以及是否需要重启来决定是否启动Docker服务
+  if [ "$docker_stopped" = true ]; then
+    if [ "$AUTO_REBOOT" = true ]; then
+      log "Docker服务已被停止，系统将重启以重新启动Docker服务"
+    else
+      log "正在启动 Docker 服务..."
+      control_docker_service "start"
+      log "Docker 服务已启动"
+    fi
+  fi
+  
   # 清理临时备份文件
   rm -rf "$backup_temp_dir"
   
