@@ -30,6 +30,8 @@ INSTALL_PPP=false
 APT_UPDATED=false
 TEMP_LOG_DIR=""
 APT_SOURCE_BACKED_UP=false  # 是否已经备份过源文件
+DOWNLOAD_HANDLER=false      # 是否下载 handler
+HANDLER_ARCHITECTURES=()    # 要下载的 handler 架构列表
 
 # 主逻辑
 main() {
@@ -192,30 +194,34 @@ check_system() {
 # 询问用户配置
 ask_user_config() {
     log "开始询问用户配置"
-    
+    echo "=============================="
     # 提示用户所有问题回答完成后可以再次修改
     echo ""
     echo "注意: 您需要回答以下所有问题, 回答结束后可以检查和修改任何配置项。"
     echo ""
-    
+    echo "-----------------------------"
     # 检查web server环境
     ask_webserver
     
+    echo "-----------------------------"
     # 询问是否修改时区为中国上海
     read -rp "是否将系统时区修改为亚洲/上海? (y/n): " answer
     if [[ ! "$answer" =~ ^[Nn]$ ]]; then
         TIMEZONE_SHANGHAI=true
     fi
+    echo "-----------------------------"
 
     # 询问是否关闭 swap
     read -rp "是否禁用 swap (虚拟内存) ? (y/n): " answer
     if [[ ! "$answer" =~ ^[Nn]$ ]]; then
         SWAP_DISABLED=true
     fi
+    echo "-----------------------------"
 
     # 询问是否换源 (仅对支持的系统进行询问)
     # 检查是否为支持换源的系统 (Debian, Ubuntu, Linux Mint, Armbian, Raspbian)
     ask_apt_mirror
+    echo "-----------------------------"
 
     # 询问是否安装 Docker
     read -rp "是否安装 Docker(含compose)? (y/n): " answer
@@ -231,15 +237,22 @@ ask_user_config() {
             DOCKER_ENABLE_IPV6=true
         fi
     fi
+    echo "-----------------------------"
 
     # 询问是否安装 ppp 用于 pppoe 拨号
     read -rp "是否安装 ppp 用于 pppoe 拨号? (y/n): " answer
     if [[ ! "$answer" =~ ^[Nn]$ ]]; then
         INSTALL_PPP=true
     fi
+    echo "-----------------------------"
 
     # 询问是否使用 GitHub 镜像加速
     ask_github_mirror
+    echo "-----------------------------"
+    
+    # 询问是否下载 handler
+    ask_download_handler
+    echo "-----------------------------"
     
     # 询问 Landscape 安装路径
     while true; do
@@ -255,6 +268,7 @@ ask_user_config() {
         
         break
     done
+    echo "-----------------------------"
 
     # 询问管理员账号密码
     read -rp "Landscape Router 管理员 用户名、密码 均为 root, 是否修改? (y/n): " answer
@@ -272,6 +286,7 @@ ask_user_config() {
         # 清除临时密码变量
         TEMP_PASS=""
     fi
+    echo "-----------------------------"
     
     # 配置 LAN 网卡
     config_lan_interface
@@ -320,10 +335,14 @@ ask_user_config() {
         if [ "$USE_GITHUB_MIRROR" = true ]; then
             echo "   GitHub 镜像地址: $GITHUB_MIRROR"
         fi
-        echo "8. Landscape Router 安装路径: $LANDSCAPE_DIR"
-        echo "9. 管理员账号: $ADMIN_USER"
-        echo "   管理员密码: $ADMIN_PASS"
-        echo "10. LAN 网桥配置:"
+        echo "8. 下载 redirect_pkg_handler: $([ "$DOWNLOAD_HANDLER" = true ] && echo "是" || echo "否")"
+        if [ "$DOWNLOAD_HANDLER" = true ]; then
+            echo "   要下载的 handler 版本: ${HANDLER_ARCHITECTURES[*]}"
+        fi
+        echo "9. Landscape Router 安装路径: $LANDSCAPE_DIR"
+        echo "10. 管理员账号: $ADMIN_USER"
+        echo "    管理员密码: $ADMIN_PASS"
+        echo "11. LAN 网桥配置:"
         echo "    名称 = $(echo "$LAN_CONFIG" | grep "bridge_name" | cut -d '"' -f 2)"
         echo "    IP地址 = $(echo "$LAN_CONFIG" | grep "lan_ip" | cut -d '"' -f 2)"
         echo "    DHCP起始地址 = $(echo "$LAN_CONFIG" | grep "dhcp_start" | cut -d '"' -f 2)"
@@ -398,6 +417,9 @@ ask_user_config() {
                 ask_github_mirror
                 ;;
             8)
+                ask_download_handler
+                ;;
+            9)
                 while true; do
                     read -rp "请输入 Landscape Router 安装路径 (默认: /root/.landscape-router): " LANDSCAPE_DIR
                     if [ -z "$LANDSCAPE_DIR" ]; then
@@ -412,7 +434,7 @@ ask_user_config() {
                     break
                 done
                 ;;
-            9)
+            10)
                 read -rp "是否设置 Landscape Router 管理员账号密码? (y/n): " answer
                 if [[ ! "$answer" =~ ^[Nn]$ ]]; then
                     read -rp "请输入管理员用户名 (默认: root): " custom_user
@@ -429,7 +451,7 @@ ask_user_config() {
                     TEMP_PASS=""
                 fi
                 ;;
-            10)
+            11)
                 config_lan_interface
                 ;;
             *)
@@ -578,6 +600,95 @@ ask_github_mirror() {
 }
 
 
+# 暂不支持 aarch64-musl
+# 询问是否下载 handler 及选择架构
+ask_download_handler() {
+    echo ""
+    echo "redirect_pkg_handler 是 分流到 Docker 容器 功能不可缺少该组件"
+    echo ""
+    read -rp "是否下载 redirect_pkg_handler 相关文件? (y/n): " answer
+    if [[ ! "$answer" =~ ^[Nn]$ ]]; then
+        DOWNLOAD_HANDLER=true
+        
+        # 获取系统架构
+        local system_arch
+        system_arch=$(uname -m)
+        
+        echo "请选择要下载的 redirect_pkg_handler 版本 (可多选，用空格分隔):"
+        # 根据系统架构提供相应的选项
+        case "$system_arch" in
+            x86_64)
+                echo "1) musl 版（适用于 Alpine 等构建的镜像）(常见)"
+                echo "2) Glibc 版（适用于 Debian 等构建的镜像）"
+                echo "3) 全选"
+                read -rp "请输入选项 (默认为 1): " handler_choice
+                
+                # 默认选择 x86_64
+                if [ -z "$handler_choice" ]; then
+                    handler_choice="1"
+                fi
+                
+                # 根据选择设置要下载的架构
+                HANDLER_ARCHITECTURES=()
+                if [[ "$handler_choice" =~ 3 ]]; then
+                    HANDLER_ARCHITECTURES=("x86_64" "x86_64-musl")
+                else
+                    [[ "$handler_choice" =~ 1 ]] && HANDLER_ARCHITECTURES+=("x86_64-musl")
+                    [[ "$handler_choice" =~ 2 ]] && HANDLER_ARCHITECTURES+=("x86_64")
+                fi
+                ;;
+            aarch64)
+                # echo "1) musl 版（适用于 Alpine 等构建的镜像）"
+                echo "2) Glibc 版（适用于 Debian 等构建的镜像）"
+                # echo "3) 全选"
+                read -rp "请输入选项 (默认为 2): " handler_choice
+                
+                # 默认选择 aarch64
+                if [ -z "$handler_choice" ]; then
+                    handler_choice="2"
+                fi
+                
+                # 根据选择设置要下载的架构
+                HANDLER_ARCHITECTURES=()
+                if [[ "$handler_choice" =~ 3 ]]; then
+                    HANDLER_ARCHITECTURES=("aarch64")
+                else
+                    [[ "$handler_choice" =~ 1 ]] && HANDLER_ARCHITECTURES+=("aarch64-musl")
+                    [[ "$handler_choice" =~ 2 ]] && HANDLER_ARCHITECTURES+=("aarch64")
+                fi
+                ;;
+            *)
+                echo "检测到不常见的系统架构: $system_arch"
+                echo "1) x86_64 musl 版（适用于 Alpine 等构建的镜像）"
+                echo "2) x86_64 Glibc 版（适用于 Debian 等构建的镜像）"
+                # echo "3) aarch64 musl 版（适用于 Alpine 等构建的镜像）"
+                echo "4) aarch64 Glibc 版（适用于 Debian 等构建的镜像）"
+                echo "5) 全选"
+                read -rp "请输入选项 (默认为 5): " handler_choice
+                
+                # 默认全选
+                if [ -z "$handler_choice" ]; then
+                    handler_choice="5"
+                fi
+                
+                # 根据选择设置要下载的架构
+                HANDLER_ARCHITECTURES=()
+                if [[ "$handler_choice" =~ 5 ]]; then
+                    HANDLER_ARCHITECTURES=("x86_64" "x86_64-musl" "aarch64")
+                else
+                    [[ "$handler_choice" =~ 1 ]] && HANDLER_ARCHITECTURES+=("x86_64-musl")
+                    [[ "$handler_choice" =~ 2 ]] && HANDLER_ARCHITECTURES+=("x86_64")
+                    # [[ "$handler_choice" =~ 3 ]] && HANDLER_ARCHITECTURES+=("aarch64-musl")
+                    [[ "$handler_choice" =~ 4 ]] && HANDLER_ARCHITECTURES+=("aarch64")
+                fi
+                ;;
+        esac
+        
+        echo "将下载以下版本的 handler: ${HANDLER_ARCHITECTURES[*]}"
+    else
+        DOWNLOAD_HANDLER=false
+    fi
+}
 
 # 配置 LAN 网卡
 config_lan_interface() {
@@ -818,13 +929,18 @@ perform_installation() {
         install_ppp
     fi
     
-    # 10. 配置网络接口
+    # 10. 下载 handler
+    if [ "$DOWNLOAD_HANDLER" = true ]; then
+        download_handlers
+    fi
+    
+    # 11. 配置网络接口
     configure_network_interfaces
     
-    # 11. 创建管理员账号密码配置文件
-    create_landscape_toml
+    # 12. 创建管理员账号密码配置文件
+    # 认证配置已合并到 landscape_init.toml 中，不再需要单独调用
     
-    # 12. 关闭本机 DNS 服务
+    # 13. 关闭本机 DNS 服务
     disable_local_dns
     
     log "安装执行完成"
@@ -1296,8 +1412,8 @@ create_landscape_dir() {
     log "创建 Landscape Router 目录: $LANDSCAPE_DIR"
     mkdir -p "$LANDSCAPE_DIR"
     
-    # 在 Landscape 目录下创建 script_log 目录
-    mkdir -p "$LANDSCAPE_DIR/script_log"
+    # 在 Landscape 目录下创建 script_logs 目录
+    mkdir -p "$LANDSCAPE_DIR/script_logs"
     
     # 将临时日志移动到 Landscape 目录下
     if [ -f "$INSTALL_LOG" ]; then
@@ -1305,13 +1421,13 @@ create_landscape_dir() {
         log_filename=$(basename "$INSTALL_LOG")
         
         # 先尝试直接移动日志文件
-        if ! mv "$INSTALL_LOG" "$LANDSCAPE_DIR/script_log/$log_filename" 2>/dev/null; then
+        if ! mv "$INSTALL_LOG" "$LANDSCAPE_DIR/script_logs/$log_filename" 2>/dev/null; then
             # 如果直接移动失败, 尝试复制并清理原文件
-            cp "$INSTALL_LOG" "$LANDSCAPE_DIR/script_log/$log_filename" && rm -f "$INSTALL_LOG"
+            cp "$INSTALL_LOG" "$LANDSCAPE_DIR/script_logs/$log_filename" && rm -f "$INSTALL_LOG"
         fi
         
         # 更新日志文件路径
-        INSTALL_LOG="$LANDSCAPE_DIR/script_log/$log_filename"
+        INSTALL_LOG="$LANDSCAPE_DIR/script_logs/$log_filename"
         log "日志路径已更新到: $INSTALL_LOG"
     fi
     
@@ -1531,6 +1647,163 @@ install_landscape_router() {
     log "Landscape Router 部署完成"
 }
 
+# 下载 handler 文件
+download_handlers() {
+    log "开始下载 redirect_pkg_handler 文件"
+    
+    # 不再创建单独的 handler 目录，直接使用 LANDSCAPE_DIR
+    
+    # 检查 curl 是否已安装, 未安装则安装
+    if ! command -v curl &> /dev/null; then
+        log "未检测到 curl, 正在安装..."
+        apt_update
+        apt_install "curl"
+    else
+        log "curl 已安装"
+    fi
+    
+    # 确保 unzip 已安装
+    log "检查并安装 unzip 工具"
+    
+    if ! command -v unzip &> /dev/null; then
+        log "未检测到 unzip, 正在安装..."
+        apt_update
+        apt_install "unzip"
+    else
+        log "unzip 已安装"
+    fi
+    
+    # 下载 redirect_pkg_handler.sh 脚本
+    local handler_script_url
+    if [ "$USE_GITHUB_MIRROR" = true ]; then
+        handler_script_url="$GITHUB_MIRROR/https://raw.githubusercontent.com/CyberRookie-X/Install_landscape_on_debian12_and_manage_compose_by_dpanel/main/redirect_pkg_handler.sh"
+    else
+        handler_script_url="https://raw.githubusercontent.com/CyberRookie-X/Install_landscape_on_debian12_and_manage_compose_by_dpanel/main/redirect_pkg_handler.sh"
+    fi
+    
+    local retry=0
+    local max_retry=3
+    local user_choice=""
+    
+    while [ "$user_choice" != "n" ]; do
+        retry=0
+        while [ $retry -lt $max_retry ]; do
+            log "正在下载 redirect_pkg_handler.sh 脚本 (尝试 $((retry+1))/$max_retry)"
+            if command -v wget >/dev/null 2>&1; then
+                if wget -O "$LANDSCAPE_DIR/redirect_pkg_handler.sh" "$handler_script_url"; then
+                    log "redirect_pkg_handler.sh 下载成功"
+                    break
+                fi
+            elif command -v curl >/dev/null 2>&1; then
+                if curl -fSL --progress-bar -o "$LANDSCAPE_DIR/redirect_pkg_handler.sh" "$handler_script_url"; then
+                    log "redirect_pkg_handler.sh 下载成功"
+                    break
+                fi
+            fi
+            retry=$((retry+1))
+            log "下载失败, 等待 5 秒后重试"
+            sleep 5
+        done
+        
+        if [ $retry -eq $max_retry ]; then
+            echo "下载 redirect_pkg_handler.sh 失败, 是否再次尝试3次？(y/n) 或输入 'm' 使用 GitHub 镜像加速: "
+            read -r user_choice
+            user_choice=$(echo "$user_choice" | tr '[:upper:]' '[:lower:]')
+            
+            # 如果用户选择使用 GitHub 镜像加速
+            if [ "$user_choice" = "m" ]; then
+                ask_github_mirror
+                
+                if [ "$USE_GITHUB_MIRROR" = true ]; then
+                    # 更新下载 URL
+                    handler_script_url="$GITHUB_MIRROR/https://raw.githubusercontent.com/CyberRookie-X/Install_landscape_on_debian12_and_manage_compose_by_dpanel/main/redirect_pkg_handler.sh"
+                    user_choice="y"  # 重置选择以便继续循环
+                    retry=0  # 重置重试计数
+                fi
+            fi
+        else
+            # 下载成功则跳出循环
+            break
+        fi
+    done
+    
+    if [ $retry -eq $max_retry ] && [ "$user_choice" = "n" ]; then
+        log "错误: 下载 redirect_pkg_handler.sh 失败"
+        exit 1
+    fi
+    
+    # 为脚本添加执行权限
+    chmod +x "$LANDSCAPE_DIR/redirect_pkg_handler.sh"
+    log "已为 redirect_pkg_handler.sh 添加执行权限"
+    
+    # 下载各个架构的 handler 二进制文件
+    for arch in "${HANDLER_ARCHITECTURES[@]}"; do
+        local handler_filename="redirect_pkg_handler-$arch"
+        local handler_url
+        
+        if [ "$USE_GITHUB_MIRROR" = true ]; then
+            handler_url="$GITHUB_MIRROR/https://github.com/ThisSeanZhang/landscape/releases/latest/download/$handler_filename"
+        else
+            handler_url="https://github.com/ThisSeanZhang/landscape/releases/latest/download/$handler_filename"
+        fi
+        
+        retry=0
+        user_choice=""
+        
+        while [ "$user_choice" != "n" ]; do
+            retry=0
+            while [ $retry -lt $max_retry ]; do
+                log "正在下载 $handler_filename (尝试 $((retry+1))/$max_retry)"
+                if command -v wget >/dev/null 2>&1; then
+                    if wget -O "$LANDSCAPE_DIR/$handler_filename" "$handler_url"; then
+                        log "$handler_filename 下载成功"
+                        break
+                    fi
+                elif command -v curl >/dev/null 2>&1; then
+                    if curl -fSL --progress-bar -o "$LANDSCAPE_DIR/$handler_filename" "$handler_url"; then
+                        log "$handler_filename 下载成功"
+                        break
+                    fi
+                fi
+                retry=$((retry+1))
+                log "下载失败, 等待 5 秒后重试"
+                sleep 5
+            done
+            
+            if [ $retry -eq $max_retry ]; then
+                echo "下载 $handler_filename 失败, 是否再次尝试3次？(y/n) 或输入 'm' 使用 GitHub 镜像加速: "
+                read -r user_choice
+                user_choice=$(echo "$user_choice" | tr '[:upper:]' '[:lower:]')
+                
+                # 如果用户选择使用 GitHub 镜像加速
+                if [ "$user_choice" = "m" ]; then
+                    ask_github_mirror
+                    
+                    if [ "$USE_GITHUB_MIRROR" = true ]; then
+                        # 更新下载 URL
+                        handler_url="$GITHUB_MIRROR/https://github.com/ThisSeanZhang/landscape/releases/latest/download/$handler_filename"
+                        user_choice="y"  # 重置选择以便继续循环
+                        retry=0  # 重置重试计数
+                    fi
+                fi
+            else
+                # 下载成功则跳出循环
+                break
+            fi
+        done
+        
+        if [ $retry -eq $max_retry ] && [ "$user_choice" = "n" ]; then
+            log "错误: 下载 $handler_filename 失败"
+            exit 1
+        fi
+        
+        # 为二进制文件添加执行权限
+        chmod +x "$LANDSCAPE_DIR/$handler_filename"
+        log "已为 $handler_filename 添加执行权限"
+    done
+    
+    log "所有 redirect_pkg_handler 文件下载完成"
+}
 
 # 创建 systemd 服务
 create_systemd_service() {
@@ -1689,26 +1962,15 @@ ip_range_end = "$dhcp_end"
 server_ip_addr = "$lan_ip"
 network_mask = $network_mask
 mac_binding_records = []
-EOF
 
-    log "landscape_init.toml 配置文件创建完成"
-}
-
-# 创建 landscape.toml 配置文件 (包含管理员账号密码) 
-create_landscape_toml() {
-    log "创建 landscape.toml 配置文件"
-    
-    mkdir -p "$LANDSCAPE_DIR/etc/landscape"
-    
-    # 不在日志中记录密码内容
-    cat > "$LANDSCAPE_DIR/etc/landscape/landscape.toml" << EOF
-[auth]
+# ==== 管理员账号密码配置 ====
+[config.auth]
 # 管理员账号、密码
 admin_user = "$ADMIN_USER"
 admin_pass = "$ADMIN_PASS"
 EOF
 
-    log "landscape.toml 配置文件创建完成"
+    log "landscape_init.toml 配置文件创建完成"
 }
 
 # 关闭本机 DNS 服务

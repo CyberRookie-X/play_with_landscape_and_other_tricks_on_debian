@@ -110,16 +110,16 @@ init_log() {
   local landscape_dir="$LANDSCAPE_DIR"
   
   # 创建日志文件路径
-  if [ -n "$landscape_dir" ] && mkdir -p "$landscape_dir/script_log" 2>/dev/null; then
+  if [ -n "$landscape_dir" ] && mkdir -p "$landscape_dir/script_logs" 2>/dev/null; then
     # 设置日志文件路径
     if [ "$ROLLBACK" = true ]; then
-      UPGRADE_LOG="$landscape_dir/script_log/rollback-from-${CURRENT_VERSION}-${timestamp}.log"
+      UPGRADE_LOG="$landscape_dir/script_logs/rollback-from-${CURRENT_VERSION}-${timestamp}.log"
     else
-      UPGRADE_LOG="$landscape_dir/script_log/upgrade-from-${CURRENT_VERSION}-${timestamp}.log"
+      UPGRADE_LOG="$landscape_dir/script_logs/upgrade-from-${CURRENT_VERSION}-${timestamp}.log"
     fi
     
     # 清理旧的日志文件，最多保留16个
-    cleanup_old_logs "$landscape_dir/script_log"
+    cleanup_old_logs "$landscape_dir/script_logs"
   else
     # 如果无法获取安装目录或创建日志目录，则使用临时目录
     if [ "$ROLLBACK" = true ]; then
