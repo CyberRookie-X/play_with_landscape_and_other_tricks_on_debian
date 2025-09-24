@@ -279,6 +279,25 @@ cleanup_old_logs() {
   fi
 }
 
+# 解析下载任务信息
+# 参数: 完整的任务字符串，输出变量名：描述、URL、文件路径
+parse_download_task() {
+  local task="$1"
+  local -n desc_ref=$2
+  local -n url_ref=$3
+  local -n path_ref=$4
+  
+  # 提取文件描述（第一个冒号之前的部分）
+  desc_ref="${task%%:*}"
+  
+  # 提取文件路径（最后一个冒号之后的部分）
+  path_ref="${task##*:}"
+  
+  # 提取URL（中间部分）
+  local temp="${task#*:}"
+  url_ref="${temp%:*}"
+}
+
 # ========== 系统环境检查函数 ==========
 
 # 系统环境检查（包括架构、初始化系统和依赖项）
@@ -676,9 +695,9 @@ get_redirect_pkg_handler_url() {
     case "$version_type" in
       "stable")
         if [ "$USE_CN_MIRROR" = true ]; then
-          download_url="https://ghfast.top/https://github.com/CyberRookie-X/Install_landscape_on_debian12_and_manage_compose_by_dpanel/releases/latest/download/$binary_name"
+          download_url="https://ghfast.top/https://github.com/ThisSeanZhang/landscape/releases/latest/download/$binary_name"
         else
-          download_url="https://github.com/CyberRookie-X/Install_landscape_on_debian12_and_manage_compose_by_dpanel/releases/latest/download/$binary_name"
+          download_url="https://github.com/ThisSeanZhang/landscape/releases/latest/download/$binary_name"
         fi
         ;;
       "beta")
@@ -1667,7 +1686,15 @@ download_files_serially() {
   # 准备下载信息
   local download_info
   download_info=$(get_download_info "$version_type")
-  local download_url=$(echo "$download_info" | cut -d'|' -f1)
+  # 修复URL解析方式，确保正确处理包含多个冒号的URL
+  local download_url=""
+  local temp_filename=""
+  IFS='|' read -r download_url temp_filename <<< "$download_info"
+  
+  # 如果解析出来的文件名不为空，则使用解析出来的文件名
+  if [ -n "$temp_filename" ]; then
+    executable_filename="$temp_filename"
+  fi
   
   local static_download_url
   static_download_url=$(get_static_download_url "$version_type")
@@ -1723,9 +1750,11 @@ download_files_serially() {
   
   for task in "${download_tasks[@]}"; do
     current_file=$((current_file + 1))
-    local file_desc=$(echo "$task" | cut -d':' -f1)
-    local file_url=$(echo "$task" | cut -d':' -f2)
-    local file_path=$(echo "$task" | cut -d':' -f3)
+    # 使用自定义函数解析任务信息，避免URL中的冒号导致解析错误
+    local file_desc=""
+    local file_url=""
+    local file_path=""
+    parse_download_task "$task" file_desc file_url file_path
     
     log "[$current_file/$total_files] 正在下载 $file_desc..."
     
