@@ -528,8 +528,84 @@ handle_mirror_by_ip() {
 # 安装 Alpine 依赖
 install_alpine_dependencies() {
     # 安装libelf和libgcc
-    # 注意：这里不再需要执行apk update，因为在上面的换源逻辑中已经执行过了
-    apk add --no-cache libelf libgcc
+    # 仅在REDIRECT_PKG_HANDLER_WRAPPER_REGION为CN/cn且未指定REDIRECT_PKG_HANDLER_WRAPPER_MIRROR时启用超时和换源重试功能
+    
+    # 检查是否需要启用超时和换源重试功能
+    ENABLE_RETRY=false
+    if [ -n "$REDIRECT_PKG_HANDLER_WRAPPER_REGION" ] && [ -z "$REDIRECT_PKG_HANDLER_WRAPPER_MIRROR" ]; then
+        # 使用POSIX内置的参数扩展将值转换为大写
+        REGION_UPPER=$(echo "$REDIRECT_PKG_HANDLER_WRAPPER_REGION" | tr '[:lower:]' '[:upper:]')
+        if [ "$REGION_UPPER" = "CN" ]; then
+            ENABLE_RETRY=true
+        fi
+    fi
+    
+    if [ "$ENABLE_RETRY" = true ]; then
+        log "Attempting to install dependencies with timeout and mirror retry feature (region: CN)"
+        
+        # 使用timeout命令设置15秒超时
+        if ! timeout 15s apk add --no-cache libelf libgcc; then
+            log "Installation timeout or failed, trying to switch mirror and retry"
+            
+            # 备份当前源配置
+            cp /etc/apk/repositories /etc/apk/repositories.install.bak
+            
+            # 尝试换源重试
+            AVAILABLE_MIRRORS="$MIRRORS"
+            RETRY_SUCCESS=false
+            
+            while [ "$RETRY_SUCCESS" = "false" ] && [ -n "$AVAILABLE_MIRRORS" ]; do
+                # 随机选择一个镜像源
+                MIRROR_COUNT=$(echo $AVAILABLE_MIRRORS | wc -w)
+                RANDOM_INDEX=$(( ( $(srand) % MIRROR_COUNT ) + 1 ))
+                SELECTED_MIRROR=$(echo $AVAILABLE_MIRRORS | cut -d' ' -f$RANDOM_INDEX)
+                
+                log "Retrying with mirror: $SELECTED_MIRROR"
+                
+                # 更新源配置
+                cp /etc/apk/repositories.install.bak /etc/apk/repositories
+                sed -i "s/dl-cdn.alpinelinux.org/$SELECTED_MIRROR/g" /etc/apk/repositories
+                
+                # 更新包索引
+                if apk update >/dev/null 2>&1; then
+                    log "Successfully updated package index with mirror: $SELECTED_MIRROR"
+                    
+                    # 再次尝试安装，设置15秒超时
+                    if timeout 15s apk add --no-cache libelf libgcc; then
+                        log "Dependencies installed successfully with mirror: $SELECTED_MIRROR"
+                        RETRY_SUCCESS=true
+                    else
+                        log "Installation failed with mirror: $SELECTED_MIRROR"
+                        # 从可用镜像源列表中移除失败的源
+                        AVAILABLE_MIRRORS=$(echo $AVAILABLE_MIRRORS | sed "s/$SELECTED_MIRROR//g" | tr -s ' ' | sed 's/^ *//;s/ *$//')
+                    fi
+                else
+                    log "Failed to update package index with mirror: $SELECTED_MIRROR"
+                    # 从可用镜像源列表中移除失败的源
+                    AVAILABLE_MIRRORS=$(echo $AVAILABLE_MIRRORS | sed "s/$SELECTED_MIRROR//g" | tr -s ' ' | sed 's/^ *//;s/ *$//')
+                fi
+            done
+            
+            # 如果所有镜像源都尝试失败，记录错误
+            if [ "$RETRY_SUCCESS" = "false" ]; then
+                log "Failed to install dependencies with all mirrors, restoring original configuration"
+                cp /etc/apk/repositories.install.bak /etc/apk/repositories
+                # 恢复原始源后需要更新包索引
+                apk update >/dev/null 2>&1
+                # 最后尝试一次安装，即使失败也继续
+                timeout 15s apk add --no-cache libelf libgcc || true
+            fi
+            
+            # 清理备份文件
+            rm -f /etc/apk/repositories.install.bak
+        else
+            log "Dependencies installed successfully with current mirror"
+        fi
+    else
+        log "Installing dependencies without timeout and mirror retry feature"
+        # 直接安装依赖，不使用超时和换源重试功能
+        apk add --no-cache libelf libgcc
+    fi
     
     # 清除apk缓存数据
     rm -rf /var/cache/apk/*
