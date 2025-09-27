@@ -244,8 +244,6 @@ ORIGINAL_ENTRYPOINT_CMD
 /landscape/redirect_pkg_handler-x86_64-musl
 /root/.landscape-router/redirect_pkg_handler.sh
 /landscape/redirect_pkg_handler.sh
-/root/.landscape-router/unix_link/
-/ld_unix_link/
 ```
 ![](/images/21.png)
 
