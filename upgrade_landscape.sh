@@ -537,7 +537,8 @@ control_landscape_service() {
   local action="$1"
   case "$action" in
     "start")
-      log "正在启动 Landscape Router 服务..."
+      log "正在启动 Landscape Router 服务...
+Starting Landscape Router service..."
       # 如果脚本之前停止了Docker服务，则在启动Landscape服务时也启动Docker服务
       if [ "$DOCKER_STOPPED_BY_SCRIPT" = true ]; then
         log "检测到脚本之前停止了Docker服务，正在同时启动Docker服务..."
@@ -584,7 +585,8 @@ control_docker_service() {
   local action="$1"
   case "$action" in
     "start")
-      log "正在启动 Docker 服务..."
+      log "正在启动 Docker 服务...
+Starting Docker service..."
       if [ "$INIT_SYSTEM" = "systemd" ]; then
         systemctl start docker
       else
@@ -1533,15 +1535,19 @@ cleanup_old_backups() {
 handle_rollback_operation() {
   # 初始化回滚日志
   init_log
-  log "Landscape Router 回滚脚本开始执行"
-  log "检测到 Landscape Router 安装目录: $LANDSCAPE_DIR"
-  log "当前版本: $CURRENT_VERSION"
+  log "Landscape Router 回滚脚本开始执行
+Rollback script started"
+  log "检测到 Landscape Router 安装目录: $LANDSCAPE_DIR
+Detected Landscape Router installation directory: $LANDSCAPE_DIR"
+  log "当前版本: $CURRENT_VERSION
+Current version: $CURRENT_VERSION"
   
   local backup_dir="$LANDSCAPE_DIR/backup"
   
   # 验证备份目录存在
   if [ ! -d "$backup_dir" ]; then
-    log "错误: 未找到备份目录 $backup_dir"
+    log "错误: 未找到备份目录 $backup_dir
+Error: Backup directory $backup_dir not found"
     return 1
   fi
   
@@ -1572,12 +1578,14 @@ handle_rollback_operation() {
   local backup_count=${#backup_files[@]}
   # 检查是否有备份文件
   if [ $backup_count -eq 0 ]; then
-    log "错误: 未找到任何备份文件"
+    log "错误: 未找到任何备份文件
+Error: No backup files found"
     return 1
   fi
   
   # 显示可用备份供用户选择
-  log "可用的备份文件:"
+  log "可用的备份文件:
+Available backup files:"
   local i
   for ((i=0; i<backup_count; i++)); do
     log "$((i+1)) $(basename "${backup_files[$i]}")"
@@ -1586,16 +1594,19 @@ handle_rollback_operation() {
   # 获取用户选择
   local choice
   while true; do
-    read -p "请选择要回滚到的备份版本 (1-${backup_count}): " choice
+    read -p "请选择要回滚到的备份版本 (1-${backup_count}):
+Please select the backup version to rollback to (1-${backup_count}): " choice
     if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le $backup_count ]; then
       break
     else
-      log "无效选择，请输入 1 到 $backup_count 之间的数字"
+      log "无效选择，请输入 1 到 $backup_count 之间的数字
+Invalid selection, please enter a number between 1 and $backup_count"
     fi
   done
   
   local selected_backup="${backup_files[$((choice-1))]}"
-  log "正在回滚到备份: $(basename "$selected_backup")"
+  log "正在回滚到备份: $(basename "$selected_backup")
+Rolling back to backup: $(basename "$selected_backup")"
   
   # 停止服务
   control_landscape_service "stop"
@@ -1606,7 +1617,8 @@ handle_rollback_operation() {
   # 创建临时目录
   local temp_dir
   temp_dir=$(mktemp -d) || {
-    log "错误: 无法创建临时目录"
+    log "错误: 无法创建临时目录
+Error: Unable to create temporary directory"
     control_landscape_service "start"
     return 1
   }
@@ -1628,7 +1640,8 @@ handle_rollback_operation() {
     # 解压 .zip 文件
     (cd "$temp_dir" && unzip -q "$selected_backup")
   else
-    log "错误: 不支持的备份文件格式"
+    log "错误: 不支持的备份文件格式
+Error: Unsupported backup file format"
     rm -rf "$temp_dir"
     control_landscape_service "start"
     return 1
@@ -1654,21 +1667,28 @@ handle_rollback_operation() {
   # 清理临时目录
   rm -rf "$temp_dir"
   
-  log "回滚完成"
+  log "回滚完成
+Rollback completed"
   
   # 处理重启
-  read -p "是否立即重启系统以应用回滚？(y/n): " -n 1 -r
+  read -p "是否立即重启系统以应用回滚？(y/n):
+Reboot system now to apply rollback? (y/n): " -n 1 -r
   echo
   if [[ $REPLY =~ ^[Yy]$ ]]; then
-    log "正在重启系统以应用回滚..."
+    log "正在重启系统以应用回滚...
+Rebooting system to apply rollback..."
     reboot
   else
-    log "正在启动 Landscape Router 服务..."
+    log "正在启动 Landscape Router 服务...
+Starting Landscape Router service..."
     control_landscape_service "start"
     control_docker_service "start"
-    log "回滚操作已成功完成，但系统尚未重启。"
-    log "注意：Landscape Router 的某些功能可能无法正常工作。"
-    log "重要提示：请在方便的时候尽快手动执行重启，以确保回滚完全生效。"
+    log "回滚操作已成功完成，但系统尚未重启。
+Rollback operation completed successfully, but system has not been rebooted."
+    log "注意：Landscape Router 的某些功能可能无法正常工作。
+Note: Some features of Landscape Router may not work properly."
+    log "重要提示：请在方便的时候尽快手动执行重启，以确保回滚完全生效。
+Important: Please manually reboot at your convenience to ensure rollback takes full effect."
   fi
 }
 
