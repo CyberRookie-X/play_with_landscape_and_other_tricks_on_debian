@@ -1911,6 +1911,7 @@ create_landscape_init_toml() {
     interfaces_list=$(echo "$LAN_CONFIG" | grep "interfaces" | cut -d '(' -f 2 | cut -d ')' -f 1)
     
     cat > "$LANDSCAPE_DIR/landscape_init.toml" << EOF
+# ==== 创建 $bridge_name 网桥 ====
 # ==== Create $bridge_name bridge ====
 [[ifaces]]
 name = "$bridge_name"
@@ -1924,6 +1925,7 @@ wifi_mode = "undefined"
 iface_name = "$bridge_name"
 enable = true
 
+# ==== 绑定网卡到 $bridge_name 网桥 ====
 # ==== Bind interfaces to $bridge_name bridge ====
 EOF
 
@@ -1951,6 +1953,7 @@ EOF
 
     cat >> "$LANDSCAPE_DIR/landscape_init.toml" << EOF
 
+# ==== 为 $bridge_name 配置 DHCP 服务====
 # ==== Configure DHCP for $bridge_name ====
 [[dhcpv4_services]]
 iface_name = "$bridge_name"
@@ -1963,8 +1966,10 @@ server_ip_addr = "$lan_ip"
 network_mask = $network_mask
 mac_binding_records = []
 
+# ==== 管理员账号配置 ====
 # ==== Administrator account configuration ====
 [config.auth]
+# 管理员 用户名 和 密码
 # Administrator username and password
 admin_user = "$ADMIN_USER"
 admin_pass = "$ADMIN_PASS"
