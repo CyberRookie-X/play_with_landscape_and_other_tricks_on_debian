@@ -1920,6 +1920,7 @@ zone_type = "lan"
 enable_in_boot = true
 wifi_mode = "undefined"
 
+# 为 $bridge_name 开启 ebpf 路由
 # Enable ebpf routing for $bridge_name
 [[route_lans]]
 iface_name = "$bridge_name"
