@@ -2004,12 +2004,22 @@ upgrade_landscape_version() {
   # 处理重启
   if [ "$AUTO_REBOOT" = true ]; then
     log "正在重启系统以应用更新..."
+    echo ""
+    echo "================================"
+    echo "o(≧▽≦)o 升级完成，请等待系统重启"
+    echo "================================"
+    echo ""
     reboot
   else
     control_landscape_service "start"
     log "升级已完成，但系统尚未重启。"
     log "Landscape Router已启动，但部分功能可能无法正常使用。"
     log "建议您在适当的时候手动重启系统。"
+    echo ""
+    echo "================================"
+    echo "o(≧▽≦)o 升级完成，请等待软件启动"
+    echo "================================"
+    echo ""
   fi
 }
 
@@ -2088,7 +2098,7 @@ replace_files_with_rollback() {
       # 如果第一次失败，停止Docker服务后再尝试
       if [[ "$file_type" == "binary_"* ]] && [ $file_retry_count -eq 3 ] && [ "$file_replace_success" = false ]; then
         if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet docker 2>/dev/null; then
-          log "$file_type替换失败，正在停止Docker服务以重试..."
+          log "$file_type 替换失败，将停止Docker服务以重试..."
           control_docker_service "stop"
           docker_stopped=true
           # 标记Docker服务是由脚本停止的
@@ -2211,7 +2221,7 @@ replace_files_with_rollback() {
   # 根据是否停止了Docker服务以及是否需要重启来决定是否启动Docker服务
   if [ "$docker_stopped" = true ]; then
     if [ "$AUTO_REBOOT" = true ]; then
-      log "Docker服务已被停止，系统将重启以重新启动Docker服务"
+      log "Docker服务已被停止，将在系统重启后自动启动"
     else
       log "正在启动 Docker 服务..."
       control_docker_service "start"
