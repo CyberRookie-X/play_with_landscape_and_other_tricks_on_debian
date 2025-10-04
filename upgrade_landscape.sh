@@ -9,6 +9,7 @@
 #   --cn           - 使用中国镜像加速（仅限 stable 版本，beta 版本不支持）
 #   --reboot       - 升级完成后自动重启（可选）
 #   --backup       - 升级前进行备份
+#   --stopdocker   - 替换 handler 时，停止 Docker 服务（可能缩短升级时间）
 #   --backup=N     - 升级前进行备份，并指定保留N个备份（默认stable保留1个，beta保留3个）
 #   --rollback     - 回滚到之前的备份版本（交互式）
 #   -h, --help     - 显示此帮助信息
@@ -44,6 +45,7 @@ LANDSCAPE_DIR=""  # Landscape安装目录全局变量
 CURRENT_VERSION=""  # 当前版本号全局变量
 GITHUB_TOKEN=""  # GitHub Token全局变量
 DOCKER_STOPPED_BY_SCRIPT=false  # 跟踪脚本是否停止了Docker服务，也用于标记 Docker 的状态
+STOP_DOCKER=false
 
 # API响应缓存变量
 CACHED_WORKFLOW_DATA=""  # 缓存的工作流列表响应
@@ -372,23 +374,8 @@ check_dependencies() {
 # 解析命令行参数
 parse_arguments() {
   ACTION="stable"  # 默认动作
-  
-  # 第一轮：先解析 --stable 和 --beta 参数来确定 ACTION
   local i=0
   local args=($@)
-  while [ $i -lt $# ]; do
-    arg="${args[$i]}"
-    case "$arg" in
-      "--stable"|"--beta")
-        local version_action="${arg#--}"
-        ACTION="$version_action"
-        ;;
-    esac
-    i=$((i+1))
-  done
-  
-  # 第二轮：解析所有参数
-  i=0
   while [ $i -lt $# ]; do
     arg="${args[$i]}"
     case "$arg" in
@@ -410,6 +397,10 @@ parse_arguments() {
       "--reboot")
         AUTO_REBOOT=true
         echo "启用自动重启" >&2
+        ;;
+      "--stopdocker")
+        STOP_DOCKER=true
+        echo "替换 handler 时，停止 Docker 服务" >&2
         ;;
       "--backup")
         CREATE_BACKUP=true
@@ -451,6 +442,7 @@ show_help() {
   echo "  --beta         - 升级到最新 Beta 版"
   echo "  --cn           - 使用中国镜像加速（仅限 stable 版本，beta 版本不支持）"
   echo "  --reboot       - 升级完成后自动重启（可选）"
+  echo "  --stopdocker   - 替换 handler 时，停止 Docker 服务（可能缩短升级时间）"
   echo "  --backup       - 升级前进行备份"
   echo "  --backup=N     - 升级前进行备份，并指定保留N个备份（默认stable保留1个，beta保留3个）"
   echo "  --rollback     - 回滚到之前的备份版本（交互式）"
@@ -2077,7 +2069,6 @@ replace_files_with_rollback() {
   # 记录替换成功的文件列表，用于需要时回滚
   local successfully_replaced=()
   local failed_files=()
-  local docker_stopped=false
   
   # 逐个替换文件，串行处理
   for task in "${replace_tasks[@]}"; do
@@ -2096,13 +2087,12 @@ replace_files_with_rollback() {
       
       # 对于redirect_pkg_handler相关的二进制文件（除了redirect_pkg_handler.sh），
       # 如果第一次失败，停止Docker服务后再尝试
-      if [[ "$file_type" == "binary_"* ]] && [ $file_retry_count -eq 3 ] && [ "$file_replace_success" = false ]; then
+      # 同时，如果指定了STOP_DOCKER选项，对于所有binary_*类型的文件也停止Docker服务
+      if [[ "$file_type" == "binary_"* ]] && [ $file_retry_count -eq 3 ] && [ "$file_replace_success" = false ] || \
+         [[ "$file_type" == "binary_"* ]] && [ "$STOP_DOCKER" = true ] && [ $file_retry_count -eq 0 ]; then
         if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet docker 2>/dev/null; then
-          log "$file_type 替换失败，将停止Docker服务以重试..."
+          log "将停止Docker服务，以保证成功替换 $file_type"
           control_docker_service "stop"
-          docker_stopped=true
-          # 标记Docker服务是由脚本停止的
-          DOCKER_STOPPED_BY_SCRIPT=true
           log "Docker服务已停止"
         fi
       fi
@@ -2219,7 +2209,7 @@ replace_files_with_rollback() {
   log "所有文件替换成功"
   
   # 根据是否停止了Docker服务以及是否需要重启来决定是否启动Docker服务
-  if [ "$docker_stopped" = true ]; then
+  if [ "$DOCKER_STOPPED_BY_SCRIPT" = true ]; then
     if [ "$AUTO_REBOOT" = true ]; then
       log "Docker服务已被停止，将在系统重启后自动启动"
     else

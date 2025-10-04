@@ -33,6 +33,9 @@ upgrade_landsacpe.sh
 
 A 高
 
+replace_files_with_rollback 函数中 关于 替换 handler 前 停止 docker 似乎有问题，没有在所有 handler 替换前 停止 docker，是否意味之着 只有 x86 musl 生效
+
+怎么处理这个 docker 问题呢
 将 handler 替换放到第一个，并且 在 handler 和 redirect.sh 替换成功后再 停止 landscape
 
 可能使用不同的命名方式（太麻烦了不想整）
