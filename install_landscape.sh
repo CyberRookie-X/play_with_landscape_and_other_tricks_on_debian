@@ -4,7 +4,6 @@
 # 适用于 Debian、Ubuntu、Mint、Armbian (需要内核版本 >= 6.9) 
 # 适用于 x86_64 架构 和 Armbian aarch64 架构
 
-
 # 全局变量
 INSTALL_LOG=""
 LANDSCAPE_DIR=""
@@ -76,6 +75,173 @@ log() {
     local timestamp
     timestamp=$(date +"%Y-%m-%d %H:%M:%S")
     echo "[$timestamp] $message" | tee -a "$INSTALL_LOG"
+}
+
+# 检测系统类型
+detect_system_type() {
+    local system_type=""
+    local system_version=""
+    local version_codename=""
+    
+    if grep -q "Debian" /etc/os-release; then
+        system_type="debian"
+        system_version=$(grep "VERSION_ID" /etc/os-release | cut -d'=' -f2 | tr -d '"')
+        version_codename=$(grep "VERSION_CODENAME" /etc/os-release | cut -d'=' -f2)
+    elif grep -q "Ubuntu" /etc/os-release; then
+        system_type="ubuntu"
+        system_version=$(grep "VERSION_ID" /etc/os-release | cut -d'=' -f2 | tr -d '"')
+        version_codename=$(grep "VERSION_CODENAME" /etc/os-release | cut -d'=' -f2)
+    elif grep -q "Linux Mint" /etc/os-release; then
+        system_type="linuxmint"
+        system_version=$(grep "VERSION_ID" /etc/os-release | cut -d'=' -f2 | tr -d '"')
+        # Linux Mint 使用 Ubuntu 的代号，需要特殊处理
+        # 从 VERSION 中提取 Ubuntu 代号
+        local ubuntu_codename=$(grep "UBUNTU_CODENAME" /etc/os-release | cut -d'=' -f2)
+        if [ -n "$ubuntu_codename" ]; then
+            version_codename="$ubuntu_codename"
+        else
+            # 如果没有 UBUNTU_CODENAME，尝试从 VERSION 中提取
+            local version_desc=$(grep "VERSION=" /etc/os-release | cut -d'=' -f2 | tr -d '"')
+            # 从版本描述中提取Ubuntu代号，例如从 "21.2 (Victoria)" 提取 "Victoria"
+            # 或者从 "20.3 (Una)" 提取 "focal" (因为Linux Mint 20.x基于Ubuntu 20.04/focal)
+            if [[ "$version_desc" =~ \((.*)\) ]]; then
+                local mint_codename="${BASH_REMATCH[1],,}"  # 转换为小写
+                
+                # 根据Linux Mint代号映射到Ubuntu代号
+                case "$mint_codename" in
+                    "vanessa"|"vera"|"victoria"|"virginia") 
+                        version_codename="jammy"  # Ubuntu 22.04
+                        ;;
+                    "una"|"uma"|"ulyssa"|"ulyana"|"julia")
+                        version_codename="focal"  # Ubuntu 20.04
+                        ;;
+                    "tricia"|"tina"|"tessa"|"tara"|"ulyana")
+                        version_codename="bionic" # Ubuntu 18.04
+                        ;;
+                    *)
+                        version_codename="focal"  # 默认使用 focal
+                        ;;
+                esac
+            else
+                version_codename="focal"  # 默认使用 focal
+            fi
+        fi
+    elif grep -q "Armbian" /etc/os-release; then
+        system_type="armbian"
+        system_version=$(grep "VERSION_ID" /etc/os-release | cut -d'=' -f2 | tr -d '"')
+        version_codename=$(grep "VERSION_CODENAME" /etc/os-release | cut -d'=' -f2)
+        # 如果没有 VERSION_CODENAME，尝试从其他字段获取
+        if [ -z "$version_codename" ]; then
+            # Armbian 通常基于 Debian，尝试获取 Debian 版本代号
+            version_codename=$(grep "DEBIAN_VERSION" /etc/os-release | cut -d'=' -f2 | tr -d '"')
+        fi
+        # 如果仍然为空，则使用默认值
+        if [ -z "$version_codename" ]; then
+            version_codename="bullseye"  # 默认使用 bullseye
+        fi
+    elif grep -q "Raspbian" /etc/os-release || grep -q "Raspberry Pi OS" /etc/os-release; then
+        system_type="raspbian"
+        system_version=$(grep "VERSION_ID" /etc/os-release | cut -d'=' -f2 | tr -d '"')
+        version_codename=$(grep "VERSION_CODENAME" /etc/os-release | cut -d'=' -f2)
+        # 如果没有 VERSION_CODENAME，则使用默认值
+        if [ -z "$version_codename" ]; then
+            version_codename="bullseye"  # 默认使用 bullseye
+        fi
+    fi
+    
+    echo "$system_type|$system_version|$version_codename"
+}
+
+# 检查是否为支持的系统类型
+is_supported_system() {
+    if grep -q "Debian" /etc/os-release || grep -q "Ubuntu" /etc/os-release || grep -q "Linux Mint" /etc/os-release || grep -q "Armbian" /etc/os-release || grep -q "Raspbian" /etc/os-release || grep -q "Raspberry Pi OS" /etc/os-release; then
+        return 0  # true
+    else
+        return 1  # false
+    fi
+}
+
+# 确保curl已安装
+ensure_curl_installed() {
+    if ! command -v curl &> /dev/null; then
+        log "未检测到 curl, 正在安装..."
+        apt_update
+        apt_install "curl"
+    else
+        log "curl 已安装"
+    fi
+}
+
+# 根据架构获取二进制文件名
+get_binary_filename() {
+    local system_arch
+    system_arch=$(uname -m)
+    if [ "$system_arch" = "aarch64" ]; then
+        echo "landscape-webserver-aarch64"
+    else
+        echo "landscape-webserver-x86_64"
+    fi
+}
+
+# 下载重试函数
+download_with_retry() {
+    local url="$1"
+    local output_file="$2"
+    local file_description="$3"
+    local max_retry=3
+    local retry=0
+    local user_choice=""
+    
+    while [ "$user_choice" != "n" ]; do
+        retry=0
+        while [ $retry -lt $max_retry ]; do
+            log "正在下载 $file_description (尝试 $((retry+1))/$max_retry)"
+            if command -v wget >/dev/null 2>&1; then
+                if wget -O "$output_file" "$url"; then
+                    log "$file_description 下载成功"
+                    return 0
+                fi
+            elif command -v curl >/dev/null 2>&1; then
+                if curl -fSL --progress-bar -o "$output_file" "$url"; then
+                    log "$file_description 下载成功"
+                    return 0
+                fi
+            fi
+            retry=$((retry+1))
+            log "下载失败, 等待 5 秒后重试"
+            sleep 5
+        done
+        
+        if [ $retry -eq $max_retry ]; then
+            echo "下载 $file_description 失败, 是否再次尝试3次？(y/n) 或输入 'm' 使用 GitHub 镜像加速: "
+            read -r user_choice
+            user_choice=$(echo "$user_choice" | tr '[:upper:]' '[:lower:]')
+            
+            # 如果用户选择使用 GitHub 镜像加速
+            if [ "$user_choice" = "m" ]; then
+                ask_github_mirror
+                
+                if [ "$USE_GITHUB_MIRROR" = true ]; then
+                    # 更新下载 URL
+                    if [[ "$url" == *"github.com"* ]]; then
+                        url="$GITHUB_MIRROR/https://$url"
+                    fi
+                    user_choice="y"  # 重置选择以便继续循环
+                    retry=0  # 重置重试计数
+                fi
+            fi
+        else
+            # 下载成功则跳出循环
+            break
+        fi
+    done
+    
+    if [ $retry -eq $max_retry ] && [ "$user_choice" = "n" ]; then
+        log "错误: 下载 $file_description 失败"
+        return 1
+    fi
+    
+    return 0
 }
 
 # 检查系统环境
@@ -183,12 +349,217 @@ check_system() {
     if [ "$supported_system" = false ]; then
         echo "警告: 检测到您的系统为 $system_name ($system_id)。"
         echo "警告: 此系统未经测试，可能存在兼容性问题。"
-        read -rp "是否继续安装? (y/n): " answer
-        if [[ "$answer" =~ ^[Nn]$ ]]; then
+        read -rp "是否继续安装? (y/n): " user_response
+        if [[ "$user_response" =~ ^[Nn]$ ]]; then
             log "用户选择退出安装"
             exit 0
         fi
     fi
+}
+
+# 询问时区配置
+ask_timezone_config() {
+    echo "-----------------------------"
+    read -rp "是否将系统时区修改为亚洲/上海? (y/n): " timezone_response
+    if [[ ! "$timezone_response" =~ ^[Nn]$ ]]; then
+        TIMEZONE_SHANGHAI=true
+    else
+        TIMEZONE_SHANGHAI=false
+    fi
+}
+
+# 询问swap配置
+ask_swap_config() {
+    echo "-----------------------------"
+    read -rp "是否禁用 swap (虚拟内存) ? (y/n): " swap_response
+    if [[ ! "$swap_response" =~ ^[Nn]$ ]]; then
+        SWAP_DISABLED=true
+    else
+        SWAP_DISABLED=false
+    fi
+}
+
+# 询问Docker配置
+ask_docker_config() {
+    echo "-----------------------------"
+    read -rp "是否安装 Docker(含compose)? (y/n): " docker_response
+    if [[ ! "$docker_response" =~ ^[Nn]$ ]]; then
+        DOCKER_INSTALLED=true
+        
+        # 询问 Docker 镜像源
+        ask_docker_mirror
+        echo "-----------------------------"
+        # 询问是否为 Docker 开启 IPv6
+        read -rp "是否为 Docker 开启 IPv6 支持? (y/n): " docker_ipv6_response
+        if [[ ! "$docker_ipv6_response" =~ ^[Nn]$ ]]; then
+            DOCKER_ENABLE_IPV6=true
+        else
+            DOCKER_ENABLE_IPV6=false
+        fi
+    else
+        DOCKER_INSTALLED=false
+    fi
+}
+
+# 询问PPP配置
+ask_ppp_config() {
+    echo "-----------------------------"
+    read -rp "是否安装 ppp 用于 pppoe 拨号? (y/n): " ppp_response
+    if [[ ! "$ppp_response" =~ ^[Nn]$ ]]; then
+        INSTALL_PPP=true
+    else
+        INSTALL_PPP=false
+    fi
+}
+
+# 询问管理员账号配置
+ask_admin_config() {
+    echo "-----------------------------"
+    read -rp "Landscape Router 管理员 用户名、密码 均为 root, 是否修改? (y/n): " admin_response
+    if [[ ! "$admin_response" =~ ^[Nn]$ ]]; then
+        read -rp "请输入管理员用户名 (默认: root): " custom_user
+        if [ -n "$custom_user" ]; then
+            ADMIN_USER="$custom_user"
+        fi
+        
+        read -rsp "请输入管理员密码 (默认: root): " TEMP_PASS
+        echo  # 换行
+        if [ -n "$TEMP_PASS" ]; then
+            ADMIN_PASS="$TEMP_PASS"
+        fi
+        # 清除临时密码变量
+        TEMP_PASS=""
+    fi
+}
+
+# 询问安装路径配置
+ask_install_path_config() {
+    echo "-----------------------------"
+    while true; do
+        read -rp "请输入 Landscape Router 安装路径 (默认: /root/.landscape-router): " path_response
+        if [ -z "$path_response" ]; then
+            LANDSCAPE_DIR="/root/.landscape-router"
+        else
+            LANDSCAPE_DIR="$path_response"
+        fi
+        
+        if [ ! -d "$(dirname "$LANDSCAPE_DIR")" ]; then
+            log "错误: 指定的安装路径的上级目录不存在"
+            continue
+        fi
+        
+        break
+    done
+}
+
+# 显示配置信息
+display_configuration() {
+    echo ""
+    echo "=============================="
+    echo "请检查您的配置:"
+    echo "=============================="
+    echo "1. 系统时区设置为亚洲/上海: $([ "$TIMEZONE_SHANGHAI" = true ] && echo "是" || echo "否")"
+    echo "2. 禁用 swap (虚拟内存): $([ "$SWAP_DISABLED" = true ] && echo "是" || echo "否")"
+    echo "3. 更换 apt 软件源: $([ "$USE_CUSTOM_MIRROR" = true ] && echo "是" || echo "否")"
+    if [ "$USE_CUSTOM_MIRROR" = true ]; then
+        local mirror_name="未知"
+        case "$MIRROR_SOURCE" in
+            "ustc") mirror_name="中国科学技术大学" ;;
+            "tsinghua") mirror_name="清华大学" ;;
+            "aliyun") mirror_name="阿里云" ;;
+            "sjtu") mirror_name="上海交通大学" ;;
+            "zju") mirror_name="浙江大学" ;;
+            "nju") mirror_name="南京大学" ;;
+            "hit") mirror_name="哈尔滨工业大学" ;;
+        esac
+        echo "   镜像源: $mirror_name"
+    fi
+    # 只有当web server不是预装时才显示web server安装选项
+    if [ "$WEB_SERVER_PREINSTALLED" != true ]; then
+        echo "4. 安装 Web Server: $([ "$WEB_SERVER_INSTALLED" = true ] && echo "是" || echo "否")"
+        if [ "$WEB_SERVER_INSTALLED" = true ]; then
+            echo "   Web Server 类型: $WEB_SERVER_TYPE"
+        fi
+    else
+        echo "4. 检测到系统已预装 Web Server: $WEB_SERVER_TYPE"
+    fi
+    echo "5. 安装 Docker(含compose): $([ "$DOCKER_INSTALLED" = true ] && echo "是" || echo "否")"
+    if [ "$DOCKER_INSTALLED" = true ]; then
+        echo "   Docker 镜像源: $DOCKER_MIRROR"
+        echo "   Docker IPv6 支持: $([ "$DOCKER_ENABLE_IPV6" = true ] && echo "是" || echo "否")"
+    fi
+    echo "6. 安装 ppp (用于 PPPOE 拨号): $([ "$INSTALL_PPP" = true ] && echo "是" || echo "否")"
+    echo "7. 使用 GitHub 镜像加速: $([ "$USE_GITHUB_MIRROR" = true ] && echo "是" || echo "否")"
+    if [ "$USE_GITHUB_MIRROR" = true ]; then
+        echo "   GitHub 镜像地址: $GITHUB_MIRROR"
+    fi
+    echo "8. 下载 redirect_pkg_handler: $([ "$DOWNLOAD_HANDLER" = true ] && echo "是" || echo "否")"
+    if [ "$DOWNLOAD_HANDLER" = true ]; then
+        echo "   要下载的 handler 版本: ${HANDLER_ARCHITECTURES[*]}"
+    fi
+    echo "9. Landscape Router 安装路径: $LANDSCAPE_DIR"
+    echo "10. 管理员账号: $ADMIN_USER"
+    echo "    管理员密码: $ADMIN_PASS"
+    echo "11. LAN 网桥配置:"
+    echo "    名称 = $(echo "$LAN_CONFIG" | grep "bridge_name" | cut -d '"' -f 2)"
+    echo "    IP地址 = $(echo "$LAN_CONFIG" | grep "lan_ip" | cut -d '"' -f 2)"
+    echo "    DHCP起始地址 = $(echo "$LAN_CONFIG" | grep "dhcp_start" | cut -d '"' -f 2)"
+    echo "    DHCP结束地址 = $(echo "$LAN_CONFIG" | grep "dhcp_end" | cut -d '"' -f 2)"
+    echo "    网络掩码 = $(echo "$LAN_CONFIG" | grep "network_mask" | awk -F'= ' '{print $2}')"
+    local interfaces_list
+    interfaces_list=$(echo "$LAN_CONFIG" | grep "interfaces" | cut -d '(' -f 2 | cut -d ')' -f 1)
+    echo "    绑定网卡 = $interfaces_list"
+    echo "=============================="
+}
+
+# 修改配置
+modify_configuration() {
+    local config_choice="$1"
+    
+    case "$config_choice" in
+        1)
+            ask_timezone_config
+            ;;
+        2)
+            ask_swap_config
+            ;;
+        3)
+            ask_apt_mirror
+            ;;
+        4)
+            # 只有当web server不是预装时才允许修改web server配置
+            ask_webserver
+            ;;
+        5)
+            ask_docker_config
+            ;;
+        6)
+            ask_ppp_config
+            ;;
+        7)
+            ask_github_mirror
+            ;;
+        8)
+            ask_download_handler
+            ;;
+        9)
+            ask_install_path_config
+            ;;
+        10)
+            ask_admin_config
+            ;;
+        11)
+            config_lan_interface
+            ;;
+        *)
+            echo "无效选择, 请重新输入"
+            echo "按任意键继续..."
+            read -n 1 -s
+            return 1
+            ;;
+    esac
+    
+    return 0
 }
 
 # 询问用户配置
@@ -203,90 +574,32 @@ ask_user_config() {
     # 检查web server环境
     ask_webserver
     
-    echo "-----------------------------"
-    # 询问是否修改时区为中国上海
-    read -rp "是否将系统时区修改为亚洲/上海? (y/n): " answer
-    if [[ ! "$answer" =~ ^[Nn]$ ]]; then
-        TIMEZONE_SHANGHAI=true
-    fi
-    echo "-----------------------------"
-
-    # 询问是否关闭 swap
-    read -rp "是否禁用 swap (虚拟内存) ? (y/n): " answer
-    if [[ ! "$answer" =~ ^[Nn]$ ]]; then
-        SWAP_DISABLED=true
-    fi
-    echo "-----------------------------"
+    # 询问时区配置
+    ask_timezone_config
+    
+    # 询问swap配置
+    ask_swap_config
 
     # 询问是否换源 (仅对支持的系统进行询问)
-    # 检查是否为支持换源的系统 (Debian, Ubuntu, Linux Mint, Armbian, Raspbian)
     ask_apt_mirror
-    echo "-----------------------------"
 
-    # 询问是否安装 Docker
-    read -rp "是否安装 Docker(含compose)? (y/n): " answer
-    if [[ ! "$answer" =~ ^[Nn]$ ]]; then
-        DOCKER_INSTALLED=true
-        
-        # 询问 Docker 镜像源
-        ask_docker_mirror
-        
-        # 询问是否为 Docker 开启 IPv6
-        read -rp "是否为 Docker 开启 IPv6 支持? (y/n): " answer
-        if [[ ! "$answer" =~ ^[Nn]$ ]]; then
-            DOCKER_ENABLE_IPV6=true
-        fi
-    fi
-    echo "-----------------------------"
+    # 询问Docker配置
+    ask_docker_config
 
-    # 询问是否安装 ppp 用于 pppoe 拨号
-    read -rp "是否安装 ppp 用于 pppoe 拨号? (y/n): " answer
-    if [[ ! "$answer" =~ ^[Nn]$ ]]; then
-        INSTALL_PPP=true
-    fi
-    echo "-----------------------------"
+    # 询问PPP配置
+    ask_ppp_config
 
     # 询问是否使用 GitHub 镜像加速
     ask_github_mirror
-    echo "-----------------------------"
     
     # 询问是否下载 handler
     ask_download_handler
-    echo "-----------------------------"
     
-    # 询问 Landscape 安装路径
-    while true; do
-        read -rp "请输入 Landscape Router 安装路径 (默认: /root/.landscape-router): " LANDSCAPE_DIR
-        if [ -z "$LANDSCAPE_DIR" ]; then
-            LANDSCAPE_DIR="/root/.landscape-router"
-        fi
-        
-        if [ ! -d "$(dirname "$LANDSCAPE_DIR")" ]; then
-            log "错误: 指定的安装路径的上级目录不存在"
-            continue
-        fi
-        
-        break
-    done
-    echo "-----------------------------"
+    # 询问安装路径
+    ask_install_path_config
 
-    # 询问管理员账号密码
-    read -rp "Landscape Router 管理员 用户名、密码 均为 root, 是否修改? (y/n): " answer
-    if [[ ! "$answer" =~ ^[Nn]$ ]]; then
-        read -rp "请输入管理员用户名 (默认: root): " custom_user
-        if [ -n "$custom_user" ]; then
-            ADMIN_USER="$custom_user"
-        fi
-        
-        read -rsp "请输入管理员密码 (默认: root): " TEMP_PASS
-        echo  # 换行
-        if [ -n "$TEMP_PASS" ]; then
-            ADMIN_PASS="$TEMP_PASS"
-        fi
-        # 清除临时密码变量
-        TEMP_PASS=""
-    fi
-    echo "-----------------------------"
+    # 询问管理员账号配置
+    ask_admin_config
     
     # 配置 LAN 网卡
     config_lan_interface
@@ -294,170 +607,18 @@ ask_user_config() {
     # 显示所有配置供用户检查和修改
     local config_confirmed=false
     while [ "$config_confirmed" = false ]; do
-        echo ""
-        echo "=============================="
-        echo "请检查您的配置:"
-        echo "=============================="
-        echo "1. 系统时区设置为亚洲/上海: $([ "$TIMEZONE_SHANGHAI" = true ] && echo "是" || echo "否")"
-        echo "2. 禁用 swap (虚拟内存): $([ "$SWAP_DISABLED" = true ] && echo "是" || echo "否")"
-        echo "3. 更换 apt 软件源: $([ "$USE_CUSTOM_MIRROR" = true ] && echo "是" || echo "否")"
-        if [ "$USE_CUSTOM_MIRROR" = true ]; then
-            local mirror_name="未知"
-            if [ "$USE_CUSTOM_MIRROR" = true ]; then
-                case "$MIRROR_SOURCE" in
-                    "ustc") mirror_name="中国科学技术大学" ;;
-                    "tsinghua") mirror_name="清华大学" ;;
-                    "aliyun") mirror_name="阿里云" ;;
-                    "sjtu") mirror_name="上海交通大学" ;;
-                    "zju") mirror_name="浙江大学" ;;
-                    "nju") mirror_name="南京大学" ;;
-                    "hit") mirror_name="哈尔滨工业大学" ;;
-                esac
-            fi
-            echo "   镜像源: $mirror_name"
-        fi
-        # 只有当web server不是预装时才显示web server安装选项
-        if [ "$WEB_SERVER_PREINSTALLED" != true ]; then
-            echo "4. 安装 Web Server: $([ "$WEB_SERVER_INSTALLED" = true ] && echo "是" || echo "否")"
-            if [ "$WEB_SERVER_INSTALLED" = true ]; then
-                echo "   Web Server 类型: $WEB_SERVER_TYPE"
-            fi
-        else
-            echo "4. 检测到系统已预装 Web Server: $WEB_SERVER_TYPE"
-        fi
-        echo "5. 安装 Docker(含compose): $([ "$DOCKER_INSTALLED" = true ] && echo "是" || echo "否")"
-        if [ "$DOCKER_INSTALLED" = true ]; then
-            echo "   Docker 镜像源: $DOCKER_MIRROR"
-            echo "   Docker IPv6 支持: $([ "$DOCKER_ENABLE_IPV6" = true ] && echo "是" || echo "否")"
-        fi
-        echo "6. 安装 ppp (用于 PPPOE 拨号): $([ "$INSTALL_PPP" = true ] && echo "是" || echo "否")"
-        echo "7. 使用 GitHub 镜像加速: $([ "$USE_GITHUB_MIRROR" = true ] && echo "是" || echo "否")"
-        if [ "$USE_GITHUB_MIRROR" = true ]; then
-            echo "   GitHub 镜像地址: $GITHUB_MIRROR"
-        fi
-        echo "8. 下载 redirect_pkg_handler: $([ "$DOWNLOAD_HANDLER" = true ] && echo "是" || echo "否")"
-        if [ "$DOWNLOAD_HANDLER" = true ]; then
-            echo "   要下载的 handler 版本: ${HANDLER_ARCHITECTURES[*]}"
-        fi
-        echo "9. Landscape Router 安装路径: $LANDSCAPE_DIR"
-        echo "10. 管理员账号: $ADMIN_USER"
-        echo "    管理员密码: $ADMIN_PASS"
-        echo "11. LAN 网桥配置:"
-        echo "    名称 = $(echo "$LAN_CONFIG" | grep "bridge_name" | cut -d '"' -f 2)"
-        echo "    IP地址 = $(echo "$LAN_CONFIG" | grep "lan_ip" | cut -d '"' -f 2)"
-        echo "    DHCP起始地址 = $(echo "$LAN_CONFIG" | grep "dhcp_start" | cut -d '"' -f 2)"
-        echo "    DHCP结束地址 = $(echo "$LAN_CONFIG" | grep "dhcp_end" | cut -d '"' -f 2)"
-        echo "    网络掩码 = $(echo "$LAN_CONFIG" | grep "network_mask" | awk -F'= ' '{print $2}')"
-        local interfaces_list
-        interfaces_list=$(echo "$LAN_CONFIG" | grep "interfaces" | cut -d '(' -f 2 | cut -d ')' -f 1)
-        echo "    绑定网卡 = $interfaces_list"
-        echo "=============================="
+        display_configuration
         
         read -rp "是否需要修改配置? (输入编号修改对应配置, 输入 'done' 完成配置): " config_choice
         case "$config_choice" in
             done)
                 config_confirmed=true
                 ;;
-            1)
-                read -rp "是否将系统时区修改为亚洲/上海? (y/n): " answer
-                if [[ ! "$answer" =~ ^[Nn]$ ]]; then
-                    TIMEZONE_SHANGHAI=true
-                else
-                    TIMEZONE_SHANGHAI=false
-                fi
-                ;;
-            2)
-                read -rp "是否禁用 swap? (y/n): " answer
-                if [[ ! "$answer" =~ ^[Nn]$ ]]; then
-                    SWAP_DISABLED=true
-                else
-                    SWAP_DISABLED=false
-                fi
-                ;;
-            3)
-                # 询问是否换源 (仅对支持的系统进行询问)
-                # 检查是否为支持换源的系统 (Debian, Ubuntu, Linux Mint, Armbian, Raspbian)
-                ask_apt_mirror
-                ;;
-            4)
-                # 只有当web server不是预装时才允许修改web server配置
-                ask_webserver
-                ;;
-            5)
-                read -rp "是否安装 Docker(含compose)? (y/n): " answer
-                if [[ ! "$answer" =~ ^[Nn]$ ]]; then
-                    # 检查是否已安装 curl，如未安装则提醒会自动安装
-                    if ! command -v curl &> /dev/null; then
-                        echo "注意: 系统未安装 curl，安装 Docker 时将自动安装 curl"
-                    fi
-                    
-                    DOCKER_INSTALLED=true
-                    
-                    ask_docker_mirror
-                    
-                    read -rp "是否为 Docker 开启 IPv6 支持? (y/n): " answer
-                    if [[ ! "$answer" =~ ^[Nn]$ ]]; then
-                        DOCKER_ENABLE_IPV6=true
-                    else
-                        DOCKER_ENABLE_IPV6=false
-                    fi
-                else
-                    DOCKER_INSTALLED=false
-                fi
-                ;;
-            6)
-                read -rp "是否安装 ppp 用于 pppoe 拨号? (y/n): " answer
-                if [[ ! "$answer" =~ ^[Nn]$ ]]; then
-                    INSTALL_PPP=true
-                else
-                    INSTALL_PPP=false
-                fi
-                ;;
-            7)
-                ask_github_mirror
-                ;;
-            8)
-                ask_download_handler
-                ;;
-            9)
-                while true; do
-                    read -rp "请输入 Landscape Router 安装路径 (默认: /root/.landscape-router): " LANDSCAPE_DIR
-                    if [ -z "$LANDSCAPE_DIR" ]; then
-                        LANDSCAPE_DIR="/root/.landscape-router"
-                    fi
-                    
-                    if [ ! -d "$(dirname "$LANDSCAPE_DIR")" ]; then
-                        log "错误: 指定的安装路径的上级目录不存在"
-                        continue
-                    fi
-                    
-                    break
-                done
-                ;;
-            10)
-                read -rp "是否设置 Landscape Router 管理员账号密码? (y/n): " answer
-                if [[ ! "$answer" =~ ^[Nn]$ ]]; then
-                    read -rp "请输入管理员用户名 (默认: root): " custom_user
-                    if [ -n "$custom_user" ]; then
-                        ADMIN_USER="$custom_user"
-                    fi
-                    
-                    read -rsp "请输入管理员密码 (默认: root): " TEMP_PASS
-                    echo  # 换行
-                    if [ -n "$TEMP_PASS" ]; then
-                        ADMIN_PASS="$TEMP_PASS"
-                    fi
-                    # 清除临时密码变量
-                    TEMP_PASS=""
-                fi
-                ;;
-            11)
-                config_lan_interface
-                ;;
             *)
-                echo "无效选择, 请重新输入"
-                echo "按任意键继续..."
-                read -n 1 -s
+                if modify_configuration "$config_choice"; then
+                    # 如果修改成功，继续循环
+                    continue
+                fi
                 ;;
         esac
     done
@@ -466,11 +627,10 @@ ask_user_config() {
 }
 
 ask_apt_mirror() { 
-
     # 询问是否换源 (仅对支持的系统进行询问)
-    # 检查是否为支持换源的系统 (Debian, Ubuntu, Linux Mint, Armbian, Raspbian)
-    if grep -q "Debian" /etc/os-release || grep -q "Ubuntu" /etc/os-release || grep -q "Linux Mint" /etc/os-release || grep -q "Armbian" /etc/os-release || grep -q "Raspbian" /etc/os-release || grep -q "Raspberry Pi OS" /etc/os-release; then
+    if is_supported_system; then
         USE_CUSTOM_MIRROR=true
+        echo "-----------------------------"
         
         # 询问使用哪个镜像源
         echo "请选择要使用的镜像源:"
@@ -482,8 +642,8 @@ ask_apt_mirror() {
         echo "5) 中国科学技术大学"
         echo "6) 南京大学"
         echo "7) 哈尔滨工业大学"
-        read -rp "请选择 (0-7, 默认为 1 阿里云 ): " answer
-        case "$answer" in
+        read -rp "请选择 (0-7, 默认为 1 阿里云 ): " mirror_response
+        case "$mirror_response" in
             1|"") 
                 MIRROR_SOURCE="aliyun"
                 ;;
@@ -513,12 +673,12 @@ ask_apt_mirror() {
         echo "当前系统不支持自动换源功能"
         echo "仅支持 Debian、Ubuntu、Linux Mint、Armbian 和 Raspbian 系统换源"
     fi
-
 }
 
 ask_webserver() { 
     # 只有当web server不是预装时才允许修改web server配置
     if [ "$WEB_SERVER_PREINSTALLED" != true ]; then
+        echo "-----------------------------"
         echo "Landscape Router 需要 web server 环境才能正常运行"
         echo "缺少 web server 可能会导致主机失联问题"
         echo ""
@@ -557,16 +717,16 @@ ask_webserver() {
     else
         echo "系统已预装 web server ($WEB_SERVER_TYPE)，无法修改此配置"
     fi
-
 }
 
 ask_docker_mirror() {
+    echo "-----------------------------"
     echo "请选择 Docker 镜像源:"
     echo "1) 阿里云 (默认)"
     echo "2) Azure 中国云"
     echo "3) 官方源 (国外)"
-    read -rp "请选择 (1-3, 默认为1): " answer
-    case "$answer" in
+    read -rp "请选择 (1-3, 默认为1): " docker_mirror_response
+    case "$docker_mirror_response" in
         2) DOCKER_MIRROR="azure" ;;
         3) DOCKER_MIRROR="official" ;;
         *) DOCKER_MIRROR="aliyun" ;;
@@ -574,12 +734,13 @@ ask_docker_mirror() {
 }
 
 ask_github_mirror() { 
+    echo "-----------------------------"
     echo "请选择 GitHub 镜像加速地址 (默认启用 https://ghfast.top):"
     echo "0) 不使用加速"
     echo "1) https://ghfast.top (默认)"
     echo "2) 自定义地址"
-    read -rp "请选择 (0-2, 默认为1): " answer
-    case "$answer" in
+    read -rp "请选择 (0-2, 默认为1): " github_mirror_response
+    case "$github_mirror_response" in
         0)
             USE_GITHUB_MIRROR=false
             ;;
@@ -599,21 +760,21 @@ ask_github_mirror() {
     esac
 }
 
-
 # 暂不支持 aarch64-musl
 # 询问是否下载 handler 及选择架构
 ask_download_handler() {
+    echo "-----------------------------"
     echo ""
     echo "redirect_pkg_handler 是 分流到 Docker 容器 功能不可缺少该组件"
     echo ""
-    read -rp "是否下载 redirect_pkg_handler 相关文件? (y/n): " answer
-    if [[ ! "$answer" =~ ^[Nn]$ ]]; then
+    read -rp "是否下载 redirect_pkg_handler 相关文件? (y/n): " handler_response
+    if [[ ! "$handler_response" =~ ^[Nn]$ ]]; then
         DOWNLOAD_HANDLER=true
         
         # 获取系统架构
         local system_arch
         system_arch=$(uname -m)
-        
+        echo "-----------------------------"
         echo "请选择要下载的 redirect_pkg_handler 版本 (可多选，用空格分隔):"
         # 根据系统架构提供相应的选项
         case "$system_arch" in
@@ -630,7 +791,7 @@ ask_download_handler() {
                 
                 # 根据选择设置要下载的架构
                 HANDLER_ARCHITECTURES=()
-                if [[ "$handler_choice" =~ 3 ]]; then
+                if [[ "$handler_choice" == *3* ]]; then
                     HANDLER_ARCHITECTURES=("x86_64" "x86_64-musl")
                 else
                     [[ "$handler_choice" =~ 1 ]] && HANDLER_ARCHITECTURES+=("x86_64-musl")
@@ -650,7 +811,7 @@ ask_download_handler() {
                 
                 # 根据选择设置要下载的架构
                 HANDLER_ARCHITECTURES=()
-                if [[ "$handler_choice" =~ 3 ]]; then
+                if [[ "$handler_choice" == *3* ]]; then
                     HANDLER_ARCHITECTURES=("aarch64")
                 else
                     [[ "$handler_choice" =~ 1 ]] && HANDLER_ARCHITECTURES+=("aarch64-musl")
@@ -690,30 +851,21 @@ ask_download_handler() {
     fi
 }
 
-# 配置 LAN 网卡
-config_lan_interface() {
-    echo ""
-    echo "WAN 配置，请稍候在 UI 中进行"
-    echo ""
-    echo "现在开始配置 LAN 网桥"
-    
-    # 询问网桥名称
-    read -rp "请输入要创建的 LAN 网桥名称 (默认为 lan1): " bridge_name
-    if [ -z "$bridge_name" ]; then
-        bridge_name="lan1"
-    fi
-    
-    # 获取可用网卡列表
-    local interfaces
-    interfaces=$(ip link show | awk -F': ' '/^[0-9]+: [a-zA-Z]/ {print $2}' | grep -v lo)
-    
-    # 显示网卡详细信息
+# 获取可用网络接口
+get_available_interfaces() {
+    ip link show | awk -F': ' '/^[0-9]+: [a-zA-Z]/ {print $2}' | grep -v lo
+}
+
+# 显示网络接口信息
+display_interface_info() {
+    local interfaces="$1"
+    echo "-----------------------------"
     echo "可用网络接口信息: "
     local i=1
     for iface in $interfaces; do
         echo "$i) $iface"
         # 显示IP地址信息
-        local ip_info=$(ip addr show $iface 2>/dev/null | grep "inet " | awk '{print $2}' | cut -d'/' -f1)
+        local ip_info=$(ip addr show "$iface" 2>/dev/null | grep "inet " | awk '{print $2}' | cut -d'/' -f1)
         if [ -n "$ip_info" ]; then
             echo "   IP地址: $ip_info"
         fi
@@ -723,9 +875,35 @@ config_lan_interface() {
         i=$((i+1))
     done
     echo ""
+}
+
+# 验证IP地址格式
+valid_ip() {
+    local ip=$1
+    local stat=1
     
-    # 选择绑定到网桥的物理网卡
-    selected_interfaces=()
+    if [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+        IFS='.' read -r -a ip_parts <<< "$ip"
+        
+        # 检查每个部分是否为0-255之间的有效值
+        if [ "${ip_parts[0]}" -ge 0 ] && [ "${ip_parts[0]}" -le 255 ] && \
+           [ "${ip_parts[1]}" -ge 0 ] && [ "${ip_parts[1]}" -le 255 ] && \
+           [ "${ip_parts[2]}" -ge 0 ] && [ "${ip_parts[2]}" -le 255 ] && \
+           [ "${ip_parts[3]}" -ge 0 ] && [ "${ip_parts[3]}" -le 255 ]; then
+            stat=0
+        fi
+    fi
+    
+    return $stat
+}
+
+# 选择绑定到网桥的物理网卡
+select_interfaces() {
+    local interfaces="$1"
+    local bridge_name="$2"
+    local -n selected_interfaces_ref=$3
+    
+    selected_interfaces_ref=()
     local valid_input=false
     
     while [ "$valid_input" = false ]; do
@@ -738,13 +916,18 @@ config_lan_interface() {
             continue
         fi
         
+        # 计算接口总数
+        local interface_count=0
+        for iface in $interfaces; do
+            interface_count=$((interface_count+1))
+        done
+        
         # 检查每个编号的有效性
         valid_input=true
-        local max_index=$((i-1))
         
         for c in $choice; do
-            if [ "$c" -lt 1 ] || [ "$c" -gt "$max_index" ]; then
-                echo "编号 $c 超出范围, 请输入 1 到 $max_index 的数字"
+            if [ "$c" -lt 1 ] || [ "$c" -gt "$interface_count" ]; then
+                echo "编号 $c 超出范围, 请输入 1 到 $interface_count 的数字"
                 valid_input=false
                 break
             fi
@@ -753,7 +936,14 @@ config_lan_interface() {
         # 检查是否有重复选择
         local unique_check=()
         for c in $choice; do
-            if [[ " ${unique_check[*]} " =~ " ${c} " ]]; then
+            local found=false
+            for existing in "${unique_check[@]}"; do
+                if [[ "$existing" == "$c" ]]; then
+                    found=true
+                    break
+                fi
+            done
+            if [[ "$found" == true ]]; then
                 echo "检测到重复的选择: $c"
                 valid_input=false
                 break
@@ -767,91 +957,72 @@ config_lan_interface() {
     for c in $choice; do
         local selected_iface
         selected_iface=$(echo "$interfaces" | sed -n "${c}p")
-        selected_interfaces+=("$selected_iface")
+        selected_interfaces_ref+=("$selected_iface")
         echo "- $selected_iface"
     done
+}
+
+# 输入并验证IP地址
+input_and_validate_ip() {
+    local prompt="$1"
+    local default_value="$2"
+    local ip_value=""
     
-    # 验证 IP 地址格式的函数
-    valid_ip() {
-        local ip=$1
-        local stat=1
-        
-        if [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-            IFS='.' read -r -a ip_parts <<< "$ip"
-            
-            # 检查每个部分是否为0-255之间的有效值
-            if [ "${ip_parts[0]}" -ge 0 ] && [ "${ip_parts[0]}" -le 255 ] && \
-               [ "${ip_parts[1]}" -ge 0 ] && [ "${ip_parts[1]}" -le 255 ] && \
-               [ "${ip_parts[2]}" -ge 0 ] && [ "${ip_parts[2]}" -le 255 ] && \
-               [ "${ip_parts[3]}" -ge 0 ] && [ "${ip_parts[3]}" -le 255 ]; then
-                stat=0
-            fi
-        fi
-        
-        return $stat
-    }
-    
-    # 询问 LAN IP
     while true; do
-        read -rp "请输入 LAN 网桥的 IP 地址 (默认为 192.168.88.1): " lan_ip
-        if [ -z "$lan_ip" ]; then
-            lan_ip="192.168.88.1"
+        read -rp "$prompt (默认为 $default_value): " ip_value
+        if [ -z "$ip_value" ]; then
+            ip_value="$default_value"
             break
         fi
         
-        if valid_ip "$lan_ip"; then
+        if valid_ip "$ip_value"; then
             break
         else
-            echo "输入的 IP 地址无效, 请输入有效的 IP 地址 (例如: 192.168.88.1) "
+            echo "输入的 IP 地址无效, 请输入有效的 IP 地址 (例如: $default_value) "
         fi
     done
     
-    # 询问 DHCP 范围
-    while true; do
-        read -rp "请输入 DHCP IP 范围起始地址 (默认为 192.168.88.100): " dhcp_start
-        if [ -z "$dhcp_start" ]; then
-            dhcp_start="192.168.88.100"
-            break
-        fi
-        
-        if valid_ip "$dhcp_start"; then
-            break
-        else
-            echo "输入的 IP 地址无效, 请输入有效的 IP 地址 (例如: 192.168.88.100) "
-        fi
-    done
+    echo "$ip_value"
+}
+
+# 输入并验证DHCP范围
+input_and_validate_dhcp_range() {
+    local dhcp_start
+    local dhcp_end
     
+    # 输入 DHCP 起始地址
+    dhcp_start=$(input_and_validate_ip "请输入 DHCP IP 范围起始地址" "192.168.88.100")
+    
+    # 输入 DHCP 结束地址
     while true; do
-        read -rp "请输入 DHCP IP 范围结束地址 (默认为 192.168.88.200): " dhcp_end
-        if [ -z "$dhcp_end" ]; then
-            dhcp_end="192.168.88.200"
-            break
-        fi
+        dhcp_end=$(input_and_validate_ip "请输入 DHCP IP 范围结束地址" "192.168.88.200")
         
-        if valid_ip "$dhcp_end"; then
-            # 检查结束IP是否在合理范围内
-            local start_octets=(${dhcp_start//./ })
-            local end_octets=(${dhcp_end//./ })
-            
-            # 检查是否在同一子网
-            if [ "${start_octets[0]}" -eq "${end_octets[0]}" ] && \
-               [ "${start_octets[1]}" -eq "${end_octets[1]}" ] && \
-               [ "${start_octets[2]}" -eq "${end_octets[2]}" ]; then
-                # 检查结束地址是否大于起始地址
-                if [ "${end_octets[3]}" -gt "${start_octets[3]}" ]; then
-                    break
-                else
-                    echo "DHCP 结束地址必须大于起始地址"
-                fi
+        # 检查结束IP是否在合理范围内
+        local start_octets=(${dhcp_start//./ })
+        local end_octets=(${dhcp_end//./ })
+        
+        # 检查是否在同一子网
+        if [ "${start_octets[0]}" -eq "${end_octets[0]}" ] && \
+           [ "${start_octets[1]}" -eq "${end_octets[1]}" ] && \
+           [ "${start_octets[2]}" -eq "${end_octets[2]}" ]; then
+            # 检查结束地址是否大于起始地址
+            if [ "${end_octets[3]}" -gt "${start_octets[3]}" ]; then
+                break
             else
-                echo "DHCP 起始和结束地址必须在同一子网"
+                echo "DHCP 结束地址必须大于起始地址"
             fi
         else
-            echo "输入的 IP 地址无效, 请输入有效的 IP 地址 (例如: 192.168.88.200) "
+            echo "DHCP 起始和结束地址必须在同一子网"
         fi
     done
     
-    # 询问网络掩码
+    echo "$dhcp_start|$dhcp_end"
+}
+
+# 输入并验证网络掩码
+input_and_validate_netmask() {
+    local network_mask
+    
     while true; do
         read -rp "请输入网络掩码位数 (默认为 24): " network_mask
         if [ -z "$network_mask" ]; then
@@ -865,6 +1036,49 @@ config_lan_interface() {
             echo "输入的网络掩码无效, 请输入 8 到 32 之间的数字"
         fi
     done
+    
+    echo "$network_mask"
+}
+
+# 配置 LAN 网卡
+config_lan_interface() {
+    echo "-----------------------------"
+    echo ""
+    echo "WAN 配置，请稍候在 UI 中进行"
+    echo ""
+    echo "现在开始配置 LAN 网桥"
+    
+    # 询问网桥名称
+    read -rp "请输入要创建的 LAN 网桥名称 (默认为 lan1): " bridge_name
+    if [ -z "$bridge_name" ]; then
+        bridge_name="lan1"
+    fi
+    
+    # 获取可用网卡列表
+    local interfaces
+    interfaces=$(get_available_interfaces)
+    
+    # 显示网卡详细信息
+    display_interface_info "$interfaces"
+    
+    # 选择绑定到网桥的物理网卡
+    local selected_interfaces=()
+    select_interfaces "$interfaces" "$bridge_name" selected_interfaces
+    
+    echo "-----------------------------"
+    # 询问 LAN IP
+    local lan_ip
+    lan_ip=$(input_and_validate_ip "请输入 LAN 网桥的 IP 地址" "192.168.88.1")
+    
+    # 询问 DHCP 范围
+    local dhcp_range
+    dhcp_range=$(input_and_validate_dhcp_range)
+    local dhcp_start=$(echo "$dhcp_range" | cut -d'|' -f1)
+    local dhcp_end=$(echo "$dhcp_range" | cut -d'|' -f2)
+    
+    # 询问网络掩码
+    local network_mask
+    network_mask=$(input_and_validate_netmask)
     
     # 构建 LAN 配置
     LAN_CONFIG="bridge_name = \"$bridge_name\"
@@ -953,7 +1167,6 @@ setup_timezone() {
     log "时区设置完成"
 }
 
-
 # 关闭 swap
 disable_swap() {
     log "禁用 swap (虚拟内存)"
@@ -963,92 +1176,119 @@ disable_swap() {
     
     log "swap (虚拟内存)  已禁用"
 }
+
+# 处理Debian/Armbian/Raspbian类型的源
+handle_debian_sources() {
+    local mirror_url="$1"
+    local version_codename="$2"
+    local system_type="$3"
+    local mirror_source="$4"
+    
+    # 如果无法获取版本代号，则使用通用代号
+    if [ -z "$version_codename" ]; then
+        version_codename="stable"
+    fi
+    
+    # 针对不同镜像源，Debian/Armbian/Raspbian 安全更新使用专门的URL
+    local security_mirror_url="$mirror_url"
+    case "$mirror_source" in
+        "sjtu"|"zju"|"nju"|"hit")
+            # 高校镜像站等使用独立的安全更新路径
+            security_mirror_url="https://${mirror_source}.debian.org/debian-security/"
+            ;;
+        *)
+            # 默认使用镜像站的debian-security子路径
+            security_mirror_url="${mirror_url}debian-security/"
+            ;;
+    esac
+    
+    # 特别处理 Debian 12 (bookworm) 及以上版本的安全更新源
+    if [ "$system_type" = "debian" ] || [ "$system_type" = "armbian" ] || [ "$system_type" = "raspbian" ]; then
+        if [[ "$version_codename" > "bullseye" ]]; then
+            security_mirror_url="https://security.debian.org/debian-security"
+        fi
+    fi
+    
+    # 写入新源
+    cat > /etc/apt/sources.list << EOF
+# 默认注释了源码镜像以提高 apt update 速度，如有需要可取消注释
+deb $mirror_url $version_codename main contrib non-free non-free-firmware
+# deb-src $mirror_url $version_codename main contrib non-free non-free-firmware
+
+deb $mirror_url $version_codename-updates main contrib non-free non-free-firmware
+# deb-src $mirror_url $version_codename-updates main contrib non-free non-free-firmware
+
+deb $mirror_url $version_codename-backports main contrib non-free non-free-firmware
+# deb-src $mirror_url $version_codename-backports main contrib non-free non-free-firmware
+
+deb $security_mirror_url $version_codename-security main contrib non-free non-free-firmware
+# deb-src $security_mirror_url $version_codename-security main contrib non-free non-free-firmware
+EOF
+}
+
+# 处理Ubuntu/LinuxMint类型的源
+handle_ubuntu_sources() {
+    local mirror_url="$1"
+    local version_codename="$2"
+    local mirror_source="$3"
+    
+    # 如果无法获取版本代号，则使用通用代号
+    if [ -z "$version_codename" ]; then
+        version_codename="focal"  # 默认使用 focal
+    fi
+    
+    # 针对不同镜像源，Ubuntu/Linux Mint 安全更新使用专门的URL
+    local ubuntu_security_mirror_url="$mirror_url"
+    case "$mirror_source" in
+        "sjtu"|"zju"|"nju"|"hit")
+            # 高校镜像站等使用独立的安全更新路径
+            ubuntu_security_mirror_url="https://${mirror_source}.ubuntu.com/ubuntu-security/"
+            ;;
+        *)
+            # 默认使用镜像站的ubuntu-security子路径
+            ubuntu_security_mirror_url="${mirror_url}ubuntu-security/"
+            ;;
+    esac
+    
+    # 特别处理 Ubuntu 22.04 (jammy) 及以上版本的安全更新源
+    if [[ "$version_codename" > "focal" ]]; then
+        ubuntu_security_mirror_url="https://security.ubuntu.com/ubuntu"
+    fi
+    
+    # 写入新源
+    cat > /etc/apt/sources.list << EOF
+# 默认注释了源码镜像以提高 apt update 速度，如有需要可取消注释
+deb $mirror_url $version_codename main restricted universe multiverse
+# deb-src $mirror_url $version_codename main restricted universe multiverse
+
+deb $mirror_url $version_codename-updates main restricted universe multiverse
+# deb-src $mirror_url $version_codename-updates main restricted universe multiverse
+
+deb $mirror_url $version_codename-backports main restricted universe multiverse
+# deb-src $mirror_url $version_codename-backports main restricted universe multiverse
+
+deb $ubuntu_security_mirror_url $version_codename-security main restricted universe multiverse
+# deb-src $ubuntu_security_mirror_url $version_codename-security main restricted universe multiverse
+EOF
+}
+
 # 换源
 change_apt_mirror() {
     log "更换 apt 软件源"
     
     # 检查是否为支持的系统类型
-    local is_supported=false
-    if grep -q "Debian" /etc/os-release || grep -q "Ubuntu" /etc/os-release || grep -q "Linux Mint" /etc/os-release || grep -q "Armbian" /etc/os-release || grep -q "Raspbian" /etc/os-release || grep -q "Raspberry Pi OS" /etc/os-release; then
-        is_supported=true
-    fi
-    
-    if [ "$is_supported" = false ]; then
+    if ! is_supported_system; then
         log "警告: 不支持的系统类型，仅支持 Debian、Ubuntu、Linux Mint、Armbian 和 Raspbian"
         log "提示: 不支持小众发行版换源，建议小众发行版自行换源"
         return 0
     fi
     
-    # 检查系统类型
-    local system_type=""
-    local system_version=""
-    local version_codename=""
-    
-    if grep -q "Debian" /etc/os-release; then
-        system_type="debian"
-        system_version=$(grep "VERSION_ID" /etc/os-release | cut -d'=' -f2 | tr -d '"')
-        version_codename=$(grep "VERSION_CODENAME" /etc/os-release | cut -d'=' -f2)
-    elif grep -q "Ubuntu" /etc/os-release; then
-        system_type="ubuntu"
-        system_version=$(grep "VERSION_ID" /etc/os-release | cut -d'=' -f2 | tr -d '"')
-        version_codename=$(grep "VERSION_CODENAME" /etc/os-release | cut -d'=' -f2)
-    elif grep -q "Linux Mint" /etc/os-release; then
-        system_type="linuxmint"
-        system_version=$(grep "VERSION_ID" /etc/os-release | cut -d'=' -f2 | tr -d '"')
-        # Linux Mint 使用 Ubuntu 的代号，需要特殊处理
-        # 从 VERSION 中提取 Ubuntu 代号
-        local ubuntu_codename=$(grep "UBUNTU_CODENAME" /etc/os-release | cut -d'=' -f2)
-        if [ -n "$ubuntu_codename" ]; then
-            version_codename="$ubuntu_codename"
-        else
-            # 如果没有 UBUNTU_CODENAME，尝试从 VERSION 中提取
-            local version_desc=$(grep "VERSION=" /etc/os-release | cut -d'=' -f2 | tr -d '"')
-            # 从版本描述中提取Ubuntu代号，例如从 "21.2 (Victoria)" 提取 "Victoria"
-            # 或者从 "20.3 (Una)" 提取 "focal" (因为Linux Mint 20.x基于Ubuntu 20.04/focal)
-            if [[ $version_desc =~ \((.*)\) ]]; then
-                local mint_codename="${BASH_REMATCH[1],,}"  # 转换为小写
-                
-                # 根据Linux Mint代号映射到Ubuntu代号
-                case "$mint_codename" in
-                    "vanessa"|"vera"|"victoria"|"virginia") 
-                        version_codename="jammy"  # Ubuntu 22.04
-                        ;;
-                    "una"|"uma"|"ulyssa"|"ulyana"|"julia")
-                        version_codename="focal"  # Ubuntu 20.04
-                        ;;
-                    "tricia"|"tina"|"tessa"|"tara"|"ulyana")
-                        version_codename="bionic" # Ubuntu 18.04
-                        ;;
-                    *)
-                        version_codename="focal"  # 默认使用 focal
-                        ;;
-                esac
-            else
-                version_codename="focal"  # 默认使用 focal
-            fi
-        fi
-    elif grep -q "Armbian" /etc/os-release; then
-        system_type="armbian"
-        system_version=$(grep "VERSION_ID" /etc/os-release | cut -d'=' -f2 | tr -d '"')
-        version_codename=$(grep "VERSION_CODENAME" /etc/os-release | cut -d'=' -f2)
-        # 如果没有 VERSION_CODENAME，尝试从其他字段获取
-        if [ -z "$version_codename" ]; then
-            # Armbian 通常基于 Debian，尝试获取 Debian 版本代号
-            version_codename=$(grep "DEBIAN_VERSION" /etc/os-release | cut -d'=' -f2 | tr -d '"')
-        fi
-        # 如果仍然为空，则使用默认值
-        if [ -z "$version_codename" ]; then
-            version_codename="bullseye"  # 默认使用 bullseye
-        fi
-    elif grep -q "Raspbian" /etc/os-release || grep -q "Raspberry Pi OS" /etc/os-release; then
-        system_type="raspbian"
-        system_version=$(grep "VERSION_ID" /etc/os-release | cut -d'=' -f2 | tr -d '"')
-        version_codename=$(grep "VERSION_CODENAME" /etc/os-release | cut -d'=' -f2)
-        # 如果没有 VERSION_CODENAME，则使用默认值
-        if [ -z "$version_codename" ]; then
-            version_codename="bullseye"  # 默认使用 bullseye
-        fi
-    fi
+    # 检测系统类型
+    local system_info
+    system_info=$(detect_system_type)
+    local system_type=$(echo "$system_info" | cut -d'|' -f1)
+    local system_version=$(echo "$system_info" | cut -d'|' -f2)
+    local version_codename=$(echo "$system_info" | cut -d'|' -f3)
     
     # 确定使用的镜像源URL - 优化后的实现
     local mirror_url=""
@@ -1091,87 +1331,10 @@ change_apt_mirror() {
     # 根据系统类型生成对应的源列表
     case "$system_type" in
         "debian"|"armbian"|"raspbian")
-            # 如果无法获取版本代号，则使用通用代号
-            if [ -z "$version_codename" ]; then
-                version_codename="stable"
-            fi
-            
-            # 针对不同镜像源，Debian/Armbian/Raspbian 安全更新使用专门的URL
-            local security_mirror_url="$mirror_url"
-            case "$MIRROR_SOURCE" in
-                "sjtu"|"zju"|"nju"|"hit")
-                    # 高校镜像站等使用独立的安全更新路径
-                    security_mirror_url="https://${MIRROR_SOURCE}.debian.org/debian-security/"
-                    ;;
-                *)
-                    # 默认使用镜像站的debian-security子路径
-                    security_mirror_url="${mirror_url}debian-security/"
-                    ;;
-            esac
-            
-            # 特别处理 Debian 12 (bookworm) 及以上版本的安全更新源
-            if [ "$system_type" = "debian" ] || [ "$system_type" = "armbian" ] || [ "$system_type" = "raspbian" ]; then
-                if [[ "$version_codename" > "bullseye" ]]; then
-                    security_mirror_url="https://security.debian.org/debian-security"
-                fi
-            fi
-            
-            # 写入新源
-            cat > /etc/apt/sources.list << EOF
-# 默认注释了源码镜像以提高 apt update 速度，如有需要可取消注释
-deb $mirror_url $version_codename main contrib non-free non-free-firmware
-# deb-src $mirror_url $version_codename main contrib non-free non-free-firmware
-
-deb $mirror_url $version_codename-updates main contrib non-free non-free-firmware
-# deb-src $mirror_url $version_codename-updates main contrib non-free non-free-firmware
-
-deb $mirror_url $version_codename-backports main contrib non-free non-free-firmware
-# deb-src $mirror_url $version_codename-backports main contrib non-free non-free-firmware
-
-deb $security_mirror_url $version_codename-security main contrib non-free non-free-firmware
-# deb-src $security_mirror_url $version_codename-security main contrib non-free non-free-firmware
-EOF
+            handle_debian_sources "$mirror_url" "$version_codename" "$system_type" "$MIRROR_SOURCE"
             ;;
-            
         "ubuntu"|"linuxmint")
-            # 如果无法获取版本代号，则使用通用代号
-            if [ -z "$version_codename" ]; then
-                version_codename="focal"  # 默认使用 focal
-            fi
-            
-            # 针对不同镜像源，Ubuntu/Linux Mint 安全更新使用专门的URL
-            local ubuntu_security_mirror_url="$mirror_url"
-            case "$MIRROR_SOURCE" in
-                "sjtu"|"zju"|"nju"|"hit")
-                    # 高校镜像站等使用独立的安全更新路径
-                    ubuntu_security_mirror_url="https://${MIRROR_SOURCE}.ubuntu.com/ubuntu-security/"
-                    ;;
-                *)
-                    # 默认使用镜像站的ubuntu-security子路径
-                    ubuntu_security_mirror_url="${mirror_url}ubuntu-security/"
-                    ;;
-            esac
-            
-            # 特别处理 Ubuntu 22.04 (jammy) 及以上版本的安全更新源
-            if [[ "$version_codename" > "focal" ]]; then
-                ubuntu_security_mirror_url="https://security.ubuntu.com/ubuntu"
-            fi
-            
-            # 写入新源
-            cat > /etc/apt/sources.list << EOF
-# 默认注释了源码镜像以提高 apt update 速度，如有需要可取消注释
-deb $mirror_url $version_codename main restricted universe multiverse
-# deb-src $mirror_url $version_codename main restricted universe multiverse
-
-deb $mirror_url $version_codename-updates main restricted universe multiverse
-# deb-src $mirror_url $version_codename-updates main restricted universe multiverse
-
-deb $mirror_url $version_codename-backports main restricted universe multiverse
-# deb-src $mirror_url $version_codename-backports main restricted universe multiverse
-
-deb $ubuntu_security_mirror_url $version_codename-security main restricted universe multiverse
-# deb-src $ubuntu_security_mirror_url $version_codename-security main restricted universe multiverse
-EOF
+            handle_ubuntu_sources "$mirror_url" "$version_codename" "$MIRROR_SOURCE"
             ;;
     esac
     
@@ -1180,7 +1343,6 @@ EOF
     
     log "apt 软件源更换完成"
 }
-
 
 # 安装 webserver
 install_webserver() {
@@ -1209,14 +1371,8 @@ install_webserver() {
 install_docker() {
     log "安装 Docker(含compose)"
     
-    # 检查 curl 是否已安装, 未安装则安装
-    if ! command -v curl &> /dev/null; then
-        log "未检测到 curl, 正在安装..."
-        apt_update
-        apt_install "curl"
-    else
-        log "curl 已安装"
-    fi
+    # 确保curl已安装
+    ensure_curl_installed
     
     local retry=0
     local max_retry=3
@@ -1284,7 +1440,6 @@ install_docker() {
     log "错误: Docker(含compose) 安装失败"
     exit 1
 }
-
 
 # 配置 Docker
 configure_docker() {
@@ -1434,31 +1589,12 @@ create_landscape_dir() {
     log "Landscape Router 目录创建完成"
 }
 
-
-# 安装 Landscape Router
-install_landscape_router() {
-    log "下载并安装 Landscape Router"
+# 下载Landscape Router二进制文件
+download_landscape_binary() {
+    local binary_filename
+    binary_filename=$(get_binary_filename)
     
-    # 检查 curl 是否已安装, 未安装则安装
-    if ! command -v curl &> /dev/null; then
-        log "未检测到 curl, 正在安装..."
-        apt_update
-        apt_install "curl"
-    else
-        log "curl 已安装"
-    fi
-    
-    # 根据架构确定二进制文件名
-    local binary_filename=""
-    local system_arch
-    system_arch=$(uname -m)
-    if [ "$system_arch" = "aarch64" ]; then
-        binary_filename="landscape-webserver-aarch64"
-    else
-        binary_filename="landscape-webserver-x86_64"
-    fi
-    
-    # 直接下载 latest 版本的 landscape-webserver 二进制文件
+    # 构建下载URL
     local binary_url
     if [ "$USE_GITHUB_MIRROR" = true ]; then
         binary_url="$GITHUB_MIRROR/https://github.com/ThisSeanZhang/landscape/releases/latest/download/$binary_filename"
@@ -1466,60 +1602,29 @@ install_landscape_router() {
         binary_url="https://github.com/ThisSeanZhang/landscape/releases/latest/download/$binary_filename"
     fi
     
-    local retry=0
-    local max_retry=3
-    local user_choice=""
-    
-    while [ "$user_choice" != "n" ]; do
-        retry=0
-        while [ $retry -lt $max_retry ]; do
-            log "正在下载 $binary_filename  耗时较长 请稍候 (尝试 $((retry+1))/$max_retry)"
-            if command -v wget >/dev/null 2>&1; then
-                if wget -O "$LANDSCAPE_DIR/$binary_filename" "$binary_url"; then
-                    log "$binary_filename 下载成功"
-                    break
-                fi
-            elif command -v curl >/dev/null 2>&1; then
-                if curl -fSL --progress-bar -o "$LANDSCAPE_DIR/$binary_filename" "$binary_url"; then
-                    log "$binary_filename 下载成功"
-                    break
-                fi
-            fi
-            retry=$((retry+1))
-            log "下载失败, 等待 5 秒后重试"
-            sleep 5
-        done
-        
-        if [ $retry -eq $max_retry ]; then
-            echo "下载 $binary_filename 失败, 是否再次尝试3次？(y/n) 或输入 'm' 使用 GitHub 镜像加速: "
-            read -r user_choice
-            user_choice=$(echo "$user_choice" | tr '[:upper:]' '[:lower:]')
-            
-            # 如果用户选择使用 GitHub 镜像加速
-            if [ "$user_choice" = "m" ]; then
-                ask_github_mirror
-                
-                if [ "$USE_GITHUB_MIRROR" = true ]; then
-                    # 更新下载 URL
-                    binary_url="$GITHUB_MIRROR/https://github.com/ThisSeanZhang/landscape/releases/latest/download/$binary_filename"
-                    user_choice="y"  # 重置选择以便继续循环
-                    retry=0  # 重置重试计数
-                fi
-            fi
-        else
-            # 下载成功则跳出循环
-            break
-        fi
-    done
-    
-    if [ $retry -eq $max_retry ] && [ "$user_choice" = "n" ]; then
+    # 使用统一的下载函数
+    if ! download_with_retry "$binary_url" "$LANDSCAPE_DIR/$binary_filename" "$binary_filename"; then
         log "错误: 下载 $binary_filename 失败"
         exit 1
     fi
     
+    # 添加执行权限
+    chmod +x "$LANDSCAPE_DIR/$binary_filename"
+    
+    # 获取版本信息
+    local version
+    version=$("$LANDSCAPE_DIR/$binary_filename" --version 2>/dev/null)
+    if [ -n "$version" ]; then
+        log "Landscape Router 版本信息: $version"
+    else
+        log "无法获取 Landscape Router 版本信息"
+    fi
+}
+
+# 下载和解压static文件
+download_and_extract_static() {
     # 确保 unzip 已安装
     log "检查并安装 unzip 工具"
-    
     if ! command -v unzip &> /dev/null; then
         log "未检测到 unzip, 正在安装..."
         apt_update
@@ -1536,52 +1641,8 @@ install_landscape_router() {
         static_url="https://github.com/ThisSeanZhang/landscape/releases/latest/download/static.zip"
     fi
     
-    retry=0
-    user_choice=""
-    
-    while [ "$user_choice" != "n" ]; do
-        retry=0
-        while [ $retry -lt $max_retry ]; do
-            log "正在下载 static.zip 耗时较长 请稍候(尝试 $((retry+1))/$max_retry)"
-            if command -v wget >/dev/null 2>&1; then
-                if wget -O /tmp/static.zip "$static_url"; then
-                    log "static.zip 下载成功"
-                    break
-                fi
-            elif command -v curl >/dev/null 2>&1; then
-                if curl -fSL --progress-bar -o /tmp/static.zip "$static_url"; then
-                    log "static.zip 下载成功"
-                    break
-                fi
-            fi
-            retry=$((retry+1))
-            log "下载失败, 等待 5 秒后重试"
-            sleep 5
-        done
-        
-        if [ $retry -eq $max_retry ]; then
-            echo "下载 static.zip 失败, 是否再次尝试3次？(y/n) 或输入 'm' 使用 GitHub 镜像加速: "
-            read -r user_choice
-            user_choice=$(echo "$user_choice" | tr '[:upper:]' '[:lower:]')
-            
-            # 如果用户选择使用 GitHub 镜像加速
-            if [ "$user_choice" = "m" ]; then
-                ask_github_mirror
-                
-                if [ "$USE_GITHUB_MIRROR" = true ]; then
-                    # 更新下载 URL
-                    static_url="$GITHUB_MIRROR/https://github.com/ThisSeanZhang/landscape/releases/latest/download/static.zip"
-                    user_choice="y"  # 重置选择以便继续循环
-                    retry=0  # 重置重试计数
-                fi
-            fi
-        else
-            # 下载成功则跳出循环
-            break
-        fi
-    done
-    
-    if [ $retry -eq $max_retry ] && [ "$user_choice" = "n" ]; then
+    # 使用统一的下载函数
+    if ! download_with_retry "$static_url" "/tmp/static.zip" "static.zip"; then
         log "错误: 下载 static.zip 失败"
         exit 1
     fi
@@ -1631,18 +1692,20 @@ install_landscape_router() {
     
     # 清理临时文件
     rm -rf /tmp/static.zip /tmp/static
+}
+
+# 安装 Landscape Router
+install_landscape_router() {
+    log "下载并安装 Landscape Router"
     
-    # 添加执行权限
-    chmod +x "$LANDSCAPE_DIR/$binary_filename"
+    # 确保curl已安装
+    ensure_curl_installed
     
-    # 获取版本信息
-    local version
-    version=$("$LANDSCAPE_DIR/$binary_filename" --version 2>/dev/null)
-    if [ -n "$version" ]; then
-        log "Landscape Router 版本信息: $version"
-    else
-        log "无法获取 Landscape Router 版本信息"
-    fi
+    # 下载二进制文件
+    download_landscape_binary
+    
+    # 下载和解压static文件
+    download_and_extract_static
     
     log "Landscape Router 部署完成"
 }
@@ -1653,18 +1716,11 @@ download_handlers() {
     
     # 不再创建单独的 handler 目录，直接使用 LANDSCAPE_DIR
     
-    # 检查 curl 是否已安装, 未安装则安装
-    if ! command -v curl &> /dev/null; then
-        log "未检测到 curl, 正在安装..."
-        apt_update
-        apt_install "curl"
-    else
-        log "curl 已安装"
-    fi
+    # 确保curl已安装
+    ensure_curl_installed
     
     # 确保 unzip 已安装
     log "检查并安装 unzip 工具"
-    
     if ! command -v unzip &> /dev/null; then
         log "未检测到 unzip, 正在安装..."
         apt_update
@@ -1681,53 +1737,8 @@ download_handlers() {
         handler_script_url="https://raw.githubusercontent.com/CyberRookie-X/Install_landscape_on_debian12_and_manage_compose_by_dpanel/main/redirect_pkg_handler.sh"
     fi
     
-    local retry=0
-    local max_retry=3
-    local user_choice=""
-    
-    while [ "$user_choice" != "n" ]; do
-        retry=0
-        while [ $retry -lt $max_retry ]; do
-            log "正在下载 redirect_pkg_handler.sh 脚本 (尝试 $((retry+1))/$max_retry)"
-            if command -v wget >/dev/null 2>&1; then
-                if wget -O "$LANDSCAPE_DIR/redirect_pkg_handler.sh" "$handler_script_url"; then
-                    log "redirect_pkg_handler.sh 下载成功"
-                    break
-                fi
-            elif command -v curl >/dev/null 2>&1; then
-                if curl -fSL --progress-bar -o "$LANDSCAPE_DIR/redirect_pkg_handler.sh" "$handler_script_url"; then
-                    log "redirect_pkg_handler.sh 下载成功"
-                    break
-                fi
-            fi
-            retry=$((retry+1))
-            log "下载失败, 等待 5 秒后重试"
-            sleep 5
-        done
-        
-        if [ $retry -eq $max_retry ]; then
-            echo "下载 redirect_pkg_handler.sh 失败, 是否再次尝试3次？(y/n) 或输入 'm' 使用 GitHub 镜像加速: "
-            read -r user_choice
-            user_choice=$(echo "$user_choice" | tr '[:upper:]' '[:lower:]')
-            
-            # 如果用户选择使用 GitHub 镜像加速
-            if [ "$user_choice" = "m" ]; then
-                ask_github_mirror
-                
-                if [ "$USE_GITHUB_MIRROR" = true ]; then
-                    # 更新下载 URL
-                    handler_script_url="$GITHUB_MIRROR/https://raw.githubusercontent.com/CyberRookie-X/Install_landscape_on_debian12_and_manage_compose_by_dpanel/main/redirect_pkg_handler.sh"
-                    user_choice="y"  # 重置选择以便继续循环
-                    retry=0  # 重置重试计数
-                fi
-            fi
-        else
-            # 下载成功则跳出循环
-            break
-        fi
-    done
-    
-    if [ $retry -eq $max_retry ] && [ "$user_choice" = "n" ]; then
+    # 使用统一的下载函数
+    if ! download_with_retry "$handler_script_url" "$LANDSCAPE_DIR/redirect_pkg_handler.sh" "redirect_pkg_handler.sh"; then
         log "错误: 下载 redirect_pkg_handler.sh 失败"
         exit 1
     fi
@@ -1747,52 +1758,8 @@ download_handlers() {
             handler_url="https://github.com/ThisSeanZhang/landscape/releases/latest/download/$handler_filename"
         fi
         
-        retry=0
-        user_choice=""
-        
-        while [ "$user_choice" != "n" ]; do
-            retry=0
-            while [ $retry -lt $max_retry ]; do
-                log "正在下载 $handler_filename (尝试 $((retry+1))/$max_retry)"
-                if command -v wget >/dev/null 2>&1; then
-                    if wget -O "$LANDSCAPE_DIR/$handler_filename" "$handler_url"; then
-                        log "$handler_filename 下载成功"
-                        break
-                    fi
-                elif command -v curl >/dev/null 2>&1; then
-                    if curl -fSL --progress-bar -o "$LANDSCAPE_DIR/$handler_filename" "$handler_url"; then
-                        log "$handler_filename 下载成功"
-                        break
-                    fi
-                fi
-                retry=$((retry+1))
-                log "下载失败, 等待 5 秒后重试"
-                sleep 5
-            done
-            
-            if [ $retry -eq $max_retry ]; then
-                echo "下载 $handler_filename 失败, 是否再次尝试3次？(y/n) 或输入 'm' 使用 GitHub 镜像加速: "
-                read -r user_choice
-                user_choice=$(echo "$user_choice" | tr '[:upper:]' '[:lower:]')
-                
-                # 如果用户选择使用 GitHub 镜像加速
-                if [ "$user_choice" = "m" ]; then
-                    ask_github_mirror
-                    
-                    if [ "$USE_GITHUB_MIRROR" = true ]; then
-                        # 更新下载 URL
-                        handler_url="$GITHUB_MIRROR/https://github.com/ThisSeanZhang/landscape/releases/latest/download/$handler_filename"
-                        user_choice="y"  # 重置选择以便继续循环
-                        retry=0  # 重置重试计数
-                    fi
-                fi
-            else
-                # 下载成功则跳出循环
-                break
-            fi
-        done
-        
-        if [ $retry -eq $max_retry ] && [ "$user_choice" = "n" ]; then
+        # 使用统一的下载函数
+        if ! download_with_retry "$handler_url" "$LANDSCAPE_DIR/$handler_filename" "$handler_filename"; then
             log "错误: 下载 $handler_filename 失败"
             exit 1
         fi
@@ -1810,14 +1777,8 @@ create_systemd_service() {
     log "创建 Landscape Router systemd 服务"
     
     # 根据架构确定二进制文件名
-    local binary_filename=""
-    local system_arch
-    system_arch=$(uname -m)
-    if [ "$system_arch" = "aarch64" ]; then
-        binary_filename="landscape-webserver-aarch64"
-    else
-        binary_filename="landscape-webserver-x86_64"
-    fi
+    local binary_filename
+    binary_filename=$(get_binary_filename)
     
     cat > /etc/systemd/system/landscape-router.service << EOF
 [Unit]
@@ -1861,12 +1822,32 @@ EOF
 
     # 获取所有网络接口
     local all_interfaces
-    all_interfaces=$(ip link show | awk -F': ' '/^[0-9]+: [a-zA-Z]/ {print $2}' | grep -v lo)
+    all_interfaces=$(get_available_interfaces)
     
     # 处理所有网卡，将物理网卡设置为manual模式（排除虚拟网卡）
     for iface in $all_interfaces; do
         # 跳过虚拟网卡 (docker、veth、br、tap、tun等开头的接口)
-        if [[ "$iface" =~ ^(docker|veth|br|tap|tun|vboxnet|vmnet|macvtap|ip6tnl|sit|gre|gretap|erspan|ipip|ip6gre|ip6gretap|ip6erspan|vti|vti6|nlmon|nflog|nfqueue|vcan|vxcan|mpls|rwl|wwan|ppp|sl|isdn|hdlc|arc|appletalk|rose|netrom|ax25|dccp|sctp|llc|ieee802154|caif|caif6|caif2|caif4|caif5|caif7|caif8|caif9|caif10|caif11|caif12|caif13|caif14|caif15|caif16|caif17|caif18|caif19|caif20) ]]; then
+        # 定义虚拟网卡前缀数组，提高可读性和性能
+        local virtual_prefixes=(
+            "docker" "veth" "br" "tap" "tun" "vboxnet" "vmnet" "macvtap" "ip6tnl" "sit"
+            "gre" "gretap" "erspan" "ipip" "ip6gre" "ip6gretap" "ip6erspan" "vti" "vti6"
+            "nlmon" "nflog" "nfqueue" "vcan" "vxcan" "mpls" "rwl" "wwan" "ppp" "sl"
+            "isdn" "hdlc" "arc" "appletalk" "rose" "netrom" "ax25" "dccp" "sctp"
+            "llc" "ieee802154" "caif" "caif6" "caif2" "caif4" "caif5" "caif7" "caif8"
+            "caif9" "caif10" "caif11" "caif12" "caif13" "caif14" "caif15" "caif16"
+            "caif17" "caif18" "caif19" "caif20"
+        )
+        
+        # 检查是否为虚拟网卡
+        local is_virtual=false
+        for prefix in "${virtual_prefixes[@]}"; do
+            if [[ "$iface" == "$prefix"* ]]; then
+                is_virtual=true
+                break
+            fi
+        done
+        
+        if [[ "$is_virtual" == true ]]; then
             log "跳过虚拟网卡: $iface"
             continue
         fi
@@ -1886,7 +1867,6 @@ EOF
     
     log "LAN 网桥配置完成"
 }
-
 
 # 创建 landscape_init.toml 配置文件
 create_landscape_init_toml() {
