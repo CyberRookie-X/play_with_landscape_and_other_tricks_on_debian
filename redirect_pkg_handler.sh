@@ -3,7 +3,6 @@
 # 本脚本初次运行时，可能需要访问互联网
 # 本脚本支持基于 debian/ubuntu/centos/rocky/alma 和 alpine 打包的镜像
 
-
 # 环境变量说明：
 # 环境变量只对 需要换源、安装依赖的 alpine 系镜像有效
 # 不使用环境变量时，脚本从 互联网 API 获取必要信息，通常可以正常运行。
@@ -17,20 +16,17 @@
 # 3. ORIGINAL_ENTRYPOINT_CMD
 # 用于传入镜像原始的 entrypoint 或 CMD，当这个环境变量不为空时会被采用 ORIGINAL_ENTRYPOINT_CMD=/docker-entrypoint.sh nginx -g daemon off;  # 原始镜像的 ENTRYPOINT 和 CMD
 
-
 # 脚本逻辑说明
 # 1、检查 容器系统 是否属于 debian/ubuntu/centos/rocky/alma，在此范围之外的系统暂不支持
 # 2、对于 debian/ubuntu/centos/rocky/alma，配置防火墙，并运行 redirect_pkg_handler ，最后执行原始镜像的 ENTRYPOINT 和 CMD
 # 3、对于 alpine，具有 libelf 和 libgcc支持的，则配置防火墙，并运行 redirect_pkg_handler ，最后执行原始镜像的 ENTRYPOINT 和 CMD
 # 4、对于 alpine，没有 libelf 和 libgcc 支持
 # 4.1 确定 是否处于 无法访问 alpine 官方源 的地区。通过 环境变量 REDIRECT_PKG_HANDLER_WRAPPER_REGION 或 本机 IP 归属地查询，确定 是否处于 无法访问 alpine 官方源 的地区
-# 4.2 对于 alpine 源不可用的 国家/地区，如中国，进行换源操作 
+# 4.2 对于 alpine 源不可用的 国家/地区，如中国，进行换源操作
 # 4.3 采用 环境变量 REDIRECT_PKG_HANDLER_WRAPPER_MIRROR 给出的源 或者 从 中科大/清华/阿里/腾讯/华为/上交大/浙大/华科大/南大/哈工大 中随机选一个 能成功 apk update 的源
 # 4.4 安装 libelf 和 libgcc，配置防火墙，启动 redirect_pkg_handler ，等待 0.2 s，最后执行原始镜像的 ENTRYPOINT 和 CMD
 
-
-
-# 使用方式: 
+# 使用方式:
 # 1、从 dockerfile 或 docker inspect 找到 镜像原始的 ENTRYPOINT 和 CMD
 # 2、下载 redirect_pkg_handler-XXXXXXXX （从github下载后，无需修改该其文件名） 和 redirect_pkg_handler.sh 到 landscape Router 所在主机中，赋予可执行权限
 # 3、在 docker run、docker-compose.yml 或 Dockerfile 中将本脚本设置为 ENTRYPOINT，并将原始镜像的 ENTRYPOINT和 CMD 作为参数传递
@@ -38,8 +34,6 @@
 
 # 例如: ENTRYPOINT ["/landscape/redirect_pkg_handler.sh", "/original/entrypoint", "original", "cmd", "args"]
 # 或者: ENTRYPOINT ["/land/redirect_pkg_handler.sh", "/original/entrypoint", "original", "cmd", "args"]
-
-
 
 # 示例1
 # version: '3.8'
@@ -62,7 +56,7 @@
 # services:
 #   my-service:
 #     image: some-image:latest
-#     entrypoint: 
+#     entrypoint:
 #       - "/landscape/redirect_pkg_handler.sh"
 #       - "/docker-entrypoint.sh"  # 原始镜像的 ENTRYPOINT
 #       - "nginx"                  # 原始镜像的 CMD
@@ -74,7 +68,7 @@
 # services:
 #   my-service:
 #     image: some-image:latest
-#     entrypoint: 
+#     entrypoint:
 #       - "/land/redirect_pkg_handler.sh"
 #       - "/docker-entrypoint.sh"  # 原始镜像的 ENTRYPOINT
 #       - "nginx"                  # 原始镜像的 CMD
@@ -101,18 +95,84 @@
 #     entrypoint: ["/land/redirect_pkg_handler.sh"]
 #     # 其他配置...
 
+# ==================== 常量定义 ====================
 
+# 系统检测相关
+readonly DEBIAN_VERSION_FILE="/etc/debian_version"
+readonly OS_RELEASE_FILE="/etc/os-release"
+readonly REDHAT_RELEASE_FILE="/etc/redhat-release"
 
-# TODO
-# 1. 多容器时，丛书容器 如何保证本地 apk 与 最新 镜像兼容问题。通过 apk update 获取最新 apk 列表，然后对比 apk 列表，如果本地 apk 不是最新版，等待 主容器拉取最新版 apk
+# 目录路径
+readonly HANDLER_DIR_LANDSCAPE="/landscape"
+readonly HANDLER_DIR_LAND="/land"
+readonly ALPINE_REPOSITORIES_FILE="/etc/apk/repositories"
+readonly ALPINE_REPOSITORIES_BACKUP="/etc/apk/repositories.bak"
 
+# 网络和超时
+readonly DEFAULT_TIMEOUT=1
+readonly MAX_RETRY=3
+readonly IP_CHECK_TIMEOUT=4
+readonly INSTALL_TIMEOUT=15
+readonly HANDLER_DELAY=0.2
 
-# ==================== 全局变量定义 ====================
+# 路由和防火墙
+readonly FIREWALL_MARK=0x1
+readonly ROUTE_TABLE_ID=100
+
+# 国家/地区
+readonly CHINA_CODE="CN"
+readonly CHINA_NAME="中国"
+
+# 架构
+readonly ARCH_X86_64="x86_64"
+readonly ARCH_AARCH64="aarch64"
+
+# Alpine 依赖包
+readonly ALPINE_PACKAGES="libelf libgcc"
+
+# 镜像源列表
+readonly MIRRORS="mirrors.ustc.edu.cn mirrors.aliyun.com mirrors.tuna.tsinghua.edu.cn mirrors.cloud.tencent.com repo.huaweicloud.com mirrors.sjtug.sjtu.edu.cn mirrors.zju.edu.cn mirrors.hust.edu.cn mirrors.nju.edu.cn mirrors.hit.edu.cn"
+
+# API 端点
+readonly APIS="https://myip.ipip.net/ http://ip-api.com/json/ https://ip.sb/ http://ipwho.is/ http://ipinfo.io/country"
+
+# 用户代理
+readonly USER_AGENT="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
+
+# ==================== 全局变量 ====================
+
+# 资源清理相关
+TEMP_FILES=""
+BACKGROUND_PIDS=""
+CLEANUP_DONE=false
+
+# 信号处理函数
+cleanup_on_exit() {
+    [ "$CLEANUP_DONE" = "true" ] && return
+    
+    # 终止后台进程
+    for pid in $BACKGROUND_PIDS; do
+        kill -0 "$pid" 2>/dev/null && kill "$pid" 2>/dev/null
+    done
+    
+    # 清理临时文件
+    for temp_file in $TEMP_FILES; do
+        rm -f "$temp_file" 2>/dev/null
+    done
+    
+    CLEANUP_DONE=true
+}
+
+# 注册信号处理
+trap 'cleanup_on_exit' EXIT TERM INT
 
 # 保存原始的ENTRYPOINT和CMD
-# 如果环境变量 ORIGINAL_ENTRYPOINT_CMD 不为空，则使用环境变量的值
 if [ -n "$ORIGINAL_ENTRYPOINT_CMD" ]; then
-    ORIGINAL_ENTRYPOINT_CMD="$ORIGINAL_ENTRYPOINT_CMD"
+    # 验证ORIGINAL_ENTRYPOINT_CMD
+    if echo "$ORIGINAL_ENTRYPOINT_CMD" | grep -q '[^a-zA-Z0-9/._\[:space:];-]'; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') [redirect_pkg_handler_wrapper] ERROR: Invalid characters in ORIGINAL_ENTRYPOINT_CMD" >&2
+        exit 1
+    fi
 else
     ORIGINAL_ENTRYPOINT_CMD="$@"
 fi
@@ -120,550 +180,552 @@ fi
 # 获取CPU架构
 ARCH=$(uname -m)
 
-# 定义可用的镜像源列表 中科大/清华/阿里/腾讯/华为/上交大/浙大/华科大/南大/哈工大
-MIRRORS="mirrors.ustc.edu.cn mirrors.aliyun.com mirrors.tuna.tsinghua.edu.cn mirrors.cloud.tencent.com repo.huaweicloud.com mirrors.sjtug.sjtu.edu.cn mirrors.zju.edu.cn mirrors.hust.edu.cn mirrors.nju.edu.cn mirrors.hit.edu.cn"
-
 # ==================== 主函数 ====================
 
 main() {
-    # 检查容器是debian/ubuntu/centos/rocky/alma还是alpine
-    if [ -f /etc/debian_version ] || grep -qi ubuntu /etc/os-release 2>/dev/null || [ -f /etc/redhat-release ] || grep -qi "centos\|rocky\|alma" /etc/os-release 2>/dev/null; then
-        # Debian/Ubuntu/CentOS/Rocky Linux/AlmaLinux处理（简单处理方式）
+    # 检测系统类型并处理
+    if is_debian_based || is_redhat_based; then
         simple_system_handler
-        
-    elif grep -qi alpine /etc/os-release 2>/dev/null; then
-        # Alpine处理（复杂处理方式）
+    elif is_alpine; then
         alpine_system_handler
     else
-        # 不支持的操作系统，报错并退出
-        log "Unsupported OS distribution"
+        log_error "Unsupported OS distribution"
         exit 1
     fi
 
-    # 我在有其他负载的情况下，实测 20ms 左右启动完成，留200ms应该够了吧
     # 等待 handler 启动完成
-    sleep 0.2
+    sleep "$HANDLER_DELAY"
 
     # 执行原始的ENTRYPOINT和CMD
-    # 使用方式: 在docker-compose.yml或Dockerfile中将本脚本设置为ENTRYPOINT，并将原始镜像的ENTRYPOINT和CMD作为参数传递
-    # 例如: ENTRYPOINT ["/landscape/redirect_pkg_handler", "/original/entrypoint", "original", "cmd", "args"]
-    if [ -n "$ORIGINAL_ENTRYPOINT_CMD" ]; then
-        log "Executing original entrypoint: $ORIGINAL_ENTRYPOINT_CMD"
-        exec "$ORIGINAL_ENTRYPOINT_CMD"
+    execute_original_entrypoint
+}
+
+# ==================== 系统检测函数 ====================
+
+is_debian_based() {
+    [ -f "$DEBIAN_VERSION_FILE" ] || grep -qi ubuntu "$OS_RELEASE_FILE" 2>/dev/null
+}
+
+is_redhat_based() {
+    [ -f "$REDHAT_RELEASE_FILE" ] || grep -qi "centos\|rocky\|alma" "$OS_RELEASE_FILE" 2>/dev/null
+}
+
+is_alpine() {
+    grep -qi alpine "$OS_RELEASE_FILE" 2>/dev/null
+}
+
+# ==================== 日志和工具函数 ====================
+
+log_info() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [redirect_pkg_handler_wrapper] INFO: $1"
+}
+
+log_error() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [redirect_pkg_handler_wrapper] ERROR: $1" >&2
+}
+
+# 兼容性延时函数
+compat_sleep() {
+    local delay_ms="$1"
+    if command -v usleep >/dev/null 2>&1; then
+        usleep "$delay_ms"000 2>/dev/null
     else
-        log "No original entrypoint found, exiting"
-        # 如果没有原始入口点，直接退出而不是等待
-        exit 0
+        sleep "$(echo "$delay_ms" | awk '{print $1/1000}')"
     fi
 }
 
-# ==================== 函数定义 ====================
-
-# 检测 handler 目录（支持 /landscape/ 和 /land/）
-detect_handler_directory() {
-    if [ -d "/landscape" ]; then
-        HANDLER_DIR="/landscape"
-    elif [ -d "/land" ]; then
-        HANDLER_DIR="/land"
-    else
-        log "Error: Neither /landscape nor /land directory found"
-        return 1
-    fi
-    return 0
-}
-
-# 日志函数，确保日志格式符合Docker规范，BusyBox不支持纳秒
-log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S.%N') [redirect_pkg_handler_wrapper] $1"
-}
-
-# 初始化随机种子
+# 随机数生成
 srand() {
-    # 优先使用 /dev/urandom，如果不可用则使用高精度时间戳
     if [ -r "/dev/urandom" ] && command -v od >/dev/null 2>&1; then
-        # 从 /dev/urandom 读取随机数据作为种子
         RANDOM_SEED=$(od -vAn -N4 -tu4 < /dev/urandom | tr -d ' ')
     else
-        # 使用纳秒级时间戳和进程ID的组合作为种子
-        RANDOM_SEED=$(date +%s%N)
-        RANDOM_SEED=$((RANDOM_SEED + $$ + RANDOM_SEED * 1103515245 + 12345))
+        # 尝试使用纳秒级时间戳，如果不支持则回退到秒级
+        if date +%s%N >/dev/null 2>&1; then
+            RANDOM_SEED=$(date +%s%N)$$
+        else
+            RANDOM_SEED=$(date +%s)$$
+        fi
+        RANDOM_SEED=$((RANDOM_SEED * 1103515245 + 12345))
     fi
     RANDOM_SEED=$((RANDOM_SEED * 1103515245 + 12345))
     echo $((RANDOM_SEED >> 16))
 }
 
-# ==================== 非 Alpine 系统处理函数 ====================
-
-# 简单系统处理函数（适用于debian/ubuntu/centos/rocky/alma）
-simple_system_handler() {
-    log "Detected Debian/Ubuntu/CentOS/Rocky Linux/AlmaLinux system"
-    
-    # 检测 handler 目录
-    if ! detect_handler_directory; then
-        exit 1
-    fi
-    
-    # 添加路由规则
-    ip rule add fwmark 0x1/0x1 lookup 100
-    ip route add local default dev lo table 100
-    
-    # 根据架构运行对应程序
-    case "$ARCH" in
-        x86_64)
-            log "Starting x86_64 handler in background"
-            $HANDLER_DIR/redirect_pkg_handler-x86_64 &
-            ;;
-        aarch64)
-            log "Starting aarch64 handler in background"
-            $HANDLER_DIR/redirect_pkg_handler-aarch64 &
-            ;;
-        *)
-            log "Unsupported architecture: $ARCH"
-            ;;
-    esac
-}
-
-# ==================== Alpine 系统处理函数 ====================
-
-# 检查 Alpine 系统依赖
-check_alpine_dependencies() {
-    # 检查是否具有libelf和libgcc支持
-    LIBELF_INSTALLED=false
-    LIBGCC_INSTALLED=false
-    
-    # 使用apk info检查库是否已安装（适用于Alpine系统）
-    if apk info libelf >/dev/null 2>&1; then
-        LIBELF_INSTALLED=true
-    fi
-    
-    if apk info libgcc >/dev/null 2>&1; then
-        LIBGCC_INSTALLED=true
-    fi
-    
-    if [ "$LIBELF_INSTALLED" = "false" ] || [ "$LIBGCC_INSTALLED" = "false" ]; then
-        return 1  # 需要安装依赖
+# 检测 handler 目录
+detect_handler_directory() {
+    if [ -d "$HANDLER_DIR_LANDSCAPE" ]; then
+        HANDLER_DIR="$HANDLER_DIR_LANDSCAPE"
+    elif [ -d "$HANDLER_DIR_LAND" ]; then
+        HANDLER_DIR="$HANDLER_DIR_LAND"
     else
-        return 0  # 依赖已安装
+        log_error "Neither $HANDLER_DIR_LANDSCAPE nor $HANDLER_DIR_LAND directory found"
+        return 1
+    fi
+    return 0
+}
+
+# 执行原始入口点
+execute_original_entrypoint() {
+    if [ -n "$ORIGINAL_ENTRYPOINT_CMD" ]; then
+        log_info "Executing original entrypoint: $ORIGINAL_ENTRYPOINT_CMD"
+        
+        # 安全检查
+        first_arg=$(echo "$ORIGINAL_ENTRYPOINT_CMD" | awk '{print $1}')
+        if [ -n "$first_arg" ] && [ "${first_arg#/}" != "$first_arg" ] && [ ! -x "$first_arg" ]; then
+            log_error "Original entrypoint not executable: $first_arg"
+            exit 1
+        fi
+        
+        exec "$ORIGINAL_ENTRYPOINT_CMD"
+    else
+        log_info "No original entrypoint found, exiting"
+        exit 0
     fi
 }
 
-# 通用镜像源处理函数
-# 参数: $1 - 镜像源列表或单一镜像源
-#      $2 - 描述信息（用于日志）
-handle_mirrors_generic() {
-    MIRROR_SOURCE="$1"
-    DESCRIPTION="$2"
+# ==================== 通用函数 ====================
+
+# HTTP请求函数
+make_http_request() {
+    local url="$1"
     
-    log "Changing to mirror ($DESCRIPTION)"
-    # 备份原始源
-    cp /etc/apk/repositories /etc/apk/repositories.bak
-    
-    # 如果只有一个镜像源（直接指定），则直接使用
-    if [ "$(echo "$MIRROR_SOURCE" | wc -w)" -eq 1 ] && [ -n "$MIRROR_SOURCE" ]; then
-        log "Using specified mirror: $MIRROR_SOURCE"
-        sed -i "s/dl-cdn.alpinelinux.org/$MIRROR_SOURCE/g" /etc/apk/repositories
-        
-        # 尝试更新包列表
-        if apk update >/dev/null 2>&1; then
-            log "Successfully updated with specified mirror: $MIRROR_SOURCE"
-            return 0
-        else
-            log "Failed to update with specified mirror: $MIRROR_SOURCE"
-            # 恢复原始源配置
-            cp /etc/apk/repositories.bak /etc/apk/repositories
-            apk update >/dev/null 2>&1
-            return 1
-        fi
+    if command -v wget >/dev/null 2>&1; then
+        for i in $(seq 1 $MAX_RETRY); do
+            if wget -qO- --header="User-Agent: $USER_AGENT" --timeout="$DEFAULT_TIMEOUT" "$url" 2>/dev/null; then
+                return 0
+            fi
+        done
+    elif command -v curl >/dev/null 2>&1; then
+        for i in $(seq 1 $MAX_RETRY); do
+            if curl -s --connect-timeout "$DEFAULT_TIMEOUT" --max-time "$DEFAULT_TIMEOUT" -H "User-Agent: $USER_AGENT" "$url" 2>/dev/null; then
+                return 0
+            fi
+        done
+    else
+        log_error "Neither wget nor curl is available for HTTP requests"
+    fi
+}
+
+# 设置路由规则
+setup_routing_rules() {
+    if ! command -v ip >/dev/null 2>&1; then
+        log_error "ip command not found"
+        return 1
     fi
     
-    # 如果有多个镜像源，遍历尝试
-    AVAILABLE_MIRRORS="$MIRROR_SOURCE"
-    SELECTED_MIRROR=""
-    UPDATE_SUCCESS=false
+    if ! ip rule add fwmark "$FIREWALL_MARK" lookup "$ROUTE_TABLE_ID" 2>/dev/null; then
+        log_error "Failed to add ip rule"
+        return 1
+    fi
     
-    # 尝试不同的镜像源直到成功或没有更多源可尝试
-    while [ "$UPDATE_SUCCESS" = "false" ] && [ -n "$AVAILABLE_MIRRORS" ]; do
-        # 随机选择一个镜像源
-        MIRROR_COUNT=$(echo $AVAILABLE_MIRRORS | wc -w)
-        RANDOM_INDEX=$(( ( $(srand) % MIRROR_COUNT ) + 1 ))
-        SELECTED_MIRROR=$(echo $AVAILABLE_MIRRORS | cut -d' ' -f$RANDOM_INDEX)
-        
-        log "Trying mirror: $SELECTED_MIRROR"
-        # 使用sed命令替换默认源为选中的镜像源
-        sed -i "s/dl-cdn.alpinelinux.org/$SELECTED_MIRROR/g" /etc/apk/repositories
-        
-        # 尝试更新包列表
-        if apk update >/dev/null 2>&1; then
-            UPDATE_SUCCESS=true
-            log "Successfully updated with mirror: $SELECTED_MIRROR"
-        else
-            log "Failed to update with mirror: $SELECTED_MIRROR"
-            # 从可用镜像源列表中移除失败的源
-            AVAILABLE_MIRRORS=$(echo $AVAILABLE_MIRRORS | sed "s/$SELECTED_MIRROR//g" | tr -s ' ' | sed 's/^ *//;s/ *$//')
-            # 恢复原始源配置以便重试
-            cp /etc/apk/repositories.bak /etc/apk/repositories
-        fi
-    done
-    
-    # 如果所有镜像源都尝试失败，记录错误并恢复原始配置
-    if [ "$UPDATE_SUCCESS" = "false" ]; then
-        log "Failed to update with all mirrors, restoring original configuration"
-        cp /etc/apk/repositories.bak /etc/apk/repositories
-        # 恢复原始源后需要更新包索引
-        apk update >/dev/null 2>&1
+    if ! ip route add local default dev lo table "$ROUTE_TABLE_ID" 2>/dev/null; then
+        log_error "Failed to add ip route"
         return 1
     fi
     
     return 0
 }
 
-# 处理镜像源（基于环境变量）
-handle_mirror_with_env_vars() {
-    # 检查是否设置了镜像源环境变量
-    if [ -n "$REDIRECT_PKG_HANDLER_WRAPPER_MIRROR" ]; then
-        handle_mirrors_generic "$REDIRECT_PKG_HANDLER_WRAPPER_MIRROR" "from environment variable"
-        return 0
-    # 检查是否设置了区域环境变量
-    elif [ -n "$REDIRECT_PKG_HANDLER_WRAPPER_REGION" ]; then
-        # 使用POSIX内置的参数扩展将值转换为大写
-        REGION_UPPER=$(echo "$REDIRECT_PKG_HANDLER_WRAPPER_REGION" | tr '[:lower:]' '[:upper:]')
+# 启动处理程序
+start_handler() {
+    if ! detect_handler_directory; then
+        exit 1
+    fi
+    
+    if ! setup_routing_rules; then
+        log_error "Failed to setup routing rules"
+        exit 1
+    fi
+    
+    local handler_suffix=""
+    if is_alpine; then
+        handler_suffix="-musl"
+    fi
+    
+    case "$ARCH" in
+        "$ARCH_X86_64")
+            handler_path="$HANDLER_DIR/redirect_pkg_handler-x86_64$handler_suffix"
+            ;;
+        "$ARCH_AARCH64")
+            handler_path="$HANDLER_DIR/redirect_pkg_handler-aarch64$handler_suffix"
+            ;;
+        *)
+            log_error "Unsupported architecture: $ARCH"
+            return 1
+            ;;
+    esac
+    
+    if [ ! -x "$handler_path" ]; then
+        log_error "Handler not found or not executable: $handler_path"
+        return 1
+    fi
+    
+    log_info "Starting handler for $ARCH in background"
+    "$handler_path" &
+    BACKGROUND_PIDS="$BACKGROUND_PIDS $!"
+}
+
+# ==================== 非 Alpine 系统处理 ====================
+
+simple_system_handler() {
+    log_info "Detected Debian/Ubuntu/CentOS/Rocky Linux/AlmaLinux system"
+    start_handler
+}
+
+# ==================== Alpine 系统处理 ====================
+
+# 检查依赖
+check_dependencies() {
+    for package in $ALPINE_PACKAGES; do
+        if ! apk info "$package" >/dev/null 2>&1; then
+            return 1  # 需要安装依赖
+        fi
+    done
+    return 0  # 依赖已安装
+}
+
+# 备份源配置
+backup_repositories() {
+    if [ ! -f "$ALPINE_REPOSITORIES_FILE" ]; then
+        log_error "Alpine repositories file not found: $ALPINE_REPOSITORIES_FILE"
+        return 1
+    fi
+    
+    if ! cp "$ALPINE_REPOSITORIES_FILE" "$ALPINE_REPOSITORIES_BACKUP" 2>/dev/null; then
+        log_error "Failed to backup Alpine repositories file"
+        return 1
+    fi
+    
+    return 0
+}
+
+# 更新镜像源
+update_mirror() {
+    local mirror="$1"
+    
+    if echo "$mirror" | grep -q '[^a-zA-Z0-9._-]'; then
+        log_error "Invalid mirror format: $mirror"
+        return 1
+    fi
+    
+    if ! sed -i "s/dl-cdn.alpinelinux.org/$mirror/g" "$ALPINE_REPOSITORIES_FILE" 2>/dev/null; then
+        log_error "Failed to update Alpine mirror: $mirror"
+        return 1
+    fi
+    
+    return 0
+}
+
+# 恢复源配置
+restore_repositories() {
+    if [ -f "$ALPINE_REPOSITORIES_BACKUP" ]; then
+        cp "$ALPINE_REPOSITORIES_BACKUP" "$ALPINE_REPOSITORIES_FILE" 2>/dev/null
+    fi
+    apk update >/dev/null 2>&1
+}
+
+# 随机选择镜像源
+select_random_mirror() {
+    local mirrors="$1"
+    local mirror_count=$(echo $mirrors | wc -w)
+    local random_index=$(( ( $(srand) % mirror_count ) + 1 ))
+    echo $mirrors | cut -d' ' -f$random_index
+}
+
+# 移除镜像源
+remove_mirror() {
+    local mirrors="$1"
+    local mirror_to_remove="$2"
+    echo "$mirrors" | sed "s/$mirror_to_remove//g" | tr -s ' ' | sed 's/^ *//;s/ *$//'
+}
+
+# 处理镜像源
+handle_mirrors() {
+    local mirror_source="$1"
+    local description="$2"
+    
+    log_info "Changing to mirror ($description)"
+    backup_repositories || return 1
+    
+    # 单一镜像源
+    if [ "$(echo "$mirror_source" | wc -w)" -eq 1 ]; then
+        log_info "Using specified mirror: $mirror_source"
+        update_mirror "$mirror_source" || return 1
         
-        # 支持大小写不敏感的CN/cn值
-        if [ "$REGION_UPPER" = "CN" ]; then
-            log "Region set to CN, skipping IP detection and using random mirror"
-            handle_mirrors_generic "$MIRRORS" "random from predefined list for CN region"
+        if apk update >/dev/null 2>&1; then
+            log_info "Successfully updated with specified mirror: $mirror_source"
+            return 0
         else
-            log "Region set to $REDIRECT_PKG_HANDLER_WRAPPER_REGION, skipping IP detection and mirror change"
-            # 不换源，直接尝试更新一次以确保包管理器正常工作
+            log_error "Failed to update with specified mirror: $mirror_source"
+            restore_repositories
+            return 1
+        fi
+    fi
+    
+    # 多个镜像源
+    local available_mirrors="$mirror_source"
+    local update_success=false
+    
+    while [ "$update_success" = "false" ] && [ -n "$available_mirrors" ]; do
+        local selected_mirror=$(select_random_mirror "$available_mirrors")
+        
+        log_info "Trying mirror: $selected_mirror"
+        update_mirror "$selected_mirror" || {
+            available_mirrors=$(remove_mirror "$available_mirrors" "$selected_mirror")
+            continue
+        }
+        
+        if apk update >/dev/null 2>&1; then
+            update_success=true
+            log_info "Successfully updated with mirror: $selected_mirror"
+        else
+            log_error "Failed to update with mirror: $selected_mirror"
+            available_mirrors=$(remove_mirror "$available_mirrors" "$selected_mirror")
+            restore_repositories
+        fi
+    done
+    
+    if [ "$update_success" = "false" ]; then
+        log_error "Failed to update with all mirrors, restoring original configuration"
+        restore_repositories
+        return 1
+    fi
+    
+    return 0
+}
+
+# 处理环境变量
+handle_env_vars() {
+    # 检查镜像源环境变量
+    if [ -n "$REDIRECT_PKG_HANDLER_WRAPPER_MIRROR" ]; then
+        if echo "$REDIRECT_PKG_HANDLER_WRAPPER_MIRROR" | grep -q '[^a-zA-Z0-9._-]'; then
+            log_error "Invalid mirror format in environment variable: $REDIRECT_PKG_HANDLER_WRAPPER_MIRROR"
+            return 1
+        fi
+        
+        handle_mirrors "$REDIRECT_PKG_HANDLER_WRAPPER_MIRROR" "from environment variable"
+        return 0
+    fi
+    
+    # 检查区域环境变量
+    if [ -n "$REDIRECT_PKG_HANDLER_WRAPPER_REGION" ]; then
+        if echo "$REDIRECT_PKG_HANDLER_WRAPPER_REGION" | grep -q '[^a-zA-Z]'; then
+            log_error "Invalid region format in environment variable: $REDIRECT_PKG_HANDLER_WRAPPER_REGION"
+            return 1
+        fi
+        
+        local region_upper=$(echo "$REDIRECT_PKG_HANDLER_WRAPPER_REGION" | tr '[:lower:]' '[:upper:]')
+        
+        if [ "$region_upper" = "$CHINA_CODE" ]; then
+            log_info "Region set to CN, skipping IP detection and using random mirror"
+            handle_mirrors "$MIRRORS" "random from predefined list for CN region"
+        else
+            log_info "Region set to $REDIRECT_PKG_HANDLER_WRAPPER_REGION, skipping IP detection and mirror change"
             apk update >/dev/null 2>&1
         fi
         return 0
     fi
     
-    return 1  # 没有设置环境变量，需要检测IP
+    return 1  # 没有设置环境变量
 }
 
-# 检测公网IP归属地
-detect_public_ip_country() {
-    # 获取本机公网IP归属国家
+# 检测IP归属地
+detect_ip_country() {
     PUBLIC_IP_COUNTRY=""
     
-    # 定义多个API查询函数，设置1秒超时，重试4次
-    check_myip_ipip() {
-        if command -v wget >/dev/null 2>&1; then
-            for i in 1 2 3 4; do
-                RESULT=$(wget -qO- --header="User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" --timeout=1 https://myip.ipip.net/ 2>/dev/null) || continue
-                echo "$RESULT" | grep -o '中国' >/dev/null && { echo "中国"; return; }
-            done
-        elif command -v curl >/dev/null 2>&1; then
-            for i in 1 2 3 4; do
-                RESULT=$(curl -s --connect-timeout 1 --max-time 1 -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" https://myip.ipip.net/ 2>/dev/null) || continue
-                echo "$RESULT" | grep -o '中国' >/dev/null && { echo "中国"; return; }
-            done
-        fi
+    # 创建临时目录
+    local temp_dir="/tmp/ip_check_$$"
+    mkdir -p "$temp_dir" 2>/dev/null || {
+        log_error "Failed to create temporary directory for IP checks"
+        return 1
     }
     
-    check_ip_api() {
-        if command -v wget >/dev/null 2>&1; then
-            for i in 1 2 3 4; do
-                RESULT=$(wget -qO- --header="User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" --timeout=1 http://ip-api.com/json/ 2>/dev/null) || continue
-                echo "$RESULT" | grep -o '"country":"[^"]*"' | cut -d'"' -f4 && return
-            done
-        elif command -v curl >/dev/null 2>&1; then
-            for i in 1 2 3 4; do
-                RESULT=$(curl -s --connect-timeout 1 --max-time 1 -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" http://ip-api.com/json/ 2>/dev/null) || continue
-                echo "$RESULT" | grep -o '"country":"[^"]*"' | cut -d'"' -f4 && return
-            done
-        fi
-    }
+    TEMP_FILES="$TEMP_FILES $temp_dir"
     
-    check_ip_sb() {
-        if command -v wget >/dev/null 2>&1; then
-            for i in 1 2 3 4; do
-                RESULT=$(wget -qO- --header="User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" --timeout=1 https://ip.sb/ 2>/dev/null) || continue
-                echo "$RESULT" | grep -o '"country":"[^"]*"' | cut -d'"' -f4 && return
-            done
-        elif command -v curl >/dev/null 2>&1; then
-            for i in 1 2 3 4; do
-                RESULT=$(curl -s --connect-timeout 1 --max-time 1 -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" https://ip.sb/ 2>/dev/null) || continue
-                echo "$RESULT" | grep -o '"country":"[^"]*"' | cut -d'"' -f4 && return
-            done
-        fi
-    }
+    # 并行执行多个API查询
+    local pids=""
+    for api in $APIS; do
+        {
+            local result=""
+            case "$api" in
+                *myip.ipip.net*)
+                    result=$(make_http_request "$api" | grep -o "$CHINA_NAME")
+                    ;;
+                *ip-api.com*|*ip.sb*|*ipwho.is*)
+                    result=$(make_http_request "$api" | grep -o '"country":"[^"]*"' | cut -d'"' -f4)
+                    ;;
+                *ipinfo.io*)
+                    result=$(make_http_request "$api" | tr -d '\n')
+                    ;;
+            esac
+            echo "$result" > "$temp_dir/$(echo $api | tr '/:' '_')"
+        } &
+        pids="$pids $!"
+    done
     
-    check_ipwhois() {
-        if command -v wget >/dev/null 2>&1; then
-            for i in 1 2 3 4; do
-                RESULT=$(wget -qO- --header="User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" --timeout=1 http://ipwho.is/ 2>/dev/null) || continue
-                echo "$RESULT" | grep -o '"country":"[^"]*"' | cut -d'"' -f4 && return
-            done
-        elif command -v curl >/dev/null 2>&1; then
-            for i in 1 2 3 4; do
-                RESULT=$(curl -s --connect-timeout 1 --max-time 1 -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" http://ipwho.is/ 2>/dev/null) || continue
-                echo "$RESULT" | grep -o '"country":"[^"]*"' | cut -d'"' -f4 && return
-            done
-        fi
-    }
-    
-    check_ipinfo() {
-        if command -v wget >/dev/null 2>&1; then
-            for i in 1 2 3 4; do
-                wget -qO- --header="User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" --timeout=1 http://ipinfo.io/country 2>/dev/null | tr -d '\n' && return
-            done
-        elif command -v curl >/dev/null 2>&1; then
-            for i in 1 2 3 4; do
-                curl -s --connect-timeout 1 --max-time 1 -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" http://ipinfo.io/country 2>/dev/null | tr -d '\n' && return
-            done
-        fi
-    }
-    
-    # 并行执行多个API查询，任何一个返回中国大陆就执行换源
-    TEMP_FILE="/tmp/ip_country_check.$$"
-    rm -f "$TEMP_FILE"
-    
-    # 后台执行多个检查，按指定顺序
-    check_myip_ipip > "$TEMP_FILE.ipip" &
-    IPIP_PID=$!
-    
-    check_ip_api > "$TEMP_FILE.api" &
-    API_PID=$!
-    
-    check_ip_sb > "$TEMP_FILE.sb" &
-    SB_PID=$!
-    
-    check_ipwhois > "$TEMP_FILE.whois" &
-    WHOIS_PID=$!
-    
-    check_ipinfo > "$TEMP_FILE.info" &
-    INFO_PID=$!
-    
-    # 存储所有后台进程PID
-    ALL_PIDS="$IPIP_PID $API_PID $SB_PID $WHOIS_PID $INFO_PID"
-    
-    # 每间隔100ms检查一次结果，最多检查40次（总共4秒）
-    count=0
-    detected_country=""
+    # 等待结果
+    local count=0
     while [ $count -lt 40 ]; do
-        # 检查各个API的返回结果，按指定顺序
-        if [ -f "$TEMP_FILE.ipip" ]; then
-            RESULT=$(cat "$TEMP_FILE.ipip" | tr -d '\n')
-            if [ "$RESULT" = "中国" ]; then
-                detected_country="CN"
-                log "Detected China IP via myip.ipip.net"
-                break
+        for api in $APIS; do
+            local file="$temp_dir/$(echo $api | tr '/:' '_')"
+            if [ -f "$file" ]; then
+                local result=$(cat "$file" 2>/dev/null | tr -d '\n')
+                if [ "$result" = "$CHINA_CODE" ] || [ "$result" = "$CHINA_NAME" ]; then
+                    PUBLIC_IP_COUNTRY="$CHINA_CODE"
+                    log_info "Detected China IP via $api"
+                    return 0
+                fi
             fi
-        fi
+        done
         
-        if [ -z "$detected_country" ] && [ -f "$TEMP_FILE.api" ]; then
-            RESULT=$(cat "$TEMP_FILE.api" | tr -d '\n')
-            if [ "$RESULT" = "CN" ] || [ "$RESULT" = "China" ] || [ "$RESULT" = "中国" ]; then
-                detected_country="CN"
-                log "Detected China IP via ip-api.com"
-                break
-            fi
-        fi
-        
-        if [ -z "$detected_country" ] && [ -f "$TEMP_FILE.sb" ]; then
-            RESULT=$(cat "$TEMP_FILE.sb" | tr -d '\n')
-            if [ "$RESULT" = "CN" ] || [ "$RESULT" = "China" ] || [ "$RESULT" = "中国" ]; then
-                detected_country="CN"
-                log "Detected China IP via ip.sb"
-                break
-            fi
-        fi
-        
-        if [ -z "$detected_country" ] && [ -f "$TEMP_FILE.whois" ]; then
-            RESULT=$(cat "$TEMP_FILE.whois" | tr -d '\n')
-            if [ "$RESULT" = "CN" ] || [ "$RESULT" = "China" ] || [ "$RESULT" = "中国" ]; then
-                detected_country="CN"
-                log "Detected China IP via ipwho.is"
-                break
-            fi
-        fi
-        
-        if [ -z "$detected_country" ] && [ -f "$TEMP_FILE.info" ]; then
-            RESULT=$(cat "$TEMP_FILE.info" | tr -d '\n')
-            if [ "$RESULT" = "CN" ] || [ "$RESULT" = "China" ] || [ "$RESULT" = "中国" ]; then
-                detected_country="CN"
-                log "Detected China IP via ipinfo.io"
-                break
-            fi
-        fi
-        
-        # 如果还没有结果，等待100ms继续检查
         count=$((count + 1))
-        usleep 100000 2>/dev/null || sleep 0.1
+        compat_sleep 100
     done
     
-    # 终止所有仍在运行的后台进程
-    for pid in $ALL_PIDS; do
-        if kill -0 "$pid" 2>/dev/null; then
-            kill "$pid" 2>/dev/null
-        fi
-    done
-    
-    # 清理临时文件
-    rm -f "$TEMP_FILE"*
-    
-    # 设置最终的PUBLIC_IP_COUNTRY变量
-    if [ "$detected_country" = "CN" ]; then
-        PUBLIC_IP_COUNTRY="CN"
-    fi
-    
-    log "Public IP country: $PUBLIC_IP_COUNTRY"
+    log_info "Public IP country: $PUBLIC_IP_COUNTRY"
 }
 
 # 根据IP归属地处理镜像源
 handle_mirror_by_ip() {
-    # 只有当明确检测到中国大陆IP时才执行换源
-    if [ "$PUBLIC_IP_COUNTRY" = "CN" ] || [ "$PUBLIC_IP_COUNTRY" = "China" ] || [ "$PUBLIC_IP_COUNTRY" = "中国" ]; then
-        handle_mirrors_generic "$MIRRORS" "based on IP location"
+    if [ "$PUBLIC_IP_COUNTRY" = "$CHINA_CODE" ]; then
+        handle_mirrors "$MIRRORS" "based on IP location"
     else
-        log "Not in China or failed to detect IP location, proceeding with default repositories"
-        # 即使没有换源，也尝试更新一次以确保包管理器正常工作
+        log_info "Not in China or failed to detect IP location, proceeding with default repositories"
         apk update >/dev/null 2>&1
     fi
 }
 
-# 安装 Alpine 依赖
-install_alpine_dependencies() {
-    # 安装libelf和libgcc
-    # 仅在REDIRECT_PKG_HANDLER_WRAPPER_REGION为CN/cn且未指定REDIRECT_PKG_HANDLER_WRAPPER_MIRROR时启用超时和换源重试功能
-    
-    # 检查是否需要启用超时和换源重试功能
-    ENABLE_RETRY=false
+# 安装依赖
+install_dependencies() {
+    # 检查是否需要启用重试功能
+    local use_retry=false
     if [ -n "$REDIRECT_PKG_HANDLER_WRAPPER_REGION" ] && [ -z "$REDIRECT_PKG_HANDLER_WRAPPER_MIRROR" ]; then
-        # 使用POSIX内置的参数扩展将值转换为大写
-        REGION_UPPER=$(echo "$REDIRECT_PKG_HANDLER_WRAPPER_REGION" | tr '[:lower:]' '[:upper:]')
-        if [ "$REGION_UPPER" = "CN" ]; then
-            ENABLE_RETRY=true
-        fi
+        local region_upper=$(echo "$REDIRECT_PKG_HANDLER_WRAPPER_REGION" | tr '[:lower:]' '[:upper:]')
+        [ "$region_upper" = "$CHINA_CODE" ] && use_retry=true
     fi
     
-    if [ "$ENABLE_RETRY" = true ]; then
-        log "Attempting to install dependencies with timeout and mirror retry feature (region: CN)"
-        
-        # 使用timeout命令设置15秒超时
-        if ! timeout 15s apk add --no-cache libelf libgcc; then
-            log "Installation timeout or failed, trying to switch mirror and retry"
-            
-            # 备份当前源配置
-            cp /etc/apk/repositories /etc/apk/repositories.install.bak
-            
-            # 尝试换源重试
-            AVAILABLE_MIRRORS="$MIRRORS"
-            RETRY_SUCCESS=false
-            
-            while [ "$RETRY_SUCCESS" = "false" ] && [ -n "$AVAILABLE_MIRRORS" ]; do
-                # 随机选择一个镜像源
-                MIRROR_COUNT=$(echo $AVAILABLE_MIRRORS | wc -w)
-                RANDOM_INDEX=$(( ( $(srand) % MIRROR_COUNT ) + 1 ))
-                SELECTED_MIRROR=$(echo $AVAILABLE_MIRRORS | cut -d' ' -f$RANDOM_INDEX)
-                
-                log "Retrying with mirror: $SELECTED_MIRROR"
-                
-                # 更新源配置
-                cp /etc/apk/repositories.install.bak /etc/apk/repositories
-                sed -i "s/dl-cdn.alpinelinux.org/$SELECTED_MIRROR/g" /etc/apk/repositories
-                
-                # 更新包索引
-                if apk update >/dev/null 2>&1; then
-                    log "Successfully updated package index with mirror: $SELECTED_MIRROR"
-                    
-                    # 再次尝试安装，设置15秒超时
-                    if timeout 15s apk add --no-cache libelf libgcc; then
-                        log "Dependencies installed successfully with mirror: $SELECTED_MIRROR"
-                        RETRY_SUCCESS=true
-                    else
-                        log "Installation failed with mirror: $SELECTED_MIRROR"
-                        # 从可用镜像源列表中移除失败的源
-                        AVAILABLE_MIRRORS=$(echo $AVAILABLE_MIRRORS | sed "s/$SELECTED_MIRROR//g" | tr -s ' ' | sed 's/^ *//;s/ *$//')
-                    fi
-                else
-                    log "Failed to update package index with mirror: $SELECTED_MIRROR"
-                    # 从可用镜像源列表中移除失败的源
-                    AVAILABLE_MIRRORS=$(echo $AVAILABLE_MIRRORS | sed "s/$SELECTED_MIRROR//g" | tr -s ' ' | sed 's/^ *//;s/ *$//')
-                fi
-            done
-            
-            # 如果所有镜像源都尝试失败，记录错误
-            if [ "$RETRY_SUCCESS" = "false" ]; then
-                log "Failed to install dependencies with all mirrors, restoring original configuration"
-                cp /etc/apk/repositories.install.bak /etc/apk/repositories
-                # 恢复原始源后需要更新包索引
-                apk update >/dev/null 2>&1
-                # 最后尝试一次安装，即使失败也继续
-                timeout 15s apk add --no-cache libelf libgcc || true
-            fi
-            
-            # 清理备份文件
-            rm -f /etc/apk/repositories.install.bak
-        else
-            log "Dependencies installed successfully with current mirror"
-        fi
+    if [ "$use_retry" = "true" ]; then
+        install_with_retry
     else
-        log "Installing dependencies without timeout and mirror retry feature"
-        # 直接安装依赖，不使用超时和换源重试功能
-        apk add --no-cache libelf libgcc
+        install_simple
     fi
     
-    # 清除apk缓存数据
-    rm -rf /var/cache/apk/*
+    # 清除缓存
+    rm -rf /var/cache/apk/* 2>/dev/null || true
 }
 
-# 启动 Alpine 处理程序
-start_alpine_handler() {
-    # 检测 handler 目录
-    if ! detect_handler_directory; then
-        exit 1
+# 带重试的安装
+install_with_retry() {
+    log_info "Attempting to install dependencies with timeout and mirror retry feature (region: CN)"
+    
+    # 尝试安装
+    local install_success=false
+    if command -v timeout >/dev/null 2>&1; then
+        if timeout "${INSTALL_TIMEOUT}s" apk add --no-cache $ALPINE_PACKAGES; then
+            install_success=true
+        fi
+    else
+        if apk add --no-cache $ALPINE_PACKAGES; then
+            install_success=true
+        fi
     fi
     
-    # 添加路由规则
-    ip rule add fwmark 0x1/0x1 lookup 100
-    ip route add local default dev lo table 100
+    if [ "$install_success" = "true" ]; then
+        log_info "Dependencies installed successfully with current mirror"
+        return
+    fi
     
-    # 根据架构运行对应程序
-    case "$ARCH" in
-        x86_64)
-            log "Starting x86_64 musl handler in background"
-            $HANDLER_DIR/redirect_pkg_handler-x86_64-musl &
-            ;;
-        aarch64)
-            log "Starting aarch64 musl handler in background"
-            $HANDLER_DIR/redirect_pkg_handler-aarch64-musl &
-            ;;
-        *)
-            log "Unsupported architecture: $ARCH"
-            ;;
-    esac
+    log_info "Installation failed, trying to switch mirror and retry"
+    
+    # 备份当前源配置
+    cp "$ALPINE_REPOSITORIES_FILE" "${ALPINE_REPOSITORIES_FILE}.install.bak" 2>/dev/null
+    
+    # 尝试不同镜像源
+    local available_mirrors="$MIRRORS"
+    local retry_success=false
+    
+    while [ "$retry_success" = "false" ] && [ -n "$available_mirrors" ]; do
+        local selected_mirror=$(select_random_mirror "$available_mirrors")
+        
+        log_info "Retrying with mirror: $selected_mirror"
+        
+        if update_mirror "$selected_mirror" && apk update >/dev/null 2>&1; then
+            log_info "Successfully updated package index with mirror: $selected_mirror"
+            
+            # 尝试安装
+            if command -v timeout >/dev/null 2>&1; then
+                if timeout "${INSTALL_TIMEOUT}s" apk add --no-cache $ALPINE_PACKAGES; then
+                    log_info "Dependencies installed successfully with mirror: $selected_mirror"
+                    retry_success=true
+                fi
+            else
+                if apk add --no-cache $ALPINE_PACKAGES; then
+                    log_info "Dependencies installed successfully with mirror: $selected_mirror"
+                    retry_success=true
+                fi
+            fi
+        fi
+        
+        if [ "$retry_success" = "false" ]; then
+            available_mirrors=$(remove_mirror "$available_mirrors" "$selected_mirror")
+        fi
+    done
+    
+    # 如果所有镜像源都尝试失败，恢复原始配置
+    if [ "$retry_success" = "false" ]; then
+        log_error "Failed to install dependencies with all mirrors, restoring original configuration"
+        cp "${ALPINE_REPOSITORIES_FILE}.install.bak" "$ALPINE_REPOSITORIES_FILE" 2>/dev/null
+        apk update >/dev/null 2>&1
+        
+        # 最后尝试一次安装，即使失败也继续
+        if command -v timeout >/dev/null 2>&1; then
+            timeout "${INSTALL_TIMEOUT}s" apk add --no-cache $ALPINE_PACKAGES || true
+        else
+            apk add --no-cache $ALPINE_PACKAGES || true
+        fi
+    fi
+    
+    # 清理备份文件
+    rm -f "${ALPINE_REPOSITORIES_FILE}.install.bak"
+}
+
+# 简单安装
+install_simple() {
+    log_info "Installing dependencies without timeout and mirror retry feature"
+    if ! apk add --no-cache $ALPINE_PACKAGES; then
+        log_error "Failed to install dependencies"
+        return 1
+    fi
+    return 0
 }
 
 # Alpine系统处理主函数
 alpine_system_handler() {
-    # Alpine处理（复杂处理方式）
-    log "Detected Alpine system"
+    log_info "Detected Alpine system"
     
     # 检查依赖
-    if check_alpine_dependencies; then
-        # 库已安装，直接添加路由规则并运行程序
-        log "Required libraries already installed"
-        start_alpine_handler
+    if check_dependencies; then
+        log_info "Required libraries already installed"
+        start_handler
         return
     fi
     
     # 处理镜像源（环境变量优先）
-    if ! handle_mirror_with_env_vars; then
+    if ! handle_env_vars; then
         # 检测公网IP归属地
-        detect_public_ip_country
+        detect_ip_country
         # 根据IP归属地处理镜像源
         handle_mirror_by_ip
     fi
     
     # 安装依赖
-    install_alpine_dependencies
+    if ! install_dependencies; then
+        log_error "Failed to install Alpine dependencies"
+        exit 1
+    fi
     
     # 启动处理程序
-    start_alpine_handler
+    start_handler
 }
 
 # 启动主函数
