@@ -1290,7 +1290,7 @@ change_apt_mirror() {
     local system_version=$(echo "$system_info" | cut -d'|' -f2)
     local version_codename=$(echo "$system_info" | cut -d'|' -f3)
     
-    # 确定使用的镜像源URL - 优化后的实现
+    # 确定使用的镜像源URL
     local mirror_url=""
     # 构建镜像源映射关系，减少重复代码
     local mirror_base=""

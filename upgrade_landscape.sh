@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Landscape Router 升级脚本 (优化版)
+# Landscape Router 升级脚本
 
-# 用法: ./upgrade_landscape_optimized.sh [--stable|--beta] [--cn] [--reboot] [--backup[=N]] [--rollback]
+# 用法: ./upgrade_landscape.sh [--stable|--beta] [--cn] [--reboot] [--backup[=N]] [--rollback]
 # 参数:
 #   --stable       - 升级到最新稳定版（默认）
 #   --beta         - 升级到最新 Beta 版
@@ -15,23 +15,21 @@
 #   -h, --help     - 显示此帮助信息
 
 # 示例:
-#   ./upgrade_landscape_optimized.sh                    # 升级到最新稳定版
-#   ./upgrade_landscape_optimized.sh --stable           # 升级到最新稳定版
-#   ./upgrade_landscape_optimized.sh --beta             # 升级到最新 Beta 版
-#   ./upgrade_landscape_optimized.sh --stable --cn      # 使用中国镜像升级到最新稳定版
-#   ./upgrade_landscape_optimized.sh --stable --reboot  # 升级到最新稳定版并自动重启
-#   ./upgrade_landscape_optimized.sh --backup           # 升级前进行备份
-#   ./upgrade_landscape_optimized.sh --backup=5         # 升级前进行备份，保留最近5个备份
-#   ./upgrade_landscape_optimized.sh --rollback         # 回滚到之前的备份版本
-#   ./upgrade_landscape_optimized.sh -h                 # 显示帮助信息
+#   ./upgrade_landscape.sh                    # 升级到最新稳定版
+#   ./upgrade_landscape.sh --stable           # 升级到最新稳定版
+#   ./upgrade_landscape.sh --beta             # 升级到最新 Beta 版
+#   ./upgrade_landscape.sh --stable --cn      # 使用中国镜像升级到最新稳定版
+#   ./upgrade_landscape.sh --stable --reboot  # 升级到最新稳定版并自动重启
+#   ./upgrade_landscape.sh --backup           # 升级前进行备份
+#   ./upgrade_landscape.sh --backup=5         # 升级前进行备份，保留最近5个备份
+#   ./upgrade_landscape.sh --rollback         # 回滚到之前的备份版本
+#   ./upgrade_landscape.sh -h                 # 显示帮助信息
 #
 # 注意:
 #   - Beta 版本从 GitHub Actions 下载，不支持 --cn 镜像加速参数
 #   - Stable 版本从 GitHub Releases 下载，支持 --cn 镜像加速参数
 
 # ========== 配置常量 ==========
-# readonly SCRIPT_NAME="$(basename "$0")"
-# readonly SCRIPT_VERSION="2.0-optimized"
 readonly DEFAULT_MAX_LOGS=16
 readonly DEFAULT_STABLE_BACKUPS=1
 readonly DEFAULT_BETA_BACKUPS=3
@@ -234,7 +232,7 @@ log() {
     fi
 }
 
-# 优化后的日志清理函数
+# 日志清理函数
 cleanup_old_logs() {
     local log_dir="$1"
     local max_logs=${2:-$DEFAULT_MAX_LOGS}
@@ -553,7 +551,7 @@ control_landscape_service() {
     esac
 }
 
-# 优化后的Docker服务控制函数，修复竞态条件
+# Docker服务控制函数，修复竞态条件
 control_docker_service() {
     local action="$1"
     local max_wait_time=30  # 最大等待时间（秒）
@@ -751,7 +749,7 @@ get_redirect_pkg_handler_url() {
     echo "$download_url"
 }
 
-# 优化后的通用下载函数，支持wget和curl，优先使用wget，并支持重试3次
+# 通用下载函数，支持wget和curl，优先使用wget，并支持重试3次
 download_with_retry() {
     local url="$1"
     local output_file="$2"
@@ -848,7 +846,7 @@ download_with_retry() {
     return 1
 }
 
-# 优化后的API请求函数，减少重复代码
+# API请求函数，减少重复代码
 make_api_request() {
     local url="$1"
     local auth_header="$2"
@@ -1492,7 +1490,7 @@ create_backup() {
     return 0
 }
 
-# 优化后的备份清理函数
+# 备份清理函数
 cleanup_old_backups() {
     local backup_dir="$1"
     local max_backups="$2"
@@ -2026,7 +2024,7 @@ upgrade_landscape_version() {
     fi
 }
 
-# 优化后的文件替换函数，带重试和回滚机制，修复竞态条件
+# 文件替换函数，带重试和回滚机制，修复竞态条件
 replace_files_with_rollback() {
     local temp_dir="$1"
     local landscape_dir="$2"
