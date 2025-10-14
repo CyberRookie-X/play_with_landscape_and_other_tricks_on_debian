@@ -1619,8 +1619,8 @@ download_landscape_binary() {
         exit 1
     fi
     
-    # 添加执行权限 (设置为755)
-    chmod 755 "$LANDSCAPE_DIR/$binary_filename"
+    # 添加执行权限
+    chmod +x "$LANDSCAPE_DIR/$binary_filename"
     
     # 获取版本信息
     local version
@@ -1754,8 +1754,8 @@ download_handlers() {
         exit 1
     fi
     
-    # 为脚本添加执行权限 (设置为755)
-    chmod 755 "$LANDSCAPE_DIR/redirect_pkg_handler.sh"
+    # 为脚本添加执行权限
+    chmod +x "$LANDSCAPE_DIR/redirect_pkg_handler.sh"
     log "已为 redirect_pkg_handler.sh 添加执行权限"
     
     # 下载各个架构的 handler 二进制文件
@@ -1775,8 +1775,8 @@ download_handlers() {
             exit 1
         fi
         
-        # 为二进制文件添加执行权限 (设置为755)
-        chmod 755 "$LANDSCAPE_DIR/$handler_filename"
+        # 为二进制文件添加执行权限
+        chmod +x "$LANDSCAPE_DIR/$handler_filename"
         log "已为 $handler_filename 添加执行权限"
     done
     
