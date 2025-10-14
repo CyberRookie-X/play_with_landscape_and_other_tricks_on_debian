@@ -131,6 +131,16 @@ set_error_trap() {
 # ========== 主函数 ==========
 
 main() {
+        # 显示安装脚本大标题
+    echo ""
+    echo "============================================================================"
+    echo "============================================================================"
+    echo "=====                                                                  ====="
+    echo "=====                    Landscape Router 升级脚本                      ====="
+    echo "=====                                                                  ====="
+    echo "============================================================================"
+    echo "============================================================================"
+    echo ""
     # 设置错误处理
     set_error_trap
     
@@ -161,7 +171,7 @@ main() {
     # 初始化日志
     init_log
     
-    log "Landscape Router 升级脚本开始执行 (优化版 v$SCRIPT_VERSION)"
+    log "Landscape Router 升级脚本开始执行"
     log "检测到 Landscape Router 安装目录: $LANDSCAPE_DIR"
     log "当前版本: $CURRENT_VERSION"
     
@@ -415,7 +425,7 @@ parse_arguments() {
 
 # 显示帮助信息
 show_help() {
-    echo "Landscape Router 升级脚本 (优化版 v$SCRIPT_VERSION)"
+    echo "Landscape Router 升级脚本 "
     echo "用法: ./$SCRIPT_NAME [--stable|--beta] [--cn] [--reboot] [--backup[=N]] [--rollback]"
     echo "参数:"
     echo "  --stable       - 升级到最新稳定版（默认）"

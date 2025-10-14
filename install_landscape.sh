@@ -34,6 +34,17 @@ HANDLER_ARCHITECTURES=()    # 要下载的 handler 架构列表
 
 # 主逻辑
 main() {
+        # 显示安装脚本大标题
+    echo ""
+    echo "============================================================================"
+    echo "============================================================================"
+    echo "=====                                                                  ====="
+    echo "=====                    Landscape Router 安装脚本                      ====="
+    echo "=====                                                                  ====="
+    echo "============================================================================"
+    echo "============================================================================"
+    echo ""
+
     # 初始化临时日志
     init_temp_log
     
@@ -2000,23 +2011,24 @@ finish_installation() {
     echo "接下来 SSH 连接可能会中断"
     echo "请通过 $lan_ip 连接 SSH 服务"
     echo ""
+    echo "网络配置即将生效"
+    echo "正在启动 Landscape Router 服务..."
+    # 重启网络服务 并 启动 Landscape Router 服务
+    # echo "安装完成, 脚本退出"
+    echo ""
     echo "=============================="
-    echo "Landscape Router 安装完成!"
+    echo "     o(≧▽≦)o 安装完成!"
     echo "=============================="
     echo ""
     echo "请通过浏览器, 访问以下地址管理您的 Landscape Router :"
     echo ""
-    echo "  http://$lan_ip:6300"
+    echo "http://$lan_ip:6300"
     echo ""
     echo "管理员用户名: $ADMIN_USER"
     echo "管理员密码: $ADMIN_PASS"
     echo ""
     echo "=============================="
-    echo ""
-    echo "网络配置即将生效"
-    echo "已启动 Landscape Router 服务"
-    # 重启网络服务 并 启动 Landscape Router 服务
-    echo "安装完成, 脚本退出"
+
     systemctl restart networking && systemctl start landscape-router.service
 
     log "安装完成"
