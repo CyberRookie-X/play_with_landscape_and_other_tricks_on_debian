@@ -28,6 +28,7 @@
 # 注意:
 #   - Beta 版本从 GitHub Actions 下载，不支持 --cn 镜像加速参数
 #   - Stable 版本从 GitHub Releases 下载，支持 --cn 镜像加速参数
+# 虽然兼容 landscape-webserver-aarch64-musl 的升级，但是 landscape 仓库尚未提供这个文件
 
 # ========== 配置常量 ==========
 readonly DEFAULT_MAX_LOGS=16
@@ -136,7 +137,7 @@ main() {
     echo "============================================================================"
     echo "============================================================================"
     echo "=====                                                                  ====="
-    echo "=====                    Landscape Router 升级脚本                      ====="
+    echo "=====                    Landscape Router 升级脚本                     ====="
     echo "=====                                                                  ====="
     echo "============================================================================"
     echo "============================================================================"
@@ -468,21 +469,61 @@ show_help() {
 get_landscape_dir() {
     if [ "$INIT_SYSTEM" = "systemd" ] && [ -f "/etc/systemd/system/landscape-router.service" ]; then
         # 从systemd服务文件获取安装路径
-        local landscape_dir
-        landscape_dir=$(grep -oP 'ExecStart=\K.*(?=/landscape-webserver-)' /etc/systemd/system/landscape-router.service 2>/dev/null) || true
-        if [ -z "$landscape_dir" ]; then
-            echo "错误: 无法从 landscape-router.service 中提取安装路径，升级终止" >&2
+        local exec_line
+        exec_line=$(grep "^ExecStart=" /etc/systemd/system/landscape-router.service 2>/dev/null | head -1) || true
+        
+        if [ -z "$exec_line" ]; then
+            echo "错误: 无法从 landscape-router.service 中找到 ExecStart 行，升级终止" >&2
             return 1
         fi
+        
+        # 提取完整的可执行文件路径（去除ExecStart=前缀和可能的参数）
+        local full_path
+        full_path=$(echo "$exec_line" | sed 's/^ExecStart=//' | awk '{print $1}')
+        
+        if [ -z "$full_path" ]; then
+            echo "错误: 无法从 landscape-router.service 中提取可执行文件路径，升级终止" >&2
+            return 1
+        fi
+        
+        # 从完整路径中提取目录部分
+        local landscape_dir
+        landscape_dir=$(dirname "$full_path")
+        
+        if [ -z "$landscape_dir" ] || [ "$landscape_dir" = "." ]; then
+            echo "错误: 无法从可执行文件路径中提取安装目录，升级终止" >&2
+            return 1
+        fi
+        
         echo "$landscape_dir"
     elif [ "$INIT_SYSTEM" = "openrc" ] && [ -f "/etc/init.d/landscape-router" ]; then
         # 从OpenRC启动脚本获取安装路径
-        local landscape_dir
-        landscape_dir=$(grep -oP 'command=\K.*(?=/landscape-webserver-)' /etc/init.d/landscape-router 2>/dev/null) || true
-        if [ -z "$landscape_dir" ]; then
-            echo "错误: 无法从 landscape-router 启动脚本中提取安装路径，升级终止" >&2
+        local command_line
+        command_line=$(grep "^command=" /etc/init.d/landscape-router 2>/dev/null | head -1) || true
+        
+        if [ -z "$command_line" ]; then
+            echo "错误: 无法从 landscape-router 启动脚本中找到 command 行，升级终止" >&2
             return 1
         fi
+        
+        # 提取完整的可执行文件路径（去除command=前缀和可能的参数）
+        local full_path
+        full_path=$(echo "$command_line" | sed 's/^command=//' | awk '{print $1}')
+        
+        if [ -z "$full_path" ]; then
+            echo "错误: 无法从 landscape-router 启动脚本中提取可执行文件路径，升级终止" >&2
+            return 1
+        fi
+        
+        # 从完整路径中提取目录部分
+        local landscape_dir
+        landscape_dir=$(dirname "$full_path")
+        
+        if [ -z "$landscape_dir" ] || [ "$landscape_dir" = "." ]; then
+            echo "错误: 无法从可执行文件路径中提取安装目录，升级终止" >&2
+            return 1
+        fi
+        
         echo "$landscape_dir"
     else
         # 处理缺失的服务文件
@@ -495,12 +536,119 @@ get_landscape_dir() {
     fi
 }
 
+# 动态获取可执行文件名
+get_landscape_executable_name() {
+    local landscape_dir="$1"
+    local system_arch="$2"
+    local use_musl="$3"
+    
+    # 首先尝试根据服务文件确定可执行文件名
+    if [ "$INIT_SYSTEM" = "systemd" ] && [ -f "/etc/systemd/system/landscape-router.service" ]; then
+        local exec_line
+        exec_line=$(grep "^ExecStart=" /etc/systemd/system/landscape-router.service 2>/dev/null | head -1) || true
+        
+        if [ -n "$exec_line" ]; then
+            # 提取完整的可执行文件路径
+            local full_path
+            full_path=$(echo "$exec_line" | sed 's/^ExecStart=//' | awk '{print $1}')
+            
+            if [ -n "$full_path" ] && [ -f "$full_path" ]; then
+                # 从完整路径中提取文件名
+                local filename
+                filename=$(basename "$full_path")
+                echo "$filename"
+                return 0
+            fi
+        fi
+    elif [ "$INIT_SYSTEM" = "openrc" ] && [ -f "/etc/init.d/landscape-router" ]; then
+        local command_line
+        command_line=$(grep "^command=" /etc/init.d/landscape-router 2>/dev/null | head -1) || true
+        
+        if [ -n "$command_line" ]; then
+            # 提取完整的可执行文件路径
+            local full_path
+            full_path=$(echo "$command_line" | sed 's/^command=//' | awk '{print $1}')
+            
+            if [ -n "$full_path" ] && [ -f "$full_path" ]; then
+                # 从完整路径中提取文件名
+                local filename
+                filename=$(basename "$full_path")
+                echo "$filename"
+                return 0
+            fi
+        fi
+    fi
+    
+    # 如果无法从服务文件确定，则尝试扫描安装目录中的可执行文件
+    if [ -n "$landscape_dir" ] && [ -d "$landscape_dir" ]; then
+        # 按优先级查找可执行文件
+        local executables=()
+        
+        # 1. 首先尝试标准命名模式
+        if [ "$use_musl" = true ]; then
+            local standard_name="landscape-webserver-$system_arch-musl"
+            if [ -f "$landscape_dir/$standard_name" ]; then
+                executables+=("$standard_name")
+            fi
+        fi
+        
+        # 也尝试非musl的标准命名模式
+        local standard_name="landscape-webserver-$system_arch"
+        if [ -f "$landscape_dir/$standard_name" ]; then
+            executables+=("$standard_name")
+        fi
+        
+        # 2. 查找所有landscape-webserver-开头的可执行文件
+        for file in "$landscape_dir"/landscape-webserver-*; do
+            if [ -f "$file" ] && [ -x "$file" ]; then
+                local filename
+                filename=$(basename "$file")
+                # 避免重复添加
+                if [[ ! " ${executables[*]} " =~ " ${filename} " ]]; then
+                    executables+=("$filename")
+                fi
+            fi
+        done
+        
+        # 3. 如果找到多个可执行文件，返回最新的一个（按修改时间）
+        if [ ${#executables[@]} -gt 0 ]; then
+            local latest_file=""
+            local latest_time=0
+            
+            for exe in "${executables[@]}"; do
+                local file_path="$landscape_dir/$exe"
+                if [ -f "$file_path" ]; then
+                    local mod_time
+                    mod_time=$(stat -c %Y "$file_path" 2>/dev/null || echo 0)
+                    if [ "$mod_time" -gt "$latest_time" ]; then
+                        latest_time="$mod_time"
+                        latest_file="$exe"
+                    fi
+                fi
+            done
+            
+            if [ -n "$latest_file" ]; then
+                echo "$latest_file"
+                return 0
+            fi
+        fi
+    fi
+    
+    # 如果所有方法都失败，返回基于架构和musl的默认名称
+    if [ "$use_musl" = true ]; then
+        echo "landscape-webserver-$system_arch-musl"
+    else
+        echo "landscape-webserver-$system_arch"
+    fi
+    
+    return 0
+}
+
 # 获取当前版本号
 get_current_version() {
-    local current_filename="landscape-webserver-$SYSTEM_ARCH"
-    if [ "$USE_MUSL" = true ] && [ "$SYSTEM_ARCH" = "x86_64" ]; then
-        current_filename="landscape-webserver-x86_64-musl"
-    fi
+    # 使用新的辅助函数动态获取可执行文件名
+    local current_filename
+    current_filename=$(get_landscape_executable_name "$LANDSCAPE_DIR" "$SYSTEM_ARCH" "$USE_MUSL")
     
     if [ -f "$LANDSCAPE_DIR/$current_filename" ]; then
         CURRENT_VERSION=$("$LANDSCAPE_DIR/$current_filename" --version 2>/dev/null)
@@ -675,9 +823,12 @@ control_docker_service() {
 # 获取下载URL和文件名
 get_download_info() {
     local version_type="$1"
-    local filename="landscape-webserver-$SYSTEM_ARCH"
-    if [ "$USE_MUSL" = true ] && [ "$SYSTEM_ARCH" = "x86_64" ]; then
-        filename="landscape-webserver-x86_64-musl"
+    # 对于下载，我们需要标准名称，因为仓库中的文件是按标准命名
+    local filename
+    if [ "$USE_MUSL" = true ]; then
+        filename="landscape-webserver-$SYSTEM_ARCH-musl"
+    else
+        filename="landscape-webserver-$SYSTEM_ARCH"
     fi
     
     local download_url=""
@@ -1423,8 +1574,8 @@ create_backup() {
     # 获取当前版本号
     local current_version="unknown"
     local current_filename="landscape-webserver-$SYSTEM_ARCH"
-    if [ "$USE_MUSL" = true ] && [ "$SYSTEM_ARCH" = "x86_64" ]; then
-        current_filename="landscape-webserver-x86_64-musl"
+    if [ "$USE_MUSL" = true ]; then
+        current_filename="landscape-webserver-$SYSTEM_ARCH-musl"
     fi
     
     if [ -f "$landscape_dir/$current_filename" ]; then
@@ -1893,8 +2044,8 @@ upgrade_landscape_version() {
     
     # 检查是否已安装
     local filename="landscape-webserver-$SYSTEM_ARCH"
-    if [ "$USE_MUSL" = true ] && [ "$SYSTEM_ARCH" = "x86_64" ]; then
-        filename="landscape-webserver-x86_64-musl"
+    if [ "$USE_MUSL" = true ]; then
+        filename="landscape-webserver-$SYSTEM_ARCH-musl"
     fi
     
     if [ ! -f "$landscape_dir/$filename" ]; then
@@ -2051,8 +2202,31 @@ replace_files_with_rollback() {
     local replace_tasks=()
     
     # 主可执行文件
-    if [ -f "$temp_dir/$filename" ]; then
-        replace_tasks+=("executable:$landscape_dir/$filename:$temp_dir/$filename")
+    # 使用动态获取的可执行文件名，同时也要处理下载的标准名称文件
+    local current_executable
+    current_executable=$(get_landscape_executable_name "$landscape_dir" "$SYSTEM_ARCH" "$USE_MUSL")
+    
+    # 确定标准下载名称（用于新文件）
+    local standard_filename
+    if [ "$USE_MUSL" = true ]; then
+        standard_filename="landscape-webserver-$SYSTEM_ARCH-musl"
+    else
+        standard_filename="landscape-webserver-$SYSTEM_ARCH"
+    fi
+    
+    # 检查下载的文件是否存在（使用标准名称）
+    if [ -f "$temp_dir/$standard_filename" ]; then
+        # 如果当前可执行文件名与标准名称不同，则需要重命名
+        if [ "$current_executable" != "$standard_filename" ]; then
+            log "检测到可执行文件名变化: $current_executable -> $standard_filename"
+            # 添加重命名任务
+            replace_tasks+=("executable_rename:$landscape_dir/$current_executable:$landscape_dir/$standard_filename:$temp_dir/$standard_filename")
+        else
+            # 文件名相同，直接替换
+            replace_tasks+=("executable:$landscape_dir/$current_executable:$temp_dir/$standard_filename")
+        fi
+    else
+        log "警告: 未找到下载的可执行文件 $standard_filename"
     fi
     
     # 静态文件
