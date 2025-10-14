@@ -2005,11 +2005,8 @@ finish_installation() {
     echo ""
     echo "1. 在物理机上将合适网卡改为 static 并配置 IP/掩码"
     echo "2. 通过配置的 IP 访问 主机 或 Landscape UI"
-    echo ""
     local lan_ip
     lan_ip=$(echo "$LAN_CONFIG" | grep "lan_ip" | cut -d '"' -f 2)
-    echo "接下来 SSH 连接可能会中断"
-    echo "请通过 $lan_ip 连接 SSH 服务"
     echo ""
     echo "网络配置即将生效"
     echo "正在启动 Landscape Router 服务..."
@@ -2019,6 +2016,9 @@ finish_installation() {
     echo "=============================="
     echo "     o(≧▽≦)o 安装完成!"
     echo "=============================="
+    echo ""
+    echo "接下来 SSH 连接可能会中断"
+    echo "请通过 $lan_ip 连接 SSH 服务"
     echo ""
     echo "请通过浏览器, 访问以下地址管理您的 Landscape Router :"
     echo ""
