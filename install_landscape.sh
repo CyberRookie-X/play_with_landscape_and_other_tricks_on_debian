@@ -205,7 +205,6 @@ ensure_download_tool_installed() {
             fi
         fi
     elif [ "$has_wget" = false ] && [ "$has_curl" = true ]; then
-        log "系统只有 curl，建议安装 wget 以获得更好的下载体验"
         log "当前将使用 curl 进行下载"
     fi
 }
