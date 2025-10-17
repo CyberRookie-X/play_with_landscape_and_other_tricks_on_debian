@@ -31,6 +31,11 @@ TEMP_LOG_DIR=""
 APT_SOURCE_BACKED_UP=false  # 是否已经备份过源文件
 DOWNLOAD_HANDLER=false      # 是否下载 handler
 HANDLER_ARCHITECTURES=()    # 要下载的 handler 架构列表
+# NTP 相关变量
+CONFIGURE_NTP=false         # 是否配置 NTP 服务器
+NTP_CLIENT_TYPE="chrony"    # NTP 客户端类型 (chrony/ntp)
+NTP_PRIMARY_SERVER="aliyun" # 主要 NTP 服务器
+NTP_SERVERS_CONFIGURED=""   # 已配置的 NTP 服务器列表
 
 # 主逻辑
 main() {
@@ -180,7 +185,7 @@ ensure_download_tool_installed() {
     # 检查 wget 是否可用
     if command -v wget >/dev/null 2>&1; then
         has_wget=true
-        log "检测到系统已安装 wget (优先使用)"
+        log "检测到系统已安装 wget"
     fi
     
     # 检查 curl 是否可用
@@ -205,13 +210,9 @@ ensure_download_tool_installed() {
             fi
         fi
     elif [ "$has_wget" = false ] && [ "$has_curl" = true ]; then
+        log "系统只有 curl，建议安装 wget 以获得更好的下载体验"
         log "当前将使用 curl 进行下载"
     fi
-}
-
-# 保持向后兼容性的函数
-ensure_curl_installed() {
-    ensure_download_tool_installed
 }
 
 # 根据架构获取二进制文件名
@@ -368,7 +369,7 @@ check_system() {
         log "错误: 系统中未找到 wget 或 curl，至少需要安装其中一个工具"
         exit 1
     elif command -v wget >/dev/null 2>&1; then
-        log "检测到系统已安装 wget (将优先使用)"
+        log "检测到系统已安装 wget"
     elif command -v curl >/dev/null 2>&1; then
         log "检测到系统已安装 curl"
     fi
@@ -418,6 +419,66 @@ ask_timezone_config() {
     else
         TIMEZONE_SHANGHAI=false
     fi
+}
+
+# 询问 NTP 配置
+ask_ntp_config() {
+    echo "-----------------------------"
+    read -rp "是否配置 NTP 服务器以同步系统时间? (y/n): " ntp_response
+    if [[ ! "$ntp_response" =~ ^[Nn]$ ]]; then
+        CONFIGURE_NTP=true
+        ask_ntp_server_choice
+    else
+        CONFIGURE_NTP=false
+    fi
+}
+
+# 询问 NTP 服务器选择
+ask_ntp_server_choice() {
+    echo "-----------------------------"
+    echo "请选择 NTP 服务器:"
+    echo "1) 阿里云 NTP 服务器（默认）"
+    echo "2) 腾讯云 NTP 服务器"
+    echo "3) 中国国家授时中心 NTP 服务器"
+    echo "4) 教育网 NTP 服务器"
+    echo "5) 自定义 NTP 服务器"
+    read -rp "请选择 (1-5, 默认为 1): " ntp_server_choice
+    
+    case "$ntp_server_choice" in
+        1|"")
+            NTP_PRIMARY_SERVER="aliyun"
+            NTP_SERVERS_CONFIGURED="ntp1.aliyun.com ntp2.aliyun.com ntp3.aliyun.com ntp4.aliyun.com ntp5.aliyun.com ntp6.aliyun.com ntp7.aliyun.com"
+            ;;
+        2)
+            NTP_PRIMARY_SERVER="tencent"
+            NTP_SERVERS_CONFIGURED="ntp.tencent.com ntp2.tencent.com ntp3.tencent.com ntp4.tencent.com ntp5.tencent.com"
+            ;;
+        3)
+            NTP_PRIMARY_SERVER="ntsc"
+            NTP_SERVERS_CONFIGURED="ntp.ntsc.ac.cn ntp1.ntsc.ac.cn ntp2.ntsc.ac.cn ntp3.ntsc.ac.cn"
+            ;;
+        4)
+            NTP_PRIMARY_SERVER="edu"
+            NTP_SERVERS_CONFIGURED="ntp.sjtu.edu.cn ntp1.sjtu.edu.cn ntp2.sjtu.edu.cn ntp3.sjtu.edu.cn ntp4.sjtu.edu.cn"
+            ;;
+        5)
+            read -rp "请输入自定义 NTP 服务器地址 (多个服务器用空格分隔): " custom_ntp_servers
+            if [ -n "$custom_ntp_servers" ]; then
+                NTP_PRIMARY_SERVER="custom"
+                NTP_SERVERS_CONFIGURED="$custom_ntp_servers"
+            else
+                echo "未输入自定义 NTP 服务器，使用默认阿里云 NTP 服务器"
+                NTP_PRIMARY_SERVER="aliyun"
+                NTP_SERVERS_CONFIGURED="ntp1.aliyun.com ntp2.aliyun.com ntp3.aliyun.com ntp4.aliyun.com ntp5.aliyun.com ntp6.aliyun.com ntp7.aliyun.com"
+            fi
+            ;;
+        *)
+            echo "无效选择，使用默认阿里云 NTP 服务器"
+            NTP_PRIMARY_SERVER="aliyun"
+            NTP_SERVERS_CONFIGURED="ntp1.aliyun.com ntp2.aliyun.com ntp3.aliyun.com ntp4.aliyun.com ntp5.aliyun.com ntp6.aliyun.com ntp7.aliyun.com"
+            ;;
+    esac
+    
 }
 
 # 询问swap配置
@@ -511,8 +572,21 @@ display_configuration() {
     echo "请检查您的配置:"
     echo "=============================="
     echo "1. 系统时区设置为亚洲/上海: $([ "$TIMEZONE_SHANGHAI" = true ] && echo "是" || echo "否")"
-    echo "2. 禁用 swap (虚拟内存): $([ "$SWAP_DISABLED" = true ] && echo "是" || echo "否")"
-    echo "3. 更换 apt 软件源: $([ "$USE_CUSTOM_MIRROR" = true ] && echo "是" || echo "否")"
+    echo "2. 配置 NTP 服务器: $([ "$CONFIGURE_NTP" = true ] && echo "是" || echo "否")"
+    if [ "$CONFIGURE_NTP" = true ]; then
+        local ntp_server_name="未知"
+        case "$NTP_PRIMARY_SERVER" in
+            "aliyun") ntp_server_name="阿里云 NTP 服务器" ;;
+            "tencent") ntp_server_name="腾讯云 NTP 服务器" ;;
+            "ntsc") ntp_server_name="中国国家授时中心 NTP 服务器" ;;
+            "edu") ntp_server_name="教育网 NTP 服务器" ;;
+            "custom") ntp_server_name="自定义 NTP 服务器" ;;
+        esac
+        echo "   NTP 服务器: $ntp_server_name"
+        echo "   注意: 仅配置已安装的 NTP 客户端，不提供 NTP 客户端安装功能"
+    fi
+    echo "3. 禁用 swap (虚拟内存): $([ "$SWAP_DISABLED" = true ] && echo "是" || echo "否")"
+    echo "4. 更换 apt 软件源: $([ "$USE_CUSTOM_MIRROR" = true ] && echo "是" || echo "否")"
     if [ "$USE_CUSTOM_MIRROR" = true ]; then
         local mirror_name="未知"
         case "$MIRROR_SOURCE" in
@@ -528,14 +602,14 @@ display_configuration() {
     fi
     # 只有当web server不是预装时才显示web server安装选项
     if [ "$WEB_SERVER_PREINSTALLED" != true ]; then
-        echo "4. 安装 Web Server: $([ "$WEB_SERVER_INSTALLED" = true ] && echo "是" || echo "否")"
+        echo "5. 安装 Web Server: $([ "$WEB_SERVER_INSTALLED" = true ] && echo "是" || echo "否")"
         if [ "$WEB_SERVER_INSTALLED" = true ]; then
             echo "   Web Server 类型: $WEB_SERVER_TYPE"
         fi
     else
-        echo "4. 检测到系统已预装 Web Server: $WEB_SERVER_TYPE"
+        echo "5. 检测到系统已预装 Web Server: $WEB_SERVER_TYPE"
     fi
-    echo "5. 安装 Docker(含compose): $([ "$DOCKER_INSTALLED" = true ] && echo "是" || echo "否")"
+    echo "6. 安装 Docker(含compose): $([ "$DOCKER_INSTALLED" = true ] && echo "是" || echo "否")"
     if [ "$DOCKER_INSTALLED" = true ]; then
         local docker_mirror_name="未知"
         case "$DOCKER_MIRROR" in
@@ -552,19 +626,19 @@ display_configuration() {
         echo "   Docker 镜像源: $docker_mirror_name"
         echo "   Docker IPv6 支持: $([ "$DOCKER_ENABLE_IPV6" = true ] && echo "是" || echo "否")"
     fi
-    echo "6. 安装 ppp (用于 PPPOE 拨号): $([ "$INSTALL_PPP" = true ] && echo "是" || echo "否")"
-    echo "7. 使用 GitHub 镜像加速: $([ "$USE_GITHUB_MIRROR" = true ] && echo "是" || echo "否")"
+    echo "7. 安装 ppp (用于 PPPOE 拨号): $([ "$INSTALL_PPP" = true ] && echo "是" || echo "否")"
+    echo "8. 使用 GitHub 镜像加速: $([ "$USE_GITHUB_MIRROR" = true ] && echo "是" || echo "否")"
     if [ "$USE_GITHUB_MIRROR" = true ]; then
         echo "   GitHub 镜像地址: $GITHUB_MIRROR"
     fi
-    echo "8. 下载 redirect_pkg_handler: $([ "$DOWNLOAD_HANDLER" = true ] && echo "是" || echo "否")"
+    echo "9. 下载 redirect_pkg_handler: $([ "$DOWNLOAD_HANDLER" = true ] && echo "是" || echo "否")"
     if [ "$DOWNLOAD_HANDLER" = true ]; then
         echo "   要下载的 handler 版本: ${HANDLER_ARCHITECTURES[*]}"
     fi
-    echo "9. Landscape Router 安装路径: $LANDSCAPE_DIR"
-    echo "10. 管理员账号: $ADMIN_USER"
+    echo "10. Landscape Router 安装路径: $LANDSCAPE_DIR"
+    echo "11. 管理员账号: $ADMIN_USER"
     echo "    管理员密码: $ADMIN_PASS"
-    echo "11. LAN 网桥配置:"
+    echo "12. LAN 网桥配置:"
     echo "    名称 = $(echo "$LAN_CONFIG" | grep "bridge_name" | cut -d '"' -f 2)"
     echo "    IP地址 = $(echo "$LAN_CONFIG" | grep "lan_ip" | cut -d '"' -f 2)"
     echo "    DHCP起始地址 = $(echo "$LAN_CONFIG" | grep "dhcp_start" | cut -d '"' -f 2)"
@@ -585,34 +659,37 @@ modify_configuration() {
             ask_timezone_config
             ;;
         2)
-            ask_swap_config
+            ask_ntp_config
             ;;
         3)
-            ask_apt_mirror
+            ask_swap_config
             ;;
         4)
+            ask_apt_mirror
+            ;;
+        5)
             # 只有当web server不是预装时才允许修改web server配置
             ask_webserver
             ;;
-        5)
+        6)
             ask_docker_config
             ;;
-        6)
+        7)
             ask_ppp_config
             ;;
-        7)
+        8)
             ask_github_mirror
             ;;
-        8)
+        9)
             ask_download_handler
             ;;
-        9)
+        10)
             ask_install_path_config
             ;;
-        10)
+        11)
             ask_admin_config
             ;;
-        11)
+        12)
             config_lan_interface
             ;;
         *)
@@ -640,6 +717,9 @@ ask_user_config() {
     
     # 询问时区配置
     ask_timezone_config
+    
+    # 询问NTP配置
+    ask_ntp_config
     
     # 询问swap配置
     ask_swap_config
@@ -796,7 +876,7 @@ ask_docker_mirror() {
     echo "6) 南京大学"
     echo "7) 哈尔滨工业大学"
     echo "8) Azure 中国云"
-    read -rp "请选择 (0-8, 默认为1): " docker_mirror_response
+    read -rp "请选择 (0-8, 默认为 1 阿里云): " docker_mirror_response
     case "$docker_mirror_response" in
         0) DOCKER_MIRROR="official" ;;
         2) DOCKER_MIRROR="tsinghua" ;;
@@ -816,7 +896,7 @@ ask_github_mirror() {
     echo "0) 不使用加速"
     echo "1) https://ghfast.top (默认)"
     echo "2) 自定义地址"
-    read -rp "请选择 (0-2, 默认为1): " github_mirror_response
+    read -rp "请选择 (0-2, 默认为 1 ): " github_mirror_response
     case "$github_mirror_response" in
         0)
             USE_GITHUB_MIRROR=false
@@ -1178,23 +1258,26 @@ perform_installation() {
         setup_timezone
     fi
     
-    # 3. 关闭 swap
+    # 3. 配置 NTP 客户端
+    configure_ntp_client
+    
+    # 4. 关闭 swap
     if [ "$SWAP_DISABLED" = true ]; then
         disable_swap
     fi
     
-    # 4. 换源
+    # 5. 换源
     if [ "$USE_CUSTOM_MIRROR" = true ]; then
         change_apt_mirror
     fi
     
-    # 5. 下载并安装 Landscape Router
+    # 6. 下载并安装 Landscape Router
     install_landscape_router
     
-    # 6. 创建 systemd 服务
+    # 7. 创建 systemd 服务
     create_systemd_service
     
-    # 7. 检查并安装 webserver
+    # 8. 检查并安装 webserver
     # 当系统已安装web server时，不再执行安装
     if [ "$WEB_SERVER_INSTALLED" = true ] && [ -n "$WEB_SERVER_TYPE" ]; then
         if ! dpkg -l | grep -q "$WEB_SERVER_TYPE" && ! command -v "$WEB_SERVER_TYPE" >/dev/null 2>&1; then
@@ -1208,30 +1291,30 @@ perform_installation() {
         log "用户选择不安装 web server, 跳过安装步骤"
     fi
     
-    # 8. 安装 Docker
+    # 9. 安装 Docker
     if [ "$DOCKER_INSTALLED" = true ]; then
         install_docker
         configure_docker
     fi
     
     
-    # 9. 安装 ppp
+    # 10. 安装 ppp
     if [ "$INSTALL_PPP" = true ]; then
         install_ppp
     fi
     
-    # 10. 下载 handler
+    # 11. 下载 handler
     if [ "$DOWNLOAD_HANDLER" = true ]; then
         download_handlers
     fi
     
-    # 11. 配置网络接口
+    # 12. 配置网络接口
     configure_network_interfaces
     
-    # 12. 创建管理员账号密码配置文件
+    # 13. 创建管理员账号密码配置文件
     # 认证配置已合并到 landscape_init.toml 中，不再需要单独调用
     
-    # 13. 关闭本机 DNS 服务
+    # 14. 关闭本机 DNS 服务
     disable_local_dns
     
     log "安装执行完成"
@@ -1244,6 +1327,407 @@ setup_timezone() {
     log "时区设置完成"
 }
 
+# 检测所有可用的 NTP 客户端类型
+detect_ntp_client() {
+    # 将日志信息输出到日志文件，而不是标准输出，避免混入返回值
+    local timestamp
+    timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+    echo "[$timestamp] 检测系统所有可用的 NTP 客户端类型" >> "$INSTALL_LOG"
+    
+    local detected_clients=()
+    
+    # 检查 systemd-timesyncd
+    if systemctl is-enabled systemd-timesyncd >/dev/null 2>&1 || command -v timedatectl >/dev/null 2>&1 && timedatectl status | grep -q "NTP service: active"; then
+        timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+        echo "[$timestamp] 检测到 systemd-timesyncd 客户端" >> "$INSTALL_LOG"
+        detected_clients+=("systemd-timesyncd")
+    fi
+    
+    # 检查 chrony
+    if command -v chronyd >/dev/null 2>&1 || command -v chronyc >/dev/null 2>&1 || dpkg -l | grep -q "chrony"; then
+        timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+        echo "[$timestamp] 检测到 chrony 客户端" >> "$INSTALL_LOG"
+        detected_clients+=("chrony")
+    fi
+    
+    # 检查 ntpd (ntp)
+    if command -v ntpd >/dev/null 2>&1 || command -v ntpq >/dev/null 2>&1 || dpkg -l | grep -q "ntp"; then
+        timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+        echo "[$timestamp] 检测到 ntpd 客户端" >> "$INSTALL_LOG"
+        detected_clients+=("ntpd")
+    fi
+    
+    # 返回所有检测到的客户端类型，用空格分隔
+    # 如果没有检测到任何 NTP 客户端，返回空字符串
+    echo "${detected_clients[@]}"
+    return 0
+}
+
+# 获取 NTP 服务器列表
+get_ntp_servers() {
+    local server_choice="$1"
+    
+    case "$server_choice" in
+        "aliyun")
+            echo "ntp1.aliyun.com ntp2.aliyun.com ntp3.aliyun.com ntp4.aliyun.com ntp5.aliyun.com ntp6.aliyun.com ntp7.aliyun.com"
+            ;;
+        "tencent")
+            echo "ntp.tencent.com ntp2.tencent.com ntp3.tencent.com ntp4.tencent.com ntp5.tencent.com"
+            ;;
+        "ntsc")
+            echo "ntp.ntsc.ac.cn ntp1.ntsc.ac.cn ntp2.ntsc.ac.cn ntp3.ntsc.ac.cn"
+            ;;
+        "edu")
+            echo "ntp.sjtu.edu.cn ntp1.sjtu.edu.cn ntp2.sjtu.edu.cn ntp3.sjtu.edu.cn ntp4.sjtu.edu.cn"
+            ;;
+        "custom")
+            echo "$NTP_SERVERS_CONFIGURED"
+            ;;
+        *)
+            echo "ntp1.aliyun.com ntp2.aliyun.com ntp3.aliyun.com ntp4.aliyun.com ntp5.aliyun.com ntp6.aliyun.com ntp7.aliyun.com"
+            ;;
+    esac
+}
+
+# 配置 systemd-timesyncd 客户端
+configure_systemd_timesyncd() {
+    log "配置 systemd-timesyncd 客户端"
+    
+    # 检查 systemd-timesyncd 是否已安装
+    if ! dpkg -l | grep -q "systemd-timesyncd"; then
+        log "警告: systemd-timesyncd 未安装，跳过配置"
+        log "请手动安装 systemd-timesyncd 后再运行此脚本"
+        return 1
+    fi
+    
+    # 获取 NTP 服务器列表
+    local ntp_servers
+    ntp_servers=$(get_ntp_servers "$NTP_PRIMARY_SERVER")
+    
+    # 分离主服务器和fallback服务器
+    local primary_server=""
+    local fallback_servers=""
+    
+    # 获取第一个服务器作为主服务器
+    primary_server=$(echo "$ntp_servers" | awk '{print $1}')
+    
+    # 获取剩余服务器作为fallback服务器
+    fallback_servers=$(echo "$ntp_servers" | cut -d' ' -f2-)
+    
+    log "主 NTP 服务器: $primary_server"
+    log "Fallback NTP 服务器: $fallback_servers"
+    
+    # 备份原始配置文件
+    local config_file="/etc/systemd/timesyncd.conf"
+    if [ -f "$config_file" ]; then
+        cp "$config_file" "${config_file}.bak.$(date +%Y%m%d%H%M%S)"
+        log "已备份原始配置文件到 ${config_file}.bak.$(date +%Y%m%d%H%M%S)"
+    fi
+    
+    # 创建配置目录（如果不存在）
+    mkdir -p "$(dirname "$config_file")"
+    
+    # 写入新的配置
+    cat > "$config_file" << EOF
+# This file is part of systemd.
+#
+# systemd is free software; you can redistribute it and/or modify it
+# under the terms of the GNU Lesser General Public License as published by
+# the Free Software Foundation; either version 2.1 of the License, or
+# (at your option) any later version.
+
+[Time]
+NTP=$primary_server
+FallbackNTP=$fallback_servers
+
+# Root distance max is the maximum allowed distance in seconds to the
+# nearest synchronization source. Setting this to a larger value will allow
+# longer distance between the local system and the synchronization source.
+#RootDistanceMaxSec=5
+
+# PollIntervalMinSec and PollIntervalMaxSec specify the minimum and maximum
+# intervals for polling the time source. The intervals are specified in
+# seconds. The default values are 64 seconds and 1024 seconds respectively.
+#PollIntervalMinSec=64
+#PollIntervalMaxSec=1024
+EOF
+    
+    # 启用并启动 systemd-timesyncd 服务
+    log "启用并启动 systemd-timesyncd 服务"
+    systemctl enable systemd-timesyncd
+    systemctl restart systemd-timesyncd
+    
+    # 等待服务启动
+    sleep 2
+    
+    # 检查服务状态
+    if systemctl is-active systemd-timesyncd >/dev/null 2>&1; then
+        log "systemd-timesyncd 服务已成功启动"
+        
+        # 显示同步状态
+        log "NTP 同步状态:"
+        timedatectl status | grep -E "(NTP service|NTP synchronized)"
+    else
+        log "警告: systemd-timesyncd 服务启动失败"
+    fi
+    
+    log "systemd-timesyncd 配置完成"
+}
+
+# 配置 chrony 客户端
+configure_chrony() {
+    log "配置 chrony 客户端"
+    
+    # 检查 chrony 是否已安装
+    if ! dpkg -l | grep -q "chrony"; then
+        log "警告: chrony 未安装，跳过配置"
+        log "请手动安装 chrony 后再运行此脚本"
+        return 1
+    fi
+    
+    # 获取 NTP 服务器列表
+    local ntp_servers
+    ntp_servers=$(get_ntp_servers "$NTP_PRIMARY_SERVER")
+    
+    # 分离主服务器和备用服务器
+    local primary_server=""
+    local backup_servers=""
+    
+    # 获取第一个服务器作为主服务器
+    primary_server=$(echo "$ntp_servers" | awk '{print $1}')
+    
+    # 获取剩余服务器作为备用服务器
+    backup_servers=$(echo "$ntp_servers" | cut -d' ' -f2-)
+    
+    log "主 NTP 服务器: $primary_server"
+    log "备用 NTP 服务器: $backup_servers"
+    
+    # 备份原始配置文件
+    local config_file="/etc/chrony/chrony.conf"
+    if [ -f "$config_file" ]; then
+        cp "$config_file" "${config_file}.bak.$(date +%Y%m%d%H%M%S)"
+        log "已备份原始配置文件到 ${config_file}.bak.$(date +%Y%m%d%H%M%S)"
+    fi
+    
+    # 创建配置目录（如果不存在）
+    mkdir -p "$(dirname "$config_file")"
+    
+    # 写入新的配置
+    cat > "$config_file" << EOF
+# Welcome to the chrony configuration file. See chrony.conf(5) for more
+# information about usable directives.
+
+# 使用主服务器
+server $primary_server iburst
+
+# 使用时间源来自 DHCP/SLAAC
+sourcedir /run/chrony-dhcp
+
+# 记录接收到的 NTP 数据包的速率和源地址
+driftfile /var/lib/chrony/chrony.drift
+
+# 允许 chronyd 在需要时调整系统时钟的速度
+# 这对于大多数系统来说是一个很好的设置
+rtcsync
+
+# 启用内核时间同步
+# 这可以提高时钟的准确性
+makestep 1.0 3
+
+# 允许特定网络访问 chronyd
+# 如果您想允许其他网络访问，请取消注释并修改
+#allow 192.168.0.0/16
+
+# 如果您想从特定网络接收 NTP 请求，请取消注释
+#bindaddress 127.0.0.1
+#bindaddress ::1
+
+# 日志文件位置
+logdir /var/log/chrony
+
+# 选择要记录的信息
+log measurements statistics tracking
+EOF
+    
+    # 启用并启动 chrony 服务
+    log "启用并启动 chrony 服务"
+    systemctl enable chrony
+    systemctl restart chrony
+    
+    # 等待服务启动
+    sleep 2
+    
+    # 检查服务状态
+    if systemctl is-active chrony >/dev/null 2>&1; then
+        log "chrony 服务已成功启动"
+        
+        # 显示同步状态
+        log "NTP 同步状态:"
+        chronyc tracking | head -n 5
+    else
+        log "警告: chrony 服务启动失败"
+    fi
+    
+    log "chrony 配置完成"
+}
+
+# 配置 ntpd 客户端
+configure_ntpd() {
+    log "配置 ntpd 客户端"
+    
+    # 检查 ntp 是否已安装
+    if ! dpkg -l | grep -q "ntp"; then
+        log "警告: ntp 未安装，跳过配置"
+        log "请手动安装 ntp 后再运行此脚本"
+        return 1
+    fi
+    
+    # 获取 NTP 服务器列表
+    local ntp_servers
+    ntp_servers=$(get_ntp_servers "$NTP_PRIMARY_SERVER")
+    
+    # 分离主服务器和备用服务器
+    local primary_server=""
+    local backup_servers=""
+    
+    # 获取第一个服务器作为主服务器
+    primary_server=$(echo "$ntp_servers" | awk '{print $1}')
+    
+    # 获取剩余服务器作为备用服务器
+    backup_servers=$(echo "$ntp_servers" | cut -d' ' -f2-)
+    
+    log "主 NTP 服务器: $primary_server"
+    log "备用 NTP 服务器: $backup_servers"
+    
+    # 备份原始配置文件
+    local config_file="/etc/ntp.conf"
+    if [ -f "$config_file" ]; then
+        cp "$config_file" "${config_file}.bak.$(date +%Y%m%d%H%M%S)"
+        log "已备份原始配置文件到 ${config_file}.bak.$(date +%Y%m%d%H%M%S)"
+    fi
+    
+    # 写入新的配置
+    cat > "$config_file" << EOF
+# /etc/ntp.conf, configuration for ntpd; see ntp.conf(5) for help
+
+driftfile /var/lib/ntp/ntp.drift
+
+# 启用日志记录
+logfile /var/log/ntp.log
+
+# 访问控制限制
+# 默认限制，不允许修改
+restrict default nomodify notrap nopeer noquery
+
+# 允许本地主机所有访问
+restrict 127.0.0.1
+restrict ::1
+
+# 如果您想允许特定网络访问，请取消注释
+#restrict 192.168.0.0 mask 255.255.255.0 nomodify notrap
+
+# 使用主服务器
+server $primary_server iburst prefer
+
+# 使用备用服务器
+EOF
+    
+    # 添加备用服务器到配置文件
+    for server in $backup_servers; do
+        echo "server $server iburst" >> "$config_file"
+    done
+    
+    cat >> "$config_file" << EOF
+
+# 使用本地时钟作为备用时间源，以防外部服务器不可用
+server 127.127.1.0
+fudge  127.127.1.0 stratum 10
+
+# 包含来自 /etc/ntpconf.d 的配置文件
+includefile /etc/ntpconf.d
+
+# 启用内核时间同步
+# 这可以提高时钟的准确性
+tos minclock 4 minsane 3
+EOF
+    
+    # 启用并启动 ntp 服务
+    log "启用并启动 ntp 服务"
+    systemctl enable ntp
+    systemctl restart ntp
+    
+    # 等待服务启动
+    sleep 5  # ntpd 需要更多时间来启动
+    
+    # 检查服务状态
+    if systemctl is-active ntp >/dev/null 2>&1; then
+        log "ntp 服务已成功启动"
+        
+        # 显示同步状态
+        log "NTP 同步状态:"
+        ntpq -p | head -n 10
+    else
+        log "警告: ntp 服务启动失败"
+    fi
+    
+    log "ntpd 配置完成"
+}
+
+# 配置 NTP 客户端
+configure_ntp_client() {
+    if [ "$CONFIGURE_NTP" = false ]; then
+        log "用户选择不配置 NTP 服务器，跳过 NTP 配置"
+        return 0
+    fi
+    
+    log "开始配置 NTP 客户端"
+    
+    # 检测所有可用的 NTP 客户端类型
+    local detected_clients
+    detected_clients=$(detect_ntp_client)
+    
+    log "检测到的所有 NTP 客户端类型: $detected_clients"
+    
+    # 检查是否检测到任何 NTP 客户端
+    if [ -z "$detected_clients" ]; then
+        log "未检测到任何已安装的 NTP 客户端，跳过 NTP 配置"
+        log "注意: 本脚本不提供 NTP 客户端安装功能，请手动安装所需的 NTP 客户端"
+        return 0
+    fi
+    
+    # 将检测到的客户端类型转换为数组
+    local client_array=($detected_clients)
+    local total_clients=${#client_array[@]}
+    
+    log "将配置 $total_clients 个 NTP 客户端"
+    
+    # 遍历所有检测到的客户端类型并进行配置
+    for client in "${client_array[@]}"; do
+        log "正在配置 NTP 客户端: $client"
+        
+        # 根据客户端类型调用相应的配置函数
+        case "$client" in
+            "systemd-timesyncd")
+                configure_systemd_timesyncd
+                ;;
+            "chrony")
+                configure_chrony
+                ;;
+            "ntpd"|"ntp")
+                configure_ntpd
+                ;;
+            *)
+                log "未知的 NTP 客户端类型: $client"
+                log "跳过配置未知的 NTP 客户端类型: $client"
+                ;;
+        esac
+        
+        log "NTP 客户端 $client 配置完成"
+    done
+    
+    log "所有 NTP 客户端配置完成"
+}
+
 # 关闭 swap
 disable_swap() {
     log "禁用 swap (虚拟内存)"
@@ -1251,7 +1735,7 @@ disable_swap() {
     # 注释掉 fstab 中的 swap 条目
     sed -i 's/^[^#].*swap.*/#&/' /etc/fstab
     
-    log "swap (虚拟内存)  已禁用"
+    log "swap (虚拟内存) 已禁用，系统重启后生效"
 }
 
 # 处理Debian/Armbian/Raspbian类型的源
