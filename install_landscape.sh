@@ -37,6 +37,13 @@ NTP_CLIENT_TYPE="chrony"    # NTP 客户端类型 (chrony/ntp)
 NTP_PRIMARY_SERVER="aliyun" # 主要 NTP 服务器
 NTP_SERVERS_CONFIGURED=""   # 已配置的 NTP 服务器列表
 
+# 系统信息相关全局变量
+SYSTEM_TYPE=""              # 系统类型 (debian/ubuntu/linuxmint/armbian/raspbian)
+SYSTEM_VERSION=""           # 系统版本号
+SYSTEM_CODENAME=""          # 系统代号 (如 bullseye/focal/jammy)
+SYSTEM_ARCH=""              # 系统架构 (x86_64/aarch64)
+SYSTEM_INFO_INITIALIZED=false  # 系统信息是否已初始化
+
 # 主逻辑
 main() {
         # 显示安装脚本大标题
@@ -54,6 +61,9 @@ main() {
     init_temp_log
     
     log "Landscape Router 交互式安装脚本开始执行"
+
+    # 初始化系统信息（在检查系统环境之前）
+    init_system_info
 
     # 检查系统环境
     check_system
@@ -93,8 +103,32 @@ log() {
     echo "[$timestamp] $message" | tee -a "$INSTALL_LOG"
 }
 
-# 检测系统类型
-detect_system_type() {
+# 初始化系统信息
+init_system_info() {
+    if [ "$SYSTEM_INFO_INITIALIZED" = true ]; then
+        log "系统信息已初始化，跳过重复检测"
+        return 0
+    fi
+    
+    log "初始化系统信息"
+    
+    # 获取系统架构
+    SYSTEM_ARCH=$(uname -m)
+    
+    # 调用核心检测函数
+    detect_system_info
+    
+    # 检查系统兼容性
+    check_system_compatibility
+    
+    # 标记系统信息已初始化
+    SYSTEM_INFO_INITIALIZED=true
+    
+    log "系统信息初始化完成: $SYSTEM_TYPE $SYSTEM_VERSION ($SYSTEM_CODENAME), 架构: $SYSTEM_ARCH"
+}
+
+# 核心系统信息检测函数
+detect_system_info() {
     local system_type=""
     local system_version=""
     local version_codename=""
@@ -125,7 +159,7 @@ detect_system_type() {
                 
                 # 根据Linux Mint代号映射到Ubuntu代号
                 case "$mint_codename" in
-                    "vanessa"|"vera"|"victoria"|"virginia") 
+                    "vanessa"|"vera"|"victoria"|"virginia")
                         version_codename="jammy"  # Ubuntu 22.04
                         ;;
                     "una"|"uma"|"ulyssa"|"ulyana"|"julia")
@@ -165,16 +199,49 @@ detect_system_type() {
         fi
     fi
     
-    echo "$system_type|$system_version|$version_codename"
+    # 保存检测到的系统信息到全局变量
+    SYSTEM_TYPE="$system_type"
+    SYSTEM_VERSION="$system_version"
+    SYSTEM_CODENAME="$version_codename"
 }
 
-# 检查是否为支持的系统类型
-is_supported_system() {
+# 检查系统兼容性
+check_system_compatibility() {
+    # 检查是否为支持的系统类型
     if grep -q "Debian" /etc/os-release || grep -q "Ubuntu" /etc/os-release || grep -q "Linux Mint" /etc/os-release || grep -q "Armbian" /etc/os-release || grep -q "Raspbian" /etc/os-release || grep -q "Raspberry Pi OS" /etc/os-release; then
-        return 0  # true
+        SUPPORTED_SYSTEM=true
     else
-        return 1  # false
+        SUPPORTED_SYSTEM=false
     fi
+}
+
+# 兼容性包装函数：检测系统类型（保持向后兼容）
+detect_system_type() {
+    # 如果系统信息已初始化，直接使用全局变量
+    if [ "$SYSTEM_INFO_INITIALIZED" = true ]; then
+        echo "$SYSTEM_TYPE|$SYSTEM_VERSION|$SYSTEM_CODENAME"
+        return 0
+    fi
+    
+    # 如果系统信息未初始化，调用初始化函数
+    init_system_info
+    
+    # 返回系统信息
+    echo "$SYSTEM_TYPE|$SYSTEM_VERSION|$SYSTEM_CODENAME"
+}
+
+# 兼容性包装函数：检查是否为支持的系统类型（保持向后兼容）
+is_supported_system() {
+    # 如果系统信息已初始化，直接使用全局变量
+    if [ "$SYSTEM_INFO_INITIALIZED" = true ]; then
+        [ "$SUPPORTED_SYSTEM" = true ] && return 0 || return 1
+    fi
+    
+    # 如果系统信息未初始化，调用初始化函数
+    init_system_info
+    
+    # 返回系统支持状态
+    [ "$SUPPORTED_SYSTEM" = true ] && return 0 || return 1
 }
 
 # 确保下载工具已安装 (优先使用 wget)
@@ -217,9 +284,12 @@ ensure_download_tool_installed() {
 
 # 根据架构获取二进制文件名
 get_binary_filename() {
-    local system_arch
-    system_arch=$(uname -m)
-    if [ "$system_arch" = "aarch64" ]; then
+    # 确保系统信息已初始化
+    if [ "$SYSTEM_INFO_INITIALIZED" = false ]; then
+        init_system_info
+    fi
+    
+    if [ "$SYSTEM_ARCH" = "aarch64" ]; then
         echo "landscape-webserver-aarch64"
     else
         echo "landscape-webserver-x86_64"
@@ -351,11 +421,9 @@ check_system() {
         exit 1
     fi
     
-    # 检查架构
-    local arch
-    arch=$(uname -m)
-    if [ "$arch" != "x86_64" ] && [ "$arch" != "aarch64" ]; then
-        log "警告: 此脚本主要适用于 x86_64 或 aarch64 架构, 当前架构为 $arch"
+    # 使用全局变量检查架构
+    if [ "$SYSTEM_ARCH" != "x86_64" ] && [ "$SYSTEM_ARCH" != "aarch64" ]; then
+        log "警告: 此脚本主要适用于 x86_64 或 aarch64 架构, 当前架构为 $SYSTEM_ARCH"
     fi
     
     # 检查是否以 root 权限运行
@@ -376,31 +444,12 @@ check_system() {
 
     log "系统环境检查完成"
 
-    # 检查系统发行版
-    local system_id=""
-    local system_name=""
-    if [ -f "/etc/os-release" ]; then
-        system_id=$(grep "^ID=" /etc/os-release | cut -d'=' -f2 | tr -d '"' | tr '[:upper:]' '[:lower:]')
-        system_name=$(grep "^NAME=" /etc/os-release | cut -d'=' -f2 | tr -d '"' | tr '[:upper:]' '[:lower:]')
-    fi
-    
-    # 检查是否为支持的系统
-    local supported_system=false
-    case "$system_id" in
-        "debian"|"armbian"|"raspbian")
-            supported_system=true
-            ;;
-        *)
-            # 检查名称中是否包含支持的系统名
-            if echo "$system_name" | grep -qE "(debian|armbian|raspbian)"; then
-                supported_system=true
-            fi
-            ;;
-    esac
+    # 使用全局变量显示系统信息
+    log "检测到系统信息: $SYSTEM_TYPE $SYSTEM_VERSION ($SYSTEM_CODENAME), 架构: $SYSTEM_ARCH"
     
     # 对于非支持的系统，询问是否继续
-    if [ "$supported_system" = false ]; then
-        echo "警告: 检测到您的系统为 $system_name ($system_id)。"
+    if [ "$SUPPORTED_SYSTEM" = false ]; then
+        echo "警告: 检测到您的系统为 $SYSTEM_TYPE ($SYSTEM_VERSION)。"
         echo "警告: 此系统未经测试，可能存在兼容性问题。"
         read -rp "是否继续安装? (y/n): " user_response
         if [[ "$user_response" =~ ^[Nn]$ ]]; then
@@ -928,13 +977,15 @@ ask_download_handler() {
     if [[ ! "$handler_response" =~ ^[Nn]$ ]]; then
         DOWNLOAD_HANDLER=true
         
-        # 获取系统架构
-        local system_arch
-        system_arch=$(uname -m)
+        # 确保系统信息已初始化
+        if [ "$SYSTEM_INFO_INITIALIZED" = false ]; then
+            init_system_info
+        fi
+        
         echo "-----------------------------"
         echo "请选择要下载的 redirect_pkg_handler 版本 (可多选，用空格分隔):"
         # 根据系统架构提供相应的选项
-        case "$system_arch" in
+        case "$SYSTEM_ARCH" in
             x86_64)
                 echo "1) musl 版（适用于 Alpine 等构建的镜像）(常见)"
                 echo "2) Glibc 版（适用于 Debian 等构建的镜像）"
@@ -976,7 +1027,7 @@ ask_download_handler() {
                 fi
                 ;;
             *)
-                echo "检测到不常见的系统架构: $system_arch"
+                echo "检测到不常见的系统架构: $SYSTEM_ARCH"
                 echo "1) x86_64 musl 版（适用于 Alpine 等构建的镜像）"
                 echo "2) x86_64 Glibc 版（适用于 Debian 等构建的镜像）"
                 # echo "3) aarch64 musl 版（适用于 Alpine 等构建的镜像）"
@@ -1974,7 +2025,7 @@ install_docker() {
             
             # 添加 Docker 仓库
             log "添加 Docker 仓库"
-            if ! add_docker_repository "$system_type" "$version_codename"; then
+            if ! add_docker_repository_global; then
                 log "错误: 添加 Docker 仓库失败"
                 retry=$((retry+1))
                 continue
@@ -2327,6 +2378,18 @@ add_docker_repository() {
         log "错误: 添加 Docker 仓库失败"
         return 1
     fi
+}
+
+# 添加 Docker 仓库（基于全局变量版本）
+add_docker_repository_global() {
+    # 确保系统信息已初始化
+    if [ "$SYSTEM_INFO_INITIALIZED" = false ]; then
+        log "系统信息未初始化，正在初始化..."
+        init_system_info
+    fi
+    
+    # 使用全局变量调用原始函数
+    add_docker_repository "$SYSTEM_TYPE" "$SYSTEM_CODENAME"
 }
 
 # 配置 Docker
