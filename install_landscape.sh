@@ -172,15 +172,47 @@ is_supported_system() {
     fi
 }
 
-# 确保curl已安装
-ensure_curl_installed() {
-    if ! command -v curl &> /dev/null; then
-        log "未检测到 curl, 正在安装..."
-        apt_update
-        apt_install "curl"
-    else
-        log "curl 已安装"
+# 确保下载工具已安装 (优先使用 wget)
+ensure_download_tool_installed() {
+    local has_wget=false
+    local has_curl=false
+    
+    # 检查 wget 是否可用
+    if command -v wget >/dev/null 2>&1; then
+        has_wget=true
+        log "检测到系统已安装 wget (优先使用)"
     fi
+    
+    # 检查 curl 是否可用
+    if command -v curl >/dev/null 2>&1; then
+        has_curl=true
+        log "检测到系统已安装 curl"
+    fi
+    
+    # 如果两者都不可用，优先安装 wget
+    if [ "$has_wget" = false ] && [ "$has_curl" = false ]; then
+        log "未检测到 wget 或 curl，正在安装 wget (优先)..."
+        apt_update
+        if apt_install "wget"; then
+            log "wget 安装成功"
+        else
+            log "wget 安装失败，尝试安装 curl..."
+            if apt_install "curl"; then
+                log "curl 安装成功"
+            else
+                log "错误: 无法安装 wget 或 curl"
+                exit 1
+            fi
+        fi
+    elif [ "$has_wget" = false ] && [ "$has_curl" = true ]; then
+        log "系统只有 curl，建议安装 wget 以获得更好的下载体验"
+        log "当前将使用 curl 进行下载"
+    fi
+}
+
+# 保持向后兼容性的函数
+ensure_curl_installed() {
+    ensure_download_tool_installed
 }
 
 # 根据架构获取二进制文件名
@@ -207,15 +239,25 @@ download_with_retry() {
         retry=0
         while [ $retry -lt $max_retry ]; do
             log "正在下载 $file_description (尝试 $((retry+1))/$max_retry)"
+            # 优先使用 wget，如果不可用则使用 curl
             if command -v wget >/dev/null 2>&1; then
-                if wget -O "$output_file" "$url"; then
+                log "使用 wget 下载 $file_description"
+                if wget --progress=bar:force -O "$output_file" "$url"; then
                     log "$file_description 下载成功"
                     return 0
+                else
+                    log "wget 下载失败，尝试使用 curl"
                 fi
-            elif command -v curl >/dev/null 2>&1; then
+            fi
+            
+            # 如果 wget 不可用或失败，尝试使用 curl
+            if command -v curl >/dev/null 2>&1; then
+                log "使用 curl 下载 $file_description"
                 if curl -fSL --progress-bar -o "$output_file" "$url"; then
                     log "$file_description 下载成功"
                     return 0
+                else
+                    log "curl 下载失败"
                 fi
             fi
             retry=$((retry+1))
@@ -322,14 +364,14 @@ check_system() {
         exit 1
     fi
     
-    # 检查是否安装了 curl 或 wget
-    if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
-        log "错误: 系统中未找到 curl 或 wget，至少需要安装其中一个工具"
+    # 检查是否安装了 wget 或 curl
+    if ! command -v wget >/dev/null 2>&1 && ! command -v curl >/dev/null 2>&1; then
+        log "错误: 系统中未找到 wget 或 curl，至少需要安装其中一个工具"
         exit 1
+    elif command -v wget >/dev/null 2>&1; then
+        log "检测到系统已安装 wget (将优先使用)"
     elif command -v curl >/dev/null 2>&1; then
         log "检测到系统已安装 curl"
-    elif command -v wget >/dev/null 2>&1; then
-        log "检测到系统已安装 wget"
     fi
 
     log "系统环境检查完成"
@@ -496,7 +538,19 @@ display_configuration() {
     fi
     echo "5. 安装 Docker(含compose): $([ "$DOCKER_INSTALLED" = true ] && echo "是" || echo "否")"
     if [ "$DOCKER_INSTALLED" = true ]; then
-        echo "   Docker 镜像源: $DOCKER_MIRROR"
+        local docker_mirror_name="未知"
+        case "$DOCKER_MIRROR" in
+            "aliyun") docker_mirror_name="阿里云" ;;
+            "azure") docker_mirror_name="Azure 中国云" ;;
+            "official") docker_mirror_name="官方源 (国外)" ;;
+            "tsinghua") docker_mirror_name="清华大学" ;;
+            "sjtu") docker_mirror_name="上海交通大学" ;;
+            "zju") docker_mirror_name="浙江大学" ;;
+            "ustc") docker_mirror_name="中国科学技术大学" ;;
+            "nju") docker_mirror_name="南京大学" ;;
+            "hit") docker_mirror_name="哈尔滨工业大学" ;;
+        esac
+        echo "   Docker 镜像源: $docker_mirror_name"
         echo "   Docker IPv6 支持: $([ "$DOCKER_ENABLE_IPV6" = true ] && echo "是" || echo "否")"
     fi
     echo "6. 安装 ppp (用于 PPPOE 拨号): $([ "$INSTALL_PPP" = true ] && echo "是" || echo "否")"
@@ -733,13 +787,26 @@ ask_webserver() {
 ask_docker_mirror() {
     echo "-----------------------------"
     echo "请选择 Docker 镜像源:"
+
+    echo "0) 官方源 (国外)"
     echo "1) 阿里云 (默认)"
-    echo "2) Azure 中国云"
-    echo "3) 官方源 (国外)"
-    read -rp "请选择 (1-3, 默认为1): " docker_mirror_response
+    echo "2) 清华大学"
+    echo "3) 上海交通大学"
+    echo "4) 浙江大学"
+    echo "5) 中国科学技术大学"
+    echo "6) 南京大学"
+    echo "7) 哈尔滨工业大学"
+    echo "8) Azure 中国云"
+    read -rp "请选择 (0-8, 默认为1): " docker_mirror_response
     case "$docker_mirror_response" in
-        2) DOCKER_MIRROR="azure" ;;
-        3) DOCKER_MIRROR="official" ;;
+        0) DOCKER_MIRROR="official" ;;
+        2) DOCKER_MIRROR="tsinghua" ;;
+        3) DOCKER_MIRROR="sjtu" ;;
+        4) DOCKER_MIRROR="zju" ;;
+        5) DOCKER_MIRROR="ustc" ;;
+        6) DOCKER_MIRROR="nju" ;;
+        7) DOCKER_MIRROR="hit" ;;
+        8) DOCKER_MIRROR="azure" ;;
         *) DOCKER_MIRROR="aliyun" ;;
     esac
 }
@@ -1382,9 +1449,6 @@ install_webserver() {
 install_docker() {
     log "安装 Docker(含compose)"
     
-    # 确保curl已安装
-    ensure_curl_installed
-    
     local retry=0
     local max_retry=3
     local user_choice=""
@@ -1392,32 +1456,95 @@ install_docker() {
     while [ "$user_choice" != "n" ]; do
         retry=0
         while [ $retry -lt $max_retry ]; do
-            log "正在安装 Docker(含compose) 耗时较长 请稍候 (尝试 $((retry+1))/$max_retry)"
+            log "正在安装 Docker(含compose) (尝试 $((retry+1))/$max_retry)"
             
-            # 根据选择的镜像源安装 Docker
-            case "$DOCKER_MIRROR" in
-                "aliyun")
-                    if curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun; then
-                        log "Docker 安装成功"
-                        return 0
-                    fi
-                    ;;
-                "azure")
-                    if curl -fsSL https://get.docker.com | bash -s docker --mirror AzureChinaCloud; then
-                        log "Docker 安装成功"
-                        return 0
-                    fi
-                    ;;
-                *)
-                    if curl -fsSL https://get.docker.com | bash; then
-                        log "Docker 安装成功"
-                        return 0
-                    fi
-                    ;;
-            esac
+            # 检测系统类型
+            local system_info
+            system_info=$(detect_system_type)
+            local system_type=$(echo "$system_info" | cut -d'|' -f1)
+            local version_codename=$(echo "$system_info" | cut -d'|' -f3)
             
-            retry=$((retry+1))
-            log "Docker(含compose) 安装失败"
+            log "系统类型: $system_type"
+            log "版本代号: $version_codename"
+            
+            # 安装必要的依赖包
+            log "安装 Docker 必要的依赖包"
+            if ! apt_update; then
+                log "错误: apt update 失败"
+                retry=$((retry+1))
+                continue
+            fi
+            
+            if ! apt_install "ca-certificates wget curl gnupg lsb-release"; then
+                log "错误: 安装 Docker 依赖包失败"
+                retry=$((retry+1))
+                continue
+            fi
+            
+            # 添加 Docker 官方 GPG 密钥
+            log "添加 Docker 官方 GPG 密钥"
+            if ! install_docker_gpg_key; then
+                log "错误: 添加 Docker GPG 密钥失败"
+                retry=$((retry+1))
+                continue
+            fi
+            
+            # 添加 Docker 仓库
+            log "添加 Docker 仓库"
+            if ! add_docker_repository "$system_type" "$version_codename"; then
+                log "错误: 添加 Docker 仓库失败"
+                retry=$((retry+1))
+                continue
+            fi
+            
+            # 强制更新 apt 包索引
+            log "更新包索引以包含 Docker 仓库"
+            if ! apt_update --force; then
+                log "错误: 更新包索引失败"
+                retry=$((retry+1))
+                continue
+            fi
+            
+            # 安装 Docker 及相关组件
+            log "安装 Docker 及相关组件"
+            if ! apt_install "docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"; then
+                log "错误: 安装 Docker 组件失败"
+                retry=$((retry+1))
+                continue
+            fi
+            
+            # 启动并启用 Docker 服务
+            log "启动并启用 Docker 服务"
+            if ! systemctl enable docker; then
+                log "警告: 启用 Docker 服务失败"
+            fi
+            
+            if ! systemctl start docker; then
+                log "警告: 启动 Docker 服务失败"
+            fi
+            
+            # 验证 Docker 安装
+            if command -v docker >/dev/null 2>&1; then
+                local docker_version
+                docker_version=$(docker --version)
+                log "Docker 安装成功: $docker_version"
+                
+                # 验证 Docker Compose 安装
+                if docker compose version >/dev/null 2>&1; then
+                    local compose_version
+                    compose_version=$(docker compose version)
+                    log "Docker Compose 安装成功: $compose_version"
+                else
+                    log "警告: Docker Compose 安装可能有问题"
+                fi
+                
+                log "Docker(含compose) 安装成功"
+                return 0
+            else
+                log "错误: Docker 安装失败"
+                retry=$((retry+1))
+                continue
+            fi
         done
         
         if [ $retry -eq $max_retry ]; then
@@ -1452,6 +1579,273 @@ install_docker() {
     exit 1
 }
 
+# 安装 Docker GPG 密钥
+install_docker_gpg_key() {
+    local retry=0
+    local max_retry=3
+    local user_choice=""
+    
+    while [ "$user_choice" != "n" ]; do
+        retry=0
+        while [ $retry -lt $max_retry ]; do
+            log "正在添加 Docker GPG 密钥 (尝试 $((retry+1))/$max_retry)"
+            
+            # 创建 keyrings 目录
+            if ! install -m 0755 -d /etc/apt/keyrings; then
+                log "错误: 创建 keyrings 目录失败"
+                retry=$((retry+1))
+                continue
+            fi
+            
+            # 根据镜像源选择 GPG 密钥 URL
+            local gpg_key_url=""
+            case "$DOCKER_MIRROR" in
+                "aliyun")
+                    gpg_key_url="https://mirrors.aliyun.com/docker-ce/linux/debian/gpg"
+                    ;;
+                "azure")
+                    gpg_key_url="https://mirrors.azure.cn/docker-ce/linux/debian/gpg"
+                    ;;
+                "tsinghua")
+                    gpg_key_url="https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/debian/gpg"
+                    ;;
+                "sjtu")
+                    gpg_key_url="https://mirror.sjtu.edu.cn/docker-ce/linux/debian/gpg"
+                    ;;
+                "zju")
+                    gpg_key_url="https://mirrors.zju.edu.cn/docker-ce/linux/debian/gpg"
+                    ;;
+                "ustc")
+                    gpg_key_url="https://mirrors.ustc.edu.cn/docker-ce/linux/debian/gpg"
+                    ;;
+                "nju")
+                    gpg_key_url="https://mirrors.nju.edu.cn/docker-ce/linux/debian/gpg"
+                    ;;
+                "hit")
+                    gpg_key_url="https://mirrors.hit.edu.cn/docker-ce/linux/debian/gpg"
+                    ;;
+                *)
+                    # 默认使用官方 GPG 密钥
+                    gpg_key_url="https://download.docker.com/linux/debian/gpg"
+                    ;;
+            esac
+            
+            log "使用 GPG 密钥 URL: $gpg_key_url"
+            
+            # 下载并添加 GPG 密钥，优先使用 wget
+            local gpg_key_downloaded=false
+            
+            # 尝试使用 wget 下载
+            if command -v wget >/dev/null 2>&1; then
+                log "使用 wget 下载 Docker GPG 密钥"
+                if wget --progress=bar:force -O /tmp/docker.gpg "$gpg_key_url"; then
+                    # 使用 wget 下载成功，处理密钥
+                    if gpg --dearmor < /tmp/docker.gpg > /etc/apt/keyrings/docker.gpg; then
+                        chmod a+r /etc/apt/keyrings/docker.gpg
+                        rm -f /tmp/docker.gpg
+                        gpg_key_downloaded=true
+                        log "Docker GPG 密钥添加成功 (使用 wget)"
+                    else
+                        log "错误: GPG 密钥处理失败"
+                        rm -f /tmp/docker.gpg
+                    fi
+                else
+                    log "wget 下载 GPG 密钥失败，尝试使用 curl"
+                fi
+            fi
+            
+            # 如果 wget 不可用或失败，尝试使用 curl
+            if [ "$gpg_key_downloaded" = false ] && command -v curl >/dev/null 2>&1; then
+                log "使用 curl 下载 Docker GPG 密钥"
+                if curl -fsSL "$gpg_key_url" | gpg --dearmor -o /etc/apt/keyrings/docker.gpg; then
+                    chmod a+r /etc/apt/keyrings/docker.gpg
+                    gpg_key_downloaded=true
+                    log "Docker GPG 密钥添加成功 (使用 curl)"
+                else
+                    log "curl 下载 GPG 密钥失败"
+                fi
+            fi
+            
+            if [ "$gpg_key_downloaded" = true ]; then
+                return 0
+            else
+                log "错误: 下载或添加 GPG 密钥失败"
+                retry=$((retry+1))
+                continue
+            fi
+        done
+        
+        if [ $retry -eq $max_retry ]; then
+            echo "Docker GPG 密钥添加失败, 请选择操作:"
+            echo "  r) 重试一次"
+            echo "  m) 重新选择镜像源再试"
+            echo "  n) 退出安装"
+            read -rp "请输入选项 (r/m/n): " user_choice
+            user_choice=$(echo "$user_choice" | tr '[:upper:]' '[:lower:]')
+            
+            case "$user_choice" in
+                "r")
+                    # 重试，保持当前镜像源
+                    user_choice="y"  # 重置选择以便继续循环
+                    retry=0  # 重置重试计数
+                    ;;
+                "m")
+                    # 重新选择镜像源
+                    ask_docker_mirror
+                    user_choice="y"  # 重置选择以便继续循环
+                    retry=0  # 重置重试计数
+                    ;;
+                *)
+                    # 默认为退出安装
+                    user_choice="n"
+                    ;;
+            esac
+        fi
+    done
+    
+    log "错误: Docker GPG 密钥添加失败"
+    return 1
+}
+
+# 添加 Docker 仓库
+add_docker_repository() {
+    local system_type="$1"
+    local version_codename="$2"
+    
+    # 根据镜像源和系统类型确定仓库 URL
+    local repo_url=""
+    case "$DOCKER_MIRROR" in
+        "aliyun")
+            case "$system_type" in
+                "debian"|"armbian"|"raspbian")
+                    repo_url="https://mirrors.aliyun.com/docker-ce/linux/debian"
+                    ;;
+                "ubuntu"|"linuxmint")
+                    repo_url="https://mirrors.aliyun.com/docker-ce/linux/ubuntu"
+                    ;;
+            esac
+            ;;
+        "azure")
+            case "$system_type" in
+                "debian"|"armbian"|"raspbian")
+                    repo_url="https://mirrors.azure.cn/docker-ce/linux/debian"
+                    ;;
+                "ubuntu"|"linuxmint")
+                    repo_url="https://mirrors.azure.cn/docker-ce/linux/ubuntu"
+                    ;;
+            esac
+            ;;
+        "tsinghua")
+            case "$system_type" in
+                "debian"|"armbian"|"raspbian")
+                    repo_url="https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/debian"
+                    ;;
+                "ubuntu"|"linuxmint")
+                    repo_url="https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/ubuntu"
+                    ;;
+            esac
+            ;;
+        "sjtu")
+            case "$system_type" in
+                "debian"|"armbian"|"raspbian")
+                    repo_url="https://mirror.sjtu.edu.cn/docker-ce/linux/debian"
+                    ;;
+                "ubuntu"|"linuxmint")
+                    repo_url="https://mirror.sjtu.edu.cn/docker-ce/linux/ubuntu"
+                    ;;
+            esac
+            ;;
+        "zju")
+            case "$system_type" in
+                "debian"|"armbian"|"raspbian")
+                    repo_url="https://mirrors.zju.edu.cn/docker-ce/linux/debian"
+                    ;;
+                "ubuntu"|"linuxmint")
+                    repo_url="https://mirrors.zju.edu.cn/docker-ce/linux/ubuntu"
+                    ;;
+            esac
+            ;;
+        "ustc")
+            case "$system_type" in
+                "debian"|"armbian"|"raspbian")
+                    repo_url="https://mirrors.ustc.edu.cn/docker-ce/linux/debian"
+                    ;;
+                "ubuntu"|"linuxmint")
+                    repo_url="https://mirrors.ustc.edu.cn/docker-ce/linux/ubuntu"
+                    ;;
+            esac
+            ;;
+        "nju")
+            case "$system_type" in
+                "debian"|"armbian"|"raspbian")
+                    repo_url="https://mirrors.nju.edu.cn/docker-ce/linux/debian"
+                    ;;
+                "ubuntu"|"linuxmint")
+                    repo_url="https://mirrors.nju.edu.cn/docker-ce/linux/ubuntu"
+                    ;;
+            esac
+            ;;
+        "hit")
+            case "$system_type" in
+                "debian"|"armbian"|"raspbian")
+                    repo_url="https://mirrors.hit.edu.cn/docker-ce/linux/debian"
+                    ;;
+                "ubuntu"|"linuxmint")
+                    repo_url="https://mirrors.hit.edu.cn/docker-ce/linux/ubuntu"
+                    ;;
+            esac
+            ;;
+        *)
+            # 默认使用官方仓库
+            case "$system_type" in
+                "debian"|"armbian"|"raspbian")
+                    repo_url="https://download.docker.com/linux/debian"
+                    ;;
+                "ubuntu"|"linuxmint")
+                    repo_url="https://download.docker.com/linux/ubuntu"
+                    ;;
+            esac
+            ;;
+    esac
+    
+    # 如果无法确定仓库 URL，使用默认的官方仓库
+    if [ -z "$repo_url" ]; then
+        log "警告: 无法确定适合的 Docker 仓库 URL，使用官方仓库"
+        case "$system_type" in
+            "debian"|"armbian"|"raspbian")
+                repo_url="https://download.docker.com/linux/debian"
+                ;;
+            "ubuntu"|"linuxmint")
+                repo_url="https://download.docker.com/linux/ubuntu"
+                ;;
+        esac
+    fi
+    
+    # 添加 Docker 仓库
+    log "添加 Docker 仓库: $repo_url"
+    
+    # 创建仓库配置文件
+    local repo_file="/etc/apt/sources.list.d/docker.list"
+    
+    # 备份现有的仓库文件（如果存在）
+    if [ -f "$repo_file" ]; then
+        cp "$repo_file" "${repo_file}.bak.$(date +%Y%m%d%H%M%S)"
+        log "已备份现有 Docker 仓库文件"
+    fi
+    
+    # 写入新的仓库配置
+    if echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] $repo_url \
+      $version_codename stable" | \
+      tee "$repo_file" > /dev/null; then
+        log "Docker 仓库添加完成"
+        return 0
+    else
+        log "错误: 添加 Docker 仓库失败"
+        return 1
+    fi
+}
+
 # 配置 Docker
 configure_docker() {
     log "配置 Docker"
@@ -1482,8 +1876,29 @@ EOF
 
 # 独立的 apt update 函数
 apt_update() {
-    if [ "$APT_UPDATED" = false ]; then
-        log "执行 apt update"
+    local force_update=false
+    
+    # 解析参数
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --force)
+                force_update=true
+                shift
+                ;;
+            *)
+                log "警告: apt_update 未知参数 $1"
+                shift
+                ;;
+        esac
+    done
+    
+    # 检查是否需要强制更新或从未更新过
+    if [ "$force_update" = true ] || [ "$APT_UPDATED" = false ]; then
+        if [ "$force_update" = true ]; then
+            log "强制执行 apt update"
+        else
+            log "执行 apt update"
+        fi
         
         local retry=0
         local max_retry=3
@@ -1709,8 +2124,8 @@ download_and_extract_static() {
 install_landscape_router() {
     log "下载并安装 Landscape Router"
     
-    # 确保curl已安装
-    ensure_curl_installed
+    # 确保下载工具已安装
+    ensure_download_tool_installed
     
     # 下载二进制文件
     download_landscape_binary
@@ -1727,8 +2142,8 @@ download_handlers() {
     
     # 不再创建单独的 handler 目录，直接使用 LANDSCAPE_DIR
     
-    # 确保curl已安装
-    ensure_curl_installed
+    # 确保下载工具已安装
+    ensure_download_tool_installed
     
     # 确保 unzip 已安装
     log "检查并安装 unzip 工具"
