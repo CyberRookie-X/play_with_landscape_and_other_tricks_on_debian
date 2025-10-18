@@ -37,6 +37,11 @@ NTP_CLIENT_TYPE="chrony"    # NTP 客户端类型 (chrony/ntp)
 NTP_PRIMARY_SERVER="aliyun" # 主要 NTP 服务器
 NTP_SERVERS_CONFIGURED=""   # 已配置的 NTP 服务器列表
 
+# 下载工具相关全局变量
+HAS_WGET=false              # 系统是否有 wget
+HAS_CURL=false              # 系统是否有 curl
+PREFERRED_DOWNLOAD_TOOL=""  # 首选下载工具 ("wget" 或 "curl")
+
 # 系统信息相关全局变量
 SYSTEM_TYPE=""              # 系统类型 (debian/ubuntu/linuxmint/armbian/raspbian)
 SYSTEM_VERSION=""           # 系统版本号
@@ -244,39 +249,88 @@ is_supported_system() {
     [ "$SUPPORTED_SYSTEM" = true ] && return 0 || return 1
 }
 
-# 确保下载工具已安装 (优先使用 wget)
-ensure_download_tool_installed() {
-    local has_wget=false
-    local has_curl=false
+# 检查下载工具可用性并初始化全局变量
+check_download_tools() {
+    log "检查下载工具可用性"
     
     # 检查 wget 是否可用
     if command -v wget >/dev/null 2>&1; then
-        has_wget=true
+        HAS_WGET=true
         log "检测到系统已安装 wget"
+    else
+        HAS_WGET=false
     fi
     
     # 检查 curl 是否可用
     if command -v curl >/dev/null 2>&1; then
-        has_curl=true
+        HAS_CURL=true
         log "检测到系统已安装 curl"
+    else
+        HAS_CURL=false
     fi
     
-    # 如果两者都不可用，优先安装 wget
-    if [ "$has_wget" = false ] && [ "$has_curl" = false ]; then
+    # 确定首选下载工具，优先使用 wget
+    if [ "$HAS_WGET" = true ]; then
+        PREFERRED_DOWNLOAD_TOOL="wget"
+        log "选择 wget 作为首选下载工具"
+    elif [ "$HAS_CURL" = true ]; then
+        PREFERRED_DOWNLOAD_TOOL="curl"
+        log "选择 curl 作为首选下载工具"
+    else
+        log "错误: 系统中未找到 wget 或 curl，至少需要安装其中一个工具"
+        exit 1
+    fi
+    
+    log "下载工具检查完成: wget=$HAS_WGET, curl=$HAS_CURL, 首选工具=$PREFERRED_DOWNLOAD_TOOL"
+}
+
+# 获取下载命令和参数
+get_download_command() {
+    local tool="$1"
+    
+    case "$tool" in
+        "wget")
+            echo "wget --progress=bar:force -O"
+            ;;
+        "curl")
+            echo "curl -fSL --progress-bar -o"
+            ;;
+        *)
+            # 如果没有指定工具，使用全局变量中的首选工具
+            if [ -n "$PREFERRED_DOWNLOAD_TOOL" ]; then
+                get_download_command "$PREFERRED_DOWNLOAD_TOOL"
+            else
+                log "错误: 没有可用的下载工具"
+                exit 1
+            fi
+            ;;
+    esac
+}
+
+# 确保下载工具已安装 (优先使用 wget)
+ensure_download_tool_installed() {
+    # 使用全局变量检查下载工具
+    if [ "$HAS_WGET" = false ] && [ "$HAS_CURL" = false ]; then
         log "未检测到 wget 或 curl，正在安装 wget (优先)..."
         apt_update
         if apt_install "wget"; then
             log "wget 安装成功"
+            # 更新全局变量
+            HAS_WGET=true
+            PREFERRED_DOWNLOAD_TOOL="wget"
         else
             log "wget 安装失败，尝试安装 curl..."
             if apt_install "curl"; then
                 log "curl 安装成功"
+                # 更新全局变量
+                HAS_CURL=true
+                PREFERRED_DOWNLOAD_TOOL="curl"
             else
                 log "错误: 无法安装 wget 或 curl"
                 exit 1
             fi
         fi
-    elif [ "$has_wget" = false ] && [ "$has_curl" = true ]; then
+    elif [ "$HAS_WGET" = false ] && [ "$HAS_CURL" = true ]; then
         log "系统只有 curl，建议安装 wget 以获得更好的下载体验"
         log "当前将使用 curl 进行下载"
     fi
@@ -304,32 +358,53 @@ download_with_retry() {
     local max_retry=3
     local retry=0
     local user_choice=""
+    local download_tool=""
+    local download_cmd=""
     
     while [ "$user_choice" != "n" ]; do
         retry=0
         while [ $retry -lt $max_retry ]; do
             log "正在下载 $file_description (尝试 $((retry+1))/$max_retry)"
-            # 优先使用 wget，如果不可用则使用 curl
-            if command -v wget >/dev/null 2>&1; then
-                log "使用 wget 下载 $file_description"
-                if wget --progress=bar:force -O "$output_file" "$url"; then
+            
+            # 使用全局变量获取首选下载工具和命令
+            if [ -n "$PREFERRED_DOWNLOAD_TOOL" ]; then
+                download_tool="$PREFERRED_DOWNLOAD_TOOL"
+                download_cmd=$(get_download_command "$download_tool")
+                log "使用 $download_tool 下载 $file_description"
+                
+                # 执行下载命令
+                if $download_cmd "$output_file" "$url"; then
                     log "$file_description 下载成功"
                     return 0
                 else
-                    log "wget 下载失败，尝试使用 curl"
+                    log "$download_tool 下载失败"
+                    
+                    # 如果首选工具失败，尝试使用另一个可用工具
+                    if [ "$download_tool" = "wget" ] && [ "$HAS_CURL" = true ]; then
+                        log "wget 失败，尝试使用 curl"
+                        download_cmd=$(get_download_command "curl")
+                        if $download_cmd "$output_file" "$url"; then
+                            log "$file_description 下载成功 (使用 curl)"
+                            return 0
+                        else
+                            log "curl 下载也失败"
+                        fi
+                    elif [ "$download_tool" = "curl" ] && [ "$HAS_WGET" = true ]; then
+                        log "curl 失败，尝试使用 wget"
+                        download_cmd=$(get_download_command "wget")
+                        if $download_cmd "$output_file" "$url"; then
+                            log "$file_description 下载成功 (使用 wget)"
+                            return 0
+                        else
+                            log "wget 下载也失败"
+                        fi
+                    fi
                 fi
+            else
+                log "错误: 没有可用的下载工具"
+                return 1
             fi
             
-            # 如果 wget 不可用或失败，尝试使用 curl
-            if command -v curl >/dev/null 2>&1; then
-                log "使用 curl 下载 $file_description"
-                if curl -fSL --progress-bar -o "$output_file" "$url"; then
-                    log "$file_description 下载成功"
-                    return 0
-                else
-                    log "curl 下载失败"
-                fi
-            fi
             retry=$((retry+1))
             log "下载失败, 等待 5 秒后重试"
             sleep 5
@@ -432,15 +507,8 @@ check_system() {
         exit 1
     fi
     
-    # 检查是否安装了 wget 或 curl
-    if ! command -v wget >/dev/null 2>&1 && ! command -v curl >/dev/null 2>&1; then
-        log "错误: 系统中未找到 wget 或 curl，至少需要安装其中一个工具"
-        exit 1
-    elif command -v wget >/dev/null 2>&1; then
-        log "检测到系统已安装 wget"
-    elif command -v curl >/dev/null 2>&1; then
-        log "检测到系统已安装 curl"
-    fi
+    # 检查下载工具可用性并初始化全局变量
+    check_download_tools
 
     log "系统环境检查完成"
 
@@ -1324,11 +1392,16 @@ perform_installation() {
     
     # 6. 下载并安装 Landscape Router
     install_landscape_router
-    
-    # 7. 创建 systemd 服务
+
+    # 7. 下载 handler
+    if [ "$DOWNLOAD_HANDLER" = true ]; then
+        download_handlers
+    fi
+
+    # 8. 创建 systemd 服务
     create_systemd_service
     
-    # 8. 检查并安装 webserver
+    # 9. 检查并安装 webserver
     # 当系统已安装web server时，不再执行安装
     if [ "$WEB_SERVER_INSTALLED" = true ] && [ -n "$WEB_SERVER_TYPE" ]; then
         if ! dpkg -l | grep -q "$WEB_SERVER_TYPE" && ! command -v "$WEB_SERVER_TYPE" >/dev/null 2>&1; then
@@ -1342,21 +1415,16 @@ perform_installation() {
         log "用户选择不安装 web server, 跳过安装步骤"
     fi
     
-    # 9. 安装 Docker
+    # 10. 安装 Docker
     if [ "$DOCKER_INSTALLED" = true ]; then
         install_docker
         configure_docker
     fi
     
     
-    # 10. 安装 ppp
+    # 11. 安装 ppp
     if [ "$INSTALL_PPP" = true ]; then
         install_ppp
-    fi
-    
-    # 11. 下载 handler
-    if [ "$DOWNLOAD_HANDLER" = true ]; then
-        download_handlers
     fi
     
     # 12. 配置网络接口
@@ -1804,9 +1872,33 @@ handle_debian_sources() {
     # 针对不同镜像源，Debian/Armbian/Raspbian 安全更新使用专门的URL
     local security_mirror_url="$mirror_url"
     case "$mirror_source" in
-        "sjtu"|"zju"|"nju"|"hit")
-            # 高校镜像站等使用独立的安全更新路径
-            security_mirror_url="https://${mirror_source}.debian.org/debian-security/"
+        "ustc")
+            # 中国科学技术大学镜像站
+            security_mirror_url="https://mirrors.ustc.edu.cn/debian-security/"
+            ;;
+        "tsinghua")
+            # 清华大学镜像站
+            security_mirror_url="https://mirrors.tuna.tsinghua.edu.cn/debian-security/"
+            ;;
+        "aliyun")
+            # 阿里云镜像站
+            security_mirror_url="https://mirrors.aliyun.com/debian-security/"
+            ;;
+        "sjtu")
+            # 上海交通大学镜像站
+            security_mirror_url="https://mirror.sjtu.edu.cn/debian-security/"
+            ;;
+        "zju")
+            # 浙江大学镜像站
+            security_mirror_url="https://mirrors.zju.edu.cn/debian-security/"
+            ;;
+        "nju")
+            # 南京大学镜像站
+            security_mirror_url="https://mirrors.nju.edu.cn/debian-security/"
+            ;;
+        "hit")
+            # 哈尔滨工业大学镜像站
+            security_mirror_url="https://mirrors.hit.edu.cn/debian-security/"
             ;;
         *)
             # 默认使用镜像站的debian-security子路径
@@ -1814,12 +1906,8 @@ handle_debian_sources() {
             ;;
     esac
     
-    # 特别处理 Debian 12 (bookworm) 及以上版本的安全更新源
-    if [ "$system_type" = "debian" ] || [ "$system_type" = "armbian" ] || [ "$system_type" = "raspbian" ]; then
-        if [[ "$version_codename" > "bullseye" ]]; then
-            security_mirror_url="https://security.debian.org/debian-security"
-        fi
-    fi
+    # 对于所有版本，使用用户选择的镜像源而不是固定的 security.debian.org
+    # 这样确保所有安全更新都通过用户选择的镜像源获取
     
     # 写入新源
     cat > /etc/apt/sources.list << EOF
@@ -1852,9 +1940,33 @@ handle_ubuntu_sources() {
     # 针对不同镜像源，Ubuntu/Linux Mint 安全更新使用专门的URL
     local ubuntu_security_mirror_url="$mirror_url"
     case "$mirror_source" in
-        "sjtu"|"zju"|"nju"|"hit")
-            # 高校镜像站等使用独立的安全更新路径
-            ubuntu_security_mirror_url="https://${mirror_source}.ubuntu.com/ubuntu-security/"
+        "ustc")
+            # 中国科学技术大学镜像站
+            ubuntu_security_mirror_url="https://mirrors.ustc.edu.cn/ubuntu-security/"
+            ;;
+        "tsinghua")
+            # 清华大学镜像站
+            ubuntu_security_mirror_url="https://mirrors.tuna.tsinghua.edu.cn/ubuntu-security/"
+            ;;
+        "aliyun")
+            # 阿里云镜像站
+            ubuntu_security_mirror_url="https://mirrors.aliyun.com/ubuntu-security/"
+            ;;
+        "sjtu")
+            # 上海交通大学镜像站
+            ubuntu_security_mirror_url="https://mirror.sjtu.edu.cn/ubuntu-security/"
+            ;;
+        "zju")
+            # 浙江大学镜像站
+            ubuntu_security_mirror_url="https://mirrors.zju.edu.cn/ubuntu-security/"
+            ;;
+        "nju")
+            # 南京大学镜像站
+            ubuntu_security_mirror_url="https://mirrors.nju.edu.cn/ubuntu-security/"
+            ;;
+        "hit")
+            # 哈尔滨工业大学镜像站
+            ubuntu_security_mirror_url="https://mirrors.hit.edu.cn/ubuntu-security/"
             ;;
         *)
             # 默认使用镜像站的ubuntu-security子路径
@@ -1862,10 +1974,8 @@ handle_ubuntu_sources() {
             ;;
     esac
     
-    # 特别处理 Ubuntu 22.04 (jammy) 及以上版本的安全更新源
-    if [[ "$version_codename" > "focal" ]]; then
-        ubuntu_security_mirror_url="https://security.ubuntu.com/ubuntu"
-    fi
+    # 对于所有版本，使用用户选择的镜像源而不是固定的 security.ubuntu.com
+    # 这样确保所有安全更新都通过用户选择的镜像源获取
     
     # 写入新源
     cat > /etc/apt/sources.list << EOF
@@ -2118,11 +2228,21 @@ install_docker_gpg_key() {
     local retry=0
     local max_retry=3
     local user_choice=""
+    local download_tool=""  # 选择的下载工具 (wget 或 curl)
+    
+    # 使用全局变量获取下载工具
+    if [ -n "$PREFERRED_DOWNLOAD_TOOL" ]; then
+        download_tool="$PREFERRED_DOWNLOAD_TOOL"
+        log "使用 $download_tool 作为下载工具"
+    else
+        log "错误: 系统中未找到可用的下载工具，无法下载 GPG 密钥"
+        return 1
+    fi
     
     while [ "$user_choice" != "n" ]; do
         retry=0
         while [ $retry -lt $max_retry ]; do
-            log "正在添加 Docker GPG 密钥 (尝试 $((retry+1))/$max_retry)"
+            log "正在添加 Docker GPG 密钥 (尝试 $((retry+1))/$max_retry)，使用工具: $download_tool"
             
             # 创建 keyrings 目录
             if ! install -m 0755 -d /etc/apt/keyrings; then
@@ -2166,52 +2286,62 @@ install_docker_gpg_key() {
             
             log "使用 GPG 密钥 URL: $gpg_key_url"
             
-            # 下载并添加 GPG 密钥，优先使用 wget
+            # 使用选定的下载工具下载并添加 GPG 密钥
             local gpg_key_downloaded=false
             
-            # 尝试使用 wget 下载
-            if command -v wget >/dev/null 2>&1; then
-                log "使用 wget 下载 Docker GPG 密钥"
-                if wget --progress=bar:force -O /tmp/docker.gpg "$gpg_key_url"; then
-                    # 使用 wget 下载成功，处理密钥
-                    if gpg --dearmor < /tmp/docker.gpg > /etc/apt/keyrings/docker.gpg; then
-                        chmod a+r /etc/apt/keyrings/docker.gpg
-                        rm -f /tmp/docker.gpg
-                        gpg_key_downloaded=true
-                        log "Docker GPG 密钥添加成功 (使用 wget)"
+            case "$download_tool" in
+                "wget")
+                    log "使用 wget 下载 Docker GPG 密钥"
+                    if $(get_download_command "wget") /tmp/docker.gpg "$gpg_key_url"; then
+                        # 使用 wget 下载成功，处理密钥
+                        if gpg --dearmor < /tmp/docker.gpg > /etc/apt/keyrings/docker.gpg; then
+                            chmod a+r /etc/apt/keyrings/docker.gpg
+                            rm -f /tmp/docker.gpg
+                            gpg_key_downloaded=true
+                            log "Docker GPG 密钥添加成功 (使用 wget)"
+                        else
+                            log "错误: GPG 密钥处理失败"
+                            rm -f /tmp/docker.gpg
+                        fi
                     else
-                        log "错误: GPG 密钥处理失败"
-                        rm -f /tmp/docker.gpg
+                        log "wget 下载 GPG 密钥失败"
                     fi
-                else
-                    log "wget 下载 GPG 密钥失败，尝试使用 curl"
-                fi
-            fi
-            
-            # 如果 wget 不可用或失败，尝试使用 curl
-            if [ "$gpg_key_downloaded" = false ] && command -v curl >/dev/null 2>&1; then
-                log "使用 curl 下载 Docker GPG 密钥"
-                if curl -fsSL "$gpg_key_url" | gpg --dearmor -o /etc/apt/keyrings/docker.gpg; then
-                    chmod a+r /etc/apt/keyrings/docker.gpg
-                    gpg_key_downloaded=true
-                    log "Docker GPG 密钥添加成功 (使用 curl)"
-                else
-                    log "curl 下载 GPG 密钥失败"
-                fi
-            fi
+                    ;;
+                "curl")
+                    log "使用 curl 下载 Docker GPG 密钥"
+                    if $(get_download_command "curl") /tmp/docker.gpg "$gpg_key_url"; then
+                        # 使用 curl 下载成功，处理密钥
+                        if gpg --dearmor < /tmp/docker.gpg > /etc/apt/keyrings/docker.gpg; then
+                            chmod a+r /etc/apt/keyrings/docker.gpg
+                            rm -f /tmp/docker.gpg
+                            gpg_key_downloaded=true
+                            log "Docker GPG 密钥添加成功 (使用 curl)"
+                        else
+                            log "错误: GPG 密钥处理失败"
+                            rm -f /tmp/docker.gpg
+                        fi
+                    else
+                        log "curl 下载 GPG 密钥失败"
+                    fi
+                    ;;
+            esac
             
             if [ "$gpg_key_downloaded" = true ]; then
                 return 0
             else
                 log "错误: 下载或添加 GPG 密钥失败"
                 retry=$((retry+1))
+                if [ $retry -lt $max_retry ]; then
+                    log "等待 5 秒后重试..."
+                    sleep 5
+                fi
                 continue
             fi
         done
         
         if [ $retry -eq $max_retry ]; then
-            echo "Docker GPG 密钥添加失败, 请选择操作:"
-            echo "  r) 重试一次"
+            echo "Docker GPG 密钥添加失败, 已尝试 $max_retry 次，请选择操作:"
+            echo "  r) 重试一次 (使用 $download_tool)"
             echo "  m) 重新选择镜像源再试"
             echo "  n) 退出安装"
             read -rp "请输入选项 (r/m/n): " user_choice
@@ -2219,7 +2349,7 @@ install_docker_gpg_key() {
             
             case "$user_choice" in
                 "r")
-                    # 重试，保持当前镜像源
+                    # 重试，保持当前镜像源和下载工具
                     user_choice="y"  # 重置选择以便继续循环
                     retry=0  # 重置重试计数
                     ;;
