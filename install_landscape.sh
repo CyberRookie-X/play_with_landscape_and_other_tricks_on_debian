@@ -872,7 +872,9 @@ ask_user_config() {
     echo "=============================="
     # 提示用户所有问题回答完成后可以再次修改
     echo ""
-    echo "注意: 您需要回答以下所有问题, 回答结束后可以检查和修改任何配置项。"
+    echo "注意: 您需要回答以下十余个问题, 回答结束后可以检查和修改任何配置项。"
+    echo ""
+    echo "大部分问题可以回车默认，所有安装操作将在询问结束后一并执行"
     echo ""
     # 检查并询问内核版本升级
     if [ "$KERNEL_HAS_BUG" = true ]; then
@@ -941,17 +943,17 @@ ask_user_config() {
 ask_kernel_upgrade() {
     echo "-----------------------------"
     echo "当前内核版本: $KERNEL_VERSION"
-    echo "当前内核存在已知 BUG ，必须升级"
     echo "Landscape 在当前内核无法正常使用"
+    echo "当前内核存在已知 BUG ，必须升级"
     echo ""
-    read -rp "是否升级内核版本? (y/n): " upgrade_response
+    read -rp "是否为您升级内核版本? (y/n): " upgrade_response
     
     if [[ ! "$upgrade_response" =~ ^[Nn]$ ]]; then
         UPGRADE_KERNEL=true
-        log "用户选择升级内核版本"
+        # log "用户选择升级内核版本"
     else
         UPGRADE_KERNEL=false
-        log "用户选择跳过内核升级"
+        # log "用户选择跳过内核升级"
     fi
 }
 
