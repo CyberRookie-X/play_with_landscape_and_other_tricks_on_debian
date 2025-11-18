@@ -49,6 +49,13 @@ SYSTEM_CODENAME=""          # 系统代号 (如 bullseye/focal/jammy)
 SYSTEM_ARCH=""              # 系统架构 (x86_64/aarch64)
 SYSTEM_INFO_INITIALIZED=false  # 系统信息是否已初始化
 
+# 内核版本相关全局变量
+KERNEL_VERSION=""               # 当前内核版本（纯数字）
+KERNEL_BUG_REGEX="^6\.12\.(49|[5-9][0-9]|[1-9][0-9]{2,})$"            # 存在bug的内核版本正则表达式，6.12.49 到 6.12.999
+# KERNEL_BUG_REGEX="^6\.(1[0-9]|2[0-9])\."  # 示例：6.10-6.29 版本可能有问题
+KERNEL_HAS_BUG=false           # 当前内核版本是否存在bug（bool值）
+UPGRADE_KERNEL=false           # 是否需要升级内核
+
 # 主逻辑
 main() {
         # 显示安装脚本大标题
@@ -208,6 +215,10 @@ detect_system_info() {
     SYSTEM_TYPE="$system_type"
     SYSTEM_VERSION="$system_version"
     SYSTEM_CODENAME="$version_codename"
+
+    # 获取并检测内核版本
+    get_kernel_version
+    check_kernel_bug
 }
 
 # 检查系统兼容性
@@ -247,6 +258,37 @@ is_supported_system() {
     
     # 返回系统支持状态
     [ "$SUPPORTED_SYSTEM" = true ] && return 0 || return 1
+}
+
+# 获取当前 Linux 内核版本（纯数字）
+get_kernel_version() {
+    log "检测当前内核版本"
+    # 获取内核版本，移除后缀信息，只保留主版本号.次版本号.修订号
+    local full_kernel_version
+    full_kernel_version=$(uname -r)
+    
+    # 提取纯数字版本号 (例如: 6.1.0 或 6.16.15)
+    KERNEL_VERSION=$(echo "$full_kernel_version" | sed 's/[^0-9.]//g' | cut -d'.' -f1-3)
+    
+    log "当前内核版本: $KERNEL_VERSION (原始: $full_kernel_version)"
+}
+
+# 检查当前内核版本是否存在 bug
+check_kernel_bug() {
+    log "检查内核版本是否为存在 bug 的版本"
+    
+    # 设置存在 bug 的内核版本正则表达式
+    # 这里可以自定义要检查的版本模式
+    # 在全局变量中填入这个表达式
+    # KERNEL_BUG_REGEX="^6\.(1[0-9]|2[0-9])\."  # 示例：6.10-6.29 版本可能有问题
+    
+    if [[ "$KERNEL_VERSION" =~ $KERNEL_BUG_REGEX ]]; then
+        KERNEL_HAS_BUG=true
+        log "检测到内核版本 $KERNEL_VERSION 可能存在已知问题"
+    else
+        KERNEL_HAS_BUG=false
+        log "内核版本 $KERNEL_VERSION 未发现已知问题"
+    fi
 }
 
 # 检查下载工具可用性并初始化全局变量
@@ -688,8 +730,9 @@ display_configuration() {
     echo "=============================="
     echo "请检查您的配置:"
     echo "=============================="
-    echo "1. 系统时区设置为亚洲/上海: $([ "$TIMEZONE_SHANGHAI" = true ] && echo "是" || echo "否")"
-    echo "2. 配置 NTP 服务器: $([ "$CONFIGURE_NTP" = true ] && echo "是" || echo "否")"
+    echo "1. 升级 kernel 版本: $([ "$UPGRADE_KERNEL" = true ] && echo "是" || echo "否")"
+    echo "2. 系统时区设置为亚洲/上海: $([ "$TIMEZONE_SHANGHAI" = true ] && echo "是" || echo "否")"
+    echo "3. 配置 NTP 服务器: $([ "$CONFIGURE_NTP" = true ] && echo "是" || echo "否")"
     if [ "$CONFIGURE_NTP" = true ]; then
         local ntp_server_name="未知"
         case "$NTP_PRIMARY_SERVER" in
@@ -702,8 +745,8 @@ display_configuration() {
         echo "   NTP 服务器: $ntp_server_name"
         echo "   注意: 仅配置已安装的 NTP 客户端，不提供 NTP 客户端安装功能"
     fi
-    echo "3. 禁用 swap (虚拟内存): $([ "$SWAP_DISABLED" = true ] && echo "是" || echo "否")"
-    echo "4. 更换 apt 软件源: $([ "$USE_CUSTOM_MIRROR" = true ] && echo "是" || echo "否")"
+    echo "4. 禁用 swap (虚拟内存): $([ "$SWAP_DISABLED" = true ] && echo "是" || echo "否")"
+    echo "5. 更换 apt 软件源: $([ "$USE_CUSTOM_MIRROR" = true ] && echo "是" || echo "否")"
     if [ "$USE_CUSTOM_MIRROR" = true ]; then
         local mirror_name="未知"
         case "$MIRROR_SOURCE" in
@@ -719,14 +762,14 @@ display_configuration() {
     fi
     # 只有当web server不是预装时才显示web server安装选项
     if [ "$WEB_SERVER_PREINSTALLED" != true ]; then
-        echo "5. 安装 Web Server: $([ "$WEB_SERVER_INSTALLED" = true ] && echo "是" || echo "否")"
+        echo "6. 安装 Web Server: $([ "$WEB_SERVER_INSTALLED" = true ] && echo "是" || echo "否")"
         if [ "$WEB_SERVER_INSTALLED" = true ]; then
             echo "   Web Server 类型: $WEB_SERVER_TYPE"
         fi
     else
-        echo "5. 检测到系统已预装 Web Server: $WEB_SERVER_TYPE"
+        echo "6. 检测到系统已预装 Web Server: $WEB_SERVER_TYPE"
     fi
-    echo "6. 安装 Docker(含compose): $([ "$DOCKER_INSTALLED" = true ] && echo "是" || echo "否")"
+    echo "7. 安装 Docker(含compose): $([ "$DOCKER_INSTALLED" = true ] && echo "是" || echo "否")"
     if [ "$DOCKER_INSTALLED" = true ]; then
         local docker_mirror_name="未知"
         case "$DOCKER_MIRROR" in
@@ -743,19 +786,19 @@ display_configuration() {
         echo "   Docker 镜像源: $docker_mirror_name"
         echo "   Docker IPv6 支持: $([ "$DOCKER_ENABLE_IPV6" = true ] && echo "是" || echo "否")"
     fi
-    echo "7. 安装 ppp (用于 PPPOE 拨号): $([ "$INSTALL_PPP" = true ] && echo "是" || echo "否")"
-    echo "8. 使用 GitHub 镜像加速: $([ "$USE_GITHUB_MIRROR" = true ] && echo "是" || echo "否")"
+    echo "8. 安装 ppp (用于 PPPOE 拨号): $([ "$INSTALL_PPP" = true ] && echo "是" || echo "否")"
+    echo "9. 使用 GitHub 镜像加速: $([ "$USE_GITHUB_MIRROR" = true ] && echo "是" || echo "否")"
     if [ "$USE_GITHUB_MIRROR" = true ]; then
         echo "   GitHub 镜像地址: $GITHUB_MIRROR"
     fi
-    echo "9. 下载 redirect_pkg_handler: $([ "$DOWNLOAD_HANDLER" = true ] && echo "是" || echo "否")"
+    echo "10. 下载 redirect_pkg_handler: $([ "$DOWNLOAD_HANDLER" = true ] && echo "是" || echo "否")"
     if [ "$DOWNLOAD_HANDLER" = true ]; then
         echo "   要下载的 handler 版本: ${HANDLER_ARCHITECTURES[*]}"
     fi
-    echo "10. Landscape Router 安装路径: $LANDSCAPE_DIR"
-    echo "11. 管理员账号: $ADMIN_USER"
+    echo "11. Landscape Router 安装路径: $LANDSCAPE_DIR"
+    echo "12. 管理员账号: $ADMIN_USER"
     echo "    管理员密码: $ADMIN_PASS"
-    echo "12. LAN 网桥配置:"
+    echo "13. LAN 网桥配置:"
     echo "    名称 = $(echo "$LAN_CONFIG" | grep "bridge_name" | cut -d '"' -f 2)"
     echo "    IP地址 = $(echo "$LAN_CONFIG" | grep "lan_ip" | cut -d '"' -f 2)"
     echo "    DHCP起始地址 = $(echo "$LAN_CONFIG" | grep "dhcp_start" | cut -d '"' -f 2)"
@@ -773,40 +816,43 @@ modify_configuration() {
     
     case "$config_choice" in
         1)
+            ask_kernel_upgrade
+            ;;        
+        2)
             ask_timezone_config
             ;;
-        2)
+        3)
             ask_ntp_config
             ;;
-        3)
+        4)
             ask_swap_config
             ;;
-        4)
+        5)
             ask_apt_mirror
             ;;
-        5)
+        6)
             # 只有当web server不是预装时才允许修改web server配置
             ask_webserver
             ;;
-        6)
+        7)
             ask_docker_config
             ;;
-        7)
+        8)
             ask_ppp_config
             ;;
-        8)
+        9)
             ask_github_mirror
             ;;
-        9)
+        10)
             ask_download_handler
             ;;
-        10)
+        11)
             ask_install_path_config
             ;;
-        11)
+        12)
             ask_admin_config
             ;;
-        12)
+        13)
             config_lan_interface
             ;;
         *)
@@ -828,9 +874,13 @@ ask_user_config() {
     echo ""
     echo "注意: 您需要回答以下所有问题, 回答结束后可以检查和修改任何配置项。"
     echo ""
-    echo "-----------------------------"
+    # 检查并询问内核版本升级
+    if [ "$KERNEL_HAS_BUG" = true ]; then
+        ask_kernel_upgrade
+    fi
+
     # 检查web server环境
-    ask_webserver
+    ask_webserver   
     
     # 询问时区配置
     ask_timezone_config
@@ -887,6 +937,24 @@ ask_user_config() {
     log "用户配置询问完成"
 }
 
+# 询问用户是否升级内核
+ask_kernel_upgrade() {
+    echo "-----------------------------"
+    echo "当前内核版本: $KERNEL_VERSION"
+    echo "当前内核存在已知 BUG ，必须升级"
+    echo "Landscape 在当前内核无法正常使用"
+    echo ""
+    read -rp "是否升级内核版本? (y/n): " upgrade_response
+    
+    if [[ ! "$upgrade_response" =~ ^[Nn]$ ]]; then
+        UPGRADE_KERNEL=true
+        log "用户选择升级内核版本"
+    else
+        UPGRADE_KERNEL=false
+        log "用户选择跳过内核升级"
+    fi
+}
+
 ask_apt_mirror() { 
     # 询问是否换源 (仅对支持的系统进行询问)
     if is_supported_system; then
@@ -937,9 +1005,9 @@ ask_apt_mirror() {
 }
 
 ask_webserver() { 
+    echo "-----------------------------"
     # 只有当web server不是预装时才允许修改web server配置
     if [ "$WEB_SERVER_PREINSTALLED" != true ]; then
-        echo "-----------------------------"
         echo "Landscape Router 需要 web server 环境才能正常运行"
         echo "缺少 web server 可能会导致主机失联问题"
         echo ""
@@ -1390,6 +1458,11 @@ perform_installation() {
         change_apt_mirror
     fi
     
+    # 5.1. 升级内核（如果需要）
+    if [ "$UPGRADE_KERNEL" = true ]; then
+        upgrade_kernel
+    fi
+    
     # 6. 下载并安装 Landscape Router
     install_landscape_router
 
@@ -1437,6 +1510,49 @@ perform_installation() {
     disable_local_dns
     
     log "安装执行完成"
+}
+
+# 升级内核函数
+upgrade_kernel() {
+    if [ "$UPGRADE_KERNEL" = false ]; then
+        log "用户选择不升级内核，跳过升级操作"
+        return 0
+    fi
+    
+    log "开始升级内核版本"
+    
+    # 确保系统信息已初始化
+    if [ "$SYSTEM_INFO_INITIALIZED" = false ]; then
+        init_system_info
+    fi
+    
+    case "$SYSTEM_TYPE" in
+        "debian")
+            case "$SYSTEM_VERSION" in
+                "13")
+                    log "检测到 Debian 13，准备升级到指定内核版本"
+                    apt_update
+                    if apt_install "linux-image-6.16*+deb13-amd64"; then
+                        log "Debian 13 内核升级成功"
+                        update-grub
+                        return 0
+                    else
+                        log "错误: Debian 13 内核升级失败"
+                        return 1
+                    fi
+                    ;;
+                *)
+                    log "当前 Debian 版本 $SYSTEM_VERSION 不支持自动内核升级"
+                    log "请手动升级内核到稳定版本"
+                    return 1
+                    ;;
+            esac
+            ;;
+        *)
+            log "不支持的系统类型: $SYSTEM_TYPE"
+            return 1
+            ;;
+    esac
 }
 
 # 设置时区
@@ -3120,7 +3236,25 @@ finish_installation() {
     echo ""
     echo "=============================="
 
-    systemctl restart networking && systemctl start landscape-router.service
+    # 根据是否升级了内核选择重启方式
+    if [ "$UPGRADE_KERNEL" = true ]; then
+        echo ""
+        echo "检测到内核已升级，即将重启系统以应用新的内核版本"
+        echo "系统重启后，Landscape Router 服务将自动启动"
+        echo ""
+        
+        log "用户选择升级内核，正在重启系统以应用新内核"
+        
+        # 延迟5秒后重启，给用户时间看到消息
+        echo "5 秒后系统将重启...  ctrl + C 取消可重启"
+        sleep 5
+        
+        # 重启系统
+        reboot
+    else
+        # 正常的网络服务重启和启动 landscape 服务
+        systemctl restart networking && systemctl start landscape-router.service
+    fi
 
     log "安装完成"
 }
