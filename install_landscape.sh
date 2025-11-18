@@ -946,6 +946,7 @@ ask_kernel_upgrade() {
     echo "Landscape 在当前内核无法正常使用"
     echo "当前内核存在已知 BUG ，必须升级"
     echo ""
+    echo "升级操作由脚本全自动进行"
     read -rp "是否为您升级内核版本? (y/n): " upgrade_response
     
     if [[ ! "$upgrade_response" =~ ^[Nn]$ ]]; then
