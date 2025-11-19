@@ -27,6 +27,7 @@ ADMIN_PASS="root"
 TEMP_PASS=""
 INSTALL_PPP=false
 APT_UPDATED=false
+APT_CHANGED=false # 受否换过源，用于更换docker仓库（需要在下载 gpg 之后才能进行）
 TEMP_LOG_DIR=""
 APT_SOURCE_BACKED_UP=false  # 是否已经备份过源文件
 DOWNLOAD_HANDLER=false      # 是否下载 handler
@@ -967,40 +968,51 @@ ask_apt_mirror() {
         echo "-----------------------------"
         
         # 询问使用哪个镜像源
-        echo "请选择要使用的镜像源:"
+        echo "请选择要使用的 apt 源:"
         echo "0) 不换源"
-        echo "1) 阿里云（默认）"
+        echo "1) 阿里云"
         echo "2) 清华大学"
         echo "3) 上海交通大学"
         echo "4) 浙江大学"
-        echo "5) 中国科学技术大学"
+        echo "5) 中国科学技术大学(默认)"
         echo "6) 南京大学"
         echo "7) 哈尔滨工业大学"
-        read -rp "请选择 (0-7, 默认为 1 阿里云 ): " mirror_response
+        echo "部分源无法安装 Docker，原因尚未明确"
+        echo "如遇此问题，重新运行脚本选择 中国科学技术大学源"
+        read -rp "请选择 (0-7, 默认为 5 中国科学技术大学 ): " mirror_response
         case "$mirror_response" in
-            1|"") 
+            1) 
                 MIRROR_SOURCE="aliyun"
+                DOCKER_MIRROR="aliyun"
                 ;;
             2) 
                 MIRROR_SOURCE="tsinghua"
+                DOCKER_MIRROR="tsinghua"
                 ;;
             3) 
                 MIRROR_SOURCE="sjtu"
+                DOCKER_MIRROR="sjtu"
                 ;;
             4)
                 MIRROR_SOURCE="zju"
+                DOCKER_MIRROR="zju"
                 ;;
             5)
                 MIRROR_SOURCE="ustc"
+                DOCKER_MIRROR="ustc"
                 ;;
             6)
                 MIRROR_SOURCE="nju"
+                DOCKER_MIRROR="nju"
                 ;;
             7)
                 MIRROR_SOURCE="hit"
+                DOCKER_MIRROR="hit"
                 ;;
             *)
-                USE_CUSTOM_MIRROR=false
+                # USE_CUSTOM_MIRROR=false
+                MIRROR_SOURCE="ustc"
+                DOCKER_MIRROR="ustc"
                 ;;
         esac
     else
@@ -1054,19 +1066,31 @@ ask_webserver() {
 }
 
 ask_docker_mirror() {
+    local mirror_name="未知"
+    case "$MIRROR_SOURCE" in
+        "ustc") mirror_name="中国科学技术大学" ;;
+        "tsinghua") mirror_name="清华大学" ;;
+        "aliyun") mirror_name="阿里云" ;;
+        "sjtu") mirror_name="上海交通大学" ;;
+        "zju") mirror_name="浙江大学" ;;
+        "nju") mirror_name="南京大学" ;;
+        "hit") mirror_name="哈尔滨工业大学" ;;
+    esac
     echo "-----------------------------"
     echo "请选择 Docker 镜像源:"
-
+    
     echo "0) 官方源 (国外)"
     echo "1) 阿里云 (默认)"
     echo "2) 清华大学"
     echo "3) 上海交通大学"
     echo "4) 浙江大学"
-    echo "5) 中国科学技术大学"
+    echo "5) 中国科学技术大学(默认)"
     echo "6) 南京大学"
     echo "7) 哈尔滨工业大学"
     echo "8) Azure 中国云"
-    read -rp "请选择 (0-8, 默认为 1 阿里云): " docker_mirror_response
+    echo "部分源无法安装 Docker，原因尚未明确"
+    echo "如遇此问题，重新运行脚本选择 中国科学技术大学源"
+    read -rp "请选择 (0-8, 默认为 $mirror_name): " docker_mirror_response
     case "$docker_mirror_response" in
         0) DOCKER_MIRROR="official" ;;
         2) DOCKER_MIRROR="tsinghua" ;;
@@ -1076,7 +1100,7 @@ ask_docker_mirror() {
         6) DOCKER_MIRROR="nju" ;;
         7) DOCKER_MIRROR="hit" ;;
         8) DOCKER_MIRROR="azure" ;;
-        *) DOCKER_MIRROR="aliyun" ;;
+        *) DOCKER_MIRROR="$MIRROR_SOURCE" ;;
     esac
 }
 
@@ -1463,10 +1487,6 @@ perform_installation() {
         change_apt_mirror
     fi
     
-    # 5.1. 升级内核（如果需要）
-    if [ "$UPGRADE_KERNEL" = true ]; then
-        upgrade_kernel
-    fi
     
     # 6. 下载并安装 Landscape Router
     install_landscape_router
@@ -1479,6 +1499,11 @@ perform_installation() {
     # 8. 创建 systemd 服务
     create_systemd_service
     
+    # 10. 安装 Docker
+    if [ "$DOCKER_INSTALLED" = true ]; then
+        install_docker
+        configure_docker
+    fi
     # 9. 检查并安装 webserver
     # 当系统已安装web server时，不再执行安装
     if [ "$WEB_SERVER_INSTALLED" = true ] && [ -n "$WEB_SERVER_TYPE" ]; then
@@ -1493,11 +1518,7 @@ perform_installation() {
         log "用户选择不安装 web server, 跳过安装步骤"
     fi
     
-    # 10. 安装 Docker
-    if [ "$DOCKER_INSTALLED" = true ]; then
-        install_docker
-        configure_docker
-    fi
+
     
     
     # 11. 安装 ppp
@@ -1513,6 +1534,11 @@ perform_installation() {
     
     # 14. 关闭本机 DNS 服务
     disable_local_dns
+
+    # 15. 升级内核（如果需要）（放最后，以免其他东西安装失败）（似乎不是这个问题导致的）
+    if [ "$UPGRADE_KERNEL" = true ]; then
+        upgrade_kernel
+    fi
     
     log "安装执行完成"
 }
@@ -2183,8 +2209,14 @@ change_apt_mirror() {
             ;;
     esac
     
+    APT_CHANGED=ture
+    # 第一次换源时不触发换docker
+    if [ "$DOCKER_INSTALLED" = true ] && [ "$APT_CHANGED" = true ] ; then
+        add_docker_repository_global
+        log "Docker 仓库同步更换"
+    fi
     # 更新包索引
-    apt_update
+    apt_update --force
     
     log "apt 软件源更换完成"
 }
@@ -3254,7 +3286,8 @@ finish_installation() {
         log "用户选择升级内核，正在重启系统以应用新内核"
         
         # 延迟5秒后重启，给用户时间看到消息
-        echo "5 秒后系统将重启...  ctrl + C 取消可重启"
+        echo "如需稍后重启，退出脚本即可"
+        echo "5 秒后系统将重启... "
         sleep 5
         
         # 重启系统
