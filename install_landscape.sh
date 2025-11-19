@@ -263,12 +263,14 @@ is_supported_system() {
 # 获取当前 Linux 内核版本（纯数字）
 get_kernel_version() {
     log "检测当前内核版本"
-    # 获取内核版本，移除后缀信息，只保留主版本号.次版本号.修订号
     local full_kernel_version
     full_kernel_version=$(uname -r)
     
-    # 提取纯数字版本号 (例如: 6.1.0 或 6.16.15)
-    KERNEL_VERSION=$(echo "$full_kernel_version" | sed 's/[^0-9.]//g' | cut -d'.' -f1-3)
+    # 使用grep提取连续的数字和点组成的版本号(只要前一段)
+    KERNEL_VERSION=$(echo "$full_kernel_version" | grep -o '^[0-9.]\+' | head -1)
+    
+    # 确保版本号格式为X.Y.Z
+    KERNEL_VERSION=$(echo "$KERNEL_VERSION" | awk -F. '{printf "%d.%d.%d", $1, $2, $3}')
     
     log "当前内核版本: $KERNEL_VERSION (原始: $full_kernel_version)"
 }
@@ -284,7 +286,7 @@ check_kernel_bug() {
     
     if [[ "$KERNEL_VERSION" =~ $KERNEL_BUG_REGEX ]]; then
         KERNEL_HAS_BUG=true
-        log "检测到内核版本 $KERNEL_VERSION 可能存在已知问题"
+        log "检测到内核版本 $KERNEL_VERSION 可能存在 bug"
     else
         KERNEL_HAS_BUG=false
         log "内核版本 $KERNEL_VERSION 未发现已知问题"
@@ -944,7 +946,7 @@ ask_kernel_upgrade() {
     echo "-----------------------------"
     echo "当前内核版本: $KERNEL_VERSION"
     echo "Landscape 在当前内核无法正常使用"
-    echo "当前内核存在已知 BUG ，必须升级"
+    echo "当前内核存在 bug ，必须升级"
     echo ""
     echo "升级操作由脚本全自动进行"
     read -rp "是否为您升级内核版本? (y/n): " upgrade_response
@@ -1129,11 +1131,11 @@ ask_download_handler() {
                 echo "1) musl 版（适用于 Alpine 等构建的镜像）(常见)"
                 echo "2) Glibc 版（适用于 Debian 等构建的镜像）"
                 echo "3) 全选"
-                read -rp "请输入选项 (默认为 1): " handler_choice
+                read -rp "请输入选项 (默认为 3): " handler_choice
                 
                 # 默认选择 x86_64
                 if [ -z "$handler_choice" ]; then
-                    handler_choice="1"
+                    handler_choice="3"
                 fi
                 
                 # 根据选择设置要下载的架构
@@ -1535,7 +1537,9 @@ upgrade_kernel() {
                 "13")
                     log "检测到 Debian 13，准备升级到指定内核版本"
                     apt_update
-                    if apt_install "linux-image-6.16*+deb13-amd64"; then
+                    # 这个会安装最新的版本，也许不是好办法，因为最新的 6.16 可能再次引入bug
+                    # 但是随着时间的推移，使用 debian13.2.0 ISO 的用户减少，其他版本用户不会触发升级内核，大概率不是问题
+                    if apt_install "linux-image-6.16.*+deb13-amd64"; then
                         log "Debian 13 内核升级成功"
                         update-grub
                         return 0
@@ -3112,6 +3116,14 @@ create_landscape_init_toml() {
     interfaces_list=$(echo "$LAN_CONFIG" | grep "interfaces" | cut -d '(' -f 2 | cut -d ')' -f 1)
     
     cat > "$LANDSCAPE_DIR/landscape_init.toml" << EOF
+# ==== 管理员账号配置 ====
+# ==== Administrator account configuration ====
+[config.auth]
+# 管理员 用户名 和 密码
+# Administrator username and password
+admin_user = "$ADMIN_USER"
+admin_pass = "$ADMIN_PASS"
+
 # ==== 创建 $bridge_name 网桥 ====
 # ==== Create $bridge_name bridge ====
 [[ifaces]]
@@ -3168,13 +3180,6 @@ server_ip_addr = "$lan_ip"
 network_mask = $network_mask
 mac_binding_records = []
 
-# ==== 管理员账号配置 ====
-# ==== Administrator account configuration ====
-[config.auth]
-# 管理员 用户名 和 密码
-# Administrator username and password
-admin_user = "$ADMIN_USER"
-admin_pass = "$ADMIN_PASS"
 EOF
 
     log "landscape_init.toml 配置文件创建完成"
