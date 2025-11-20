@@ -257,6 +257,7 @@ docker run -d \
   --privileged \
   --entrypoint /landscape/redirect_pkg_handler.sh \
   -p 外部端口:内部端口 \
+  -e ORIGINAL_ENTRYPOINT_CMD=/original/entrypoint \
   -e REDIRECT_PKG_HANDLER_WRAPPER_REGION=cn \
   -e REDIRECT_PKG_HANDLER_WRAPPER_MIRROR=mirrors.nwafu.edu.cn \
   -v /home/worker_program-1/config:/config \
@@ -264,7 +265,7 @@ docker run -d \
   -v /root/.landscape-router/redirect_pkg_handler.sh:/landscape/redirect_pkg_handler.sh \
   -v /root/.landscape-router/unix_link/:/ld_unix_link/ \
   some-image:latest \
-  /original/entrypoint original cmd args
+  /original/entrypoint
 ```
 ## compose 部署 多个 容器
 ```yaml
@@ -276,6 +277,8 @@ networks:
       config:
         - subnet: 172.100.0.0/16
           gateway: 172.100.0.254
+        - subnet: fd00:0:0:1::/124 # 固定 v6 ip (可选)
+          gateway: fd00:0:0:1::FE # 254
 services:
   service-1:
     sysctls:
@@ -284,7 +287,7 @@ services:
       - NET_ADMIN
       - BPF
       - PERFMON
-    privileged: true
+    # privileged: true
     restart: unless-stopped
     # logging:
     #   options:
@@ -295,20 +298,22 @@ services:
     #       cpus: '4.0'
     #       memory: 512M
     # 为启用 ports 配置时，使用容器ip:端口 即可在主机内访问容器web界面，主机外访问时需使用反代 或 端口映射到主机端口
-    # ports: # 可选配置  # 静态映射，主要用于映射web端口
+    # ports: # 可选配置  # 静态映射，主要用于映射web端口，便于 lan 访问。landscape 机器内可直接访问容器 ip 无需此步。
     #   - "0.0.0.0:外部端口号:内部端口号"        # 映射到主机v4端口
     #   - "[::]:外部端口号:内部端口号"        # 映射到主机v6端口
     networks:
       worker_program-br:
         ipv4_address: 172.100.0.1
+        ipv6_address: fd00:0:0:1::1 # 固定 v6 ip (可选)
     encironment:
-      - REDIRECT_PKG_HANDLER_WRAPPER_REGION=cn \ # 为 alipne 容器换源，从 中科大/清华/阿里/网易 中随机选一个
+      - ORIGINAL_ENTRYPOINT_CMD=/original/entrypoint # 镜像原始入口
+      - REDIRECT_PKG_HANDLER_WRAPPER_REGION=cn  # 为 alipne 容器换源，从 中科大/清华/阿里/网易 中随机选一个
     #   - REDIRECT_PKG_HANDLER_WRAPPER_MIRROR=mirrors.nwafu.edu.cn \ # 为 alipne 容器更换指定源，如西北林业大学源
-    entrypoint: ["/landscape/redirect_pkg_handler.sh", "/original/entrypoint", "original", "cmd", "args"] # 覆盖 原始 Entrypoint
+    entrypoint: ["/landscape/redirect_pkg_handler.sh"] # 覆盖 原始 Entrypoint
     volumes:
       - /home/worker_program-1/config:/config  # 挂载配置文件目录
-      - /root/.landscape-router/redirect_pkg_handler-x86_64-musl:/landscape/redirect_pkg_handler-x86_64-musl  # 挂载handler 
-      - /root/.landscape-router/redirect_pkg_handler.sh:/landscape/redirect_pkg_handler.sh # 挂载包装脚本
+      - /root/.landscape-router/redirect_pkg_handler-x86_64-musl:/landscape/redirect_pkg_handler-x86_64-musl  # 挂载handler(用于重定向流量)  
+      - /root/.landscape-router/redirect_pkg_handler.sh:/landscape/redirect_pkg_handler.sh # 挂载包装脚本(用于启动 hsndler 和 原始 Entrypoint)
       - /root/.landscape-router/unix_link/:/ld_unix_link/ # 必要映射
     image: some-image:latest # 修改成你需要的镜像
 
@@ -319,7 +324,7 @@ services:
       - NET_ADMIN
       - BPF
       - PERFMON
-    privileged: true
+    # privileged: true
     restart: unless-stopped
     # logging:
     #   options:
@@ -332,14 +337,16 @@ services:
     networks:
       worker_program-br:
         ipv4_address: 172.100.0.2
+        ipv6_address: fd00:0:0:1::2 # 固定 v6 ip (可选)
     encironment:
-      - REDIRECT_PKG_HANDLER_WRAPPER_REGION=cn \ 为 alipne 容器换源，从 中科大/清华/阿里/网易 中随机选一个
+      - ORIGINAL_ENTRYPOINT_CMD=/original/entrypoint # 镜像原始入口
+      - REDIRECT_PKG_HANDLER_WRAPPER_REGION=cn # 为 alipne 容器换源，从 中科大/清华/阿里/网易 中随机选一个
     #   - REDIRECT_PKG_HANDLER_WRAPPER_MIRROR=mirrors.nwafu.edu.cn \ # 为 alipne 容器更换指定源，如西北林业大学源
-    entrypoint: ["/landscape/redirect_pkg_handler.sh", "/original/entrypoint", "original", "cmd", "args"] # 覆盖 原始 Entrypoint
+    entrypoint: ["/landscape/redirect_pkg_handler.sh"] # 覆盖 原始 Entrypoint
     volumes:
       - /home/worker_program-1/config:/config  # 挂载配置文件目录
-      - /root/.landscape-router/redirect_pkg_handler-x86_64-musl:/landscape/redirect_pkg_handler-x86_64-musl  # 挂载handler 
-      - /root/.landscape-router/redirect_pkg_handler.sh:/landscape/redirect_pkg_handler.sh # 挂载包装脚本
+      - /root/.landscape-router/redirect_pkg_handler-x86_64-musl:/landscape/redirect_pkg_handler-x86_64-musl  # 挂载handler(用于重定向流量) 
+      - /root/.landscape-router/redirect_pkg_handler.sh:/landscape/redirect_pkg_handler.sh # 挂载包装脚本(用于启动 hsndler 和 原始 Entrypoint)
       - /root/.landscape-router/unix_link/:/ld_unix_link/ # 必要映射
     image: some-image:latest # 修改成你需要的镜像
 

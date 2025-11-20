@@ -15,7 +15,7 @@ SWAP_DISABLED=false
 USE_CUSTOM_MIRROR=false
 MIRROR_SOURCE="aliyun"  # 默认使用阿里云源
 SUPPORTED_SYSTEM=false  # 是否为支持换源的系统
-DOCKER_INSTALLED=false
+DOCKER_INSTALLED=false  # 这个名称不标准，true 表示需要安装 false 表示不需要
 DOCKER_MIRROR="aliyun"
 DOCKER_ENABLE_IPV6=false
 LAN_CONFIG=""
@@ -27,7 +27,7 @@ ADMIN_PASS="root"
 TEMP_PASS=""
 INSTALL_PPP=false
 APT_UPDATED=false
-APT_CHANGED=false # 受否换过源，用于更换docker仓库（需要在下载 gpg 之后才能进行）
+INSTALL_DOCKER_CALLED=false # docker 安装函数是否被触发，用于 docker 安装失败后换源
 TEMP_LOG_DIR=""
 APT_SOURCE_BACKED_UP=false  # 是否已经备份过源文件
 DOWNLOAD_HANDLER=false      # 是否下载 handler
@@ -978,7 +978,8 @@ ask_apt_mirror() {
         echo "6) 南京大学"
         echo "7) 哈尔滨工业大学"
         echo "部分源无法安装 Docker，原因尚未明确"
-        echo "如遇此问题，重新运行脚本选择 中国科学技术大学源"
+        echo "Docker 安装失败会有询问换源"
+        echo "请在失败后切换到 中国科学技术大学源"
         read -rp "请选择 (0-7, 默认为 5 中国科学技术大学 ): " mirror_response
         case "$mirror_response" in
             1) 
@@ -1089,7 +1090,8 @@ ask_docker_mirror() {
     echo "7) 哈尔滨工业大学"
     echo "8) Azure 中国云"
     echo "部分源无法安装 Docker，原因尚未明确"
-    echo "如遇此问题，重新运行脚本选择 中国科学技术大学源"
+    echo "Docker 安装失败会有询问换源"
+    echo "请在失败后切换到 中国科学技术大学源"
     read -rp "请选择 (0-8, 默认为 $mirror_name): " docker_mirror_response
     case "$docker_mirror_response" in
         0) DOCKER_MIRROR="official" ;;
@@ -2209,9 +2211,9 @@ change_apt_mirror() {
             ;;
     esac
     
-    APT_CHANGED=ture
-    # 第一次换源时不触发换docker
-    if [ "$DOCKER_INSTALLED" = true ] && [ "$APT_CHANGED" = true ] ; then
+    # docker 安装函数被触发，表示处于 docker 安装失败后的换源
+    if $DOCKER_INSTALLED && $INSTALL_DOCKER_CALLED; then
+        log "触发 docker 仓库更换"
         add_docker_repository_global
         log "Docker 仓库同步更换"
     fi
@@ -2251,6 +2253,7 @@ install_docker() {
     local retry=0
     local max_retry=3
     local user_choice=""
+    INSTALL_DOCKER_CALLED=true
     
     while [ "$user_choice" != "n" ]; do
         retry=0
@@ -2708,7 +2711,6 @@ EOF
 # 独立的 apt update 函数
 apt_update() {
     local force_update=false
-    
     # 解析参数
     while [ $# -gt 0 ]; do
         case "$1" in
@@ -2722,13 +2724,19 @@ apt_update() {
                 ;;
         esac
     done
-    
     # 检查是否需要强制更新或从未更新过
     if [ "$force_update" = true ] || [ "$APT_UPDATED" = false ]; then
         if [ "$force_update" = true ]; then
             log "强制执行 apt update"
         else
             log "执行 apt update"
+        fi
+
+        # 清空 apt 缓存（残留的包），似乎没什么意义
+        if apt-get clean; then
+            log "清空 apt 缓存成功(apt-get clean)"
+        else
+            log "清空 apt 缓存失败(apt-get clean)"
         fi
         
         local retry=0
@@ -2794,6 +2802,9 @@ apt_install() {
         done
         
         if [ $retry -eq $max_retry ]; then
+            echo "部分源无法安装 Docker，原因尚未明确"
+            echo "Docker 安装失败会有询问换源"
+            echo "请在失败后切换到 中国科学技术大学源"
             echo "软件包 $packages 安装失败, 是否再次尝试3次？(y/n) 或输入 'm' 选择镜像源: "
             read -r user_choice
             user_choice=$(echo "$user_choice" | tr '[:upper:]' '[:lower:]')
