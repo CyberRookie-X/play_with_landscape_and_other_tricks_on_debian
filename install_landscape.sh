@@ -7,9 +7,9 @@
 # 全局变量
 INSTALL_LOG=""
 LANDSCAPE_DIR=""
-WEB_SERVER_INSTALLED=false
-WEB_SERVER_TYPE=""
-WEB_SERVER_PREINSTALLED=false
+# WEB_SERVER_INSTALLED=false
+# WEB_SERVER_TYPE=""
+# WEB_SERVER_PREINSTALLED=false
 TIMEZONE_SHANGHAI=false
 SWAP_DISABLED=false
 USE_CUSTOM_MIRROR=false
@@ -509,23 +509,24 @@ check_system() {
         exit 1
     fi
     
-    # 检查是否已安装web server (apache2, nginx, lighttpd)
-    if ! dpkg -l | grep -q apache2 && ! command -v nginx >/dev/null 2>&1 && ! command -v lighttpd >/dev/null 2>&1; then
-        log "警告: 系统中未检测到 web server 环境 (apache2/nginx/lighttpd)"
-        log "Landscape Router 需要 web server 环境才能正常运行"
-        log "缺少 web server 可能会导致主机失联问题"
-    else
-        WEB_SERVER_PREINSTALLED=true
-        # 确定已安装的web server类型
-        if dpkg -l | grep -q apache2; then
-            WEB_SERVER_TYPE="apache2"
-        elif command -v nginx >/dev/null 2>&1; then
-            WEB_SERVER_TYPE="nginx"
-        elif command -v lighttpd >/dev/null 2>&1; then
-            WEB_SERVER_TYPE="lighttpd"
-        fi
-        log "检测到系统已安装 web server 环境: $WEB_SERVER_TYPE"
-    fi
+    # 似乎没有影响，注释掉这部分
+    # # 检查是否已安装web server (apache2, nginx, lighttpd)
+    # if ! dpkg -l | grep -q apache2 && ! command -v nginx >/dev/null 2>&1 && ! command -v lighttpd >/dev/null 2>&1; then
+    #     log "警告: 系统中未检测到 web server 环境 (apache2/nginx/lighttpd)"
+    #     log "Landscape Router 需要 web server 环境才能正常运行"
+    #     log "缺少 web server 可能会导致主机失联问题"
+    # else
+    #     WEB_SERVER_PREINSTALLED=true
+    #     # 确定已安装的web server类型
+    #     if dpkg -l | grep -q apache2; then
+    #         WEB_SERVER_TYPE="apache2"
+    #     elif command -v nginx >/dev/null 2>&1; then
+    #         WEB_SERVER_TYPE="nginx"
+    #     elif command -v lighttpd >/dev/null 2>&1; then
+    #         WEB_SERVER_TYPE="lighttpd"
+    #     fi
+    #     log "检测到系统已安装 web server 环境: $WEB_SERVER_TYPE"
+    # fi
     
     # 检查内核版本 (需要 > 6.9) 
     local kernel_version
@@ -763,15 +764,15 @@ display_configuration() {
         esac
         echo "   镜像源: $mirror_name"
     fi
-    # 只有当web server不是预装时才显示web server安装选项
-    if [ "$WEB_SERVER_PREINSTALLED" != true ]; then
-        echo "6. 安装 Web Server: $([ "$WEB_SERVER_INSTALLED" = true ] && echo "是" || echo "否")"
-        if [ "$WEB_SERVER_INSTALLED" = true ]; then
-            echo "   Web Server 类型: $WEB_SERVER_TYPE"
-        fi
-    else
-        echo "6. 检测到系统已预装 Web Server: $WEB_SERVER_TYPE"
-    fi
+    # # 只有当web server不是预装时才显示web server安装选项
+    # if [ "$WEB_SERVER_PREINSTALLED" != true ]; then
+    #     echo "6. 安装 Web Server: $([ "$WEB_SERVER_INSTALLED" = true ] && echo "是" || echo "否")"
+    #     if [ "$WEB_SERVER_INSTALLED" = true ]; then
+    #         echo "   Web Server 类型: $WEB_SERVER_TYPE"
+    #     fi
+    # else
+    #     echo "6. 检测到系统已预装 Web Server: $WEB_SERVER_TYPE"
+    # fi
     echo "7. 安装 Docker(含compose): $([ "$DOCKER_INSTALLED" = true ] && echo "是" || echo "否")"
     if [ "$DOCKER_INSTALLED" = true ]; then
         local docker_mirror_name="未知"
@@ -834,8 +835,8 @@ modify_configuration() {
             ask_apt_mirror
             ;;
         6)
-            # 只有当web server不是预装时才允许修改web server配置
-            ask_webserver
+            # # 只有当web server不是预装时才允许修改web server配置
+            # ask_webserver
             ;;
         7)
             ask_docker_config
@@ -884,8 +885,8 @@ ask_user_config() {
         ask_kernel_upgrade
     fi
 
-    # 检查web server环境
-    ask_webserver   
+    # # 检查web server环境
+    # ask_webserver   
     
     # 询问时区配置
     ask_timezone_config
@@ -1022,49 +1023,49 @@ ask_apt_mirror() {
     fi
 }
 
-ask_webserver() { 
-    echo "-----------------------------"
-    # 只有当web server不是预装时才允许修改web server配置
-    if [ "$WEB_SERVER_PREINSTALLED" != true ]; then
-        echo "Landscape Router 需要 web server 环境才能正常运行"
-        echo "缺少 web server 可能会导致主机失联问题"
-        echo ""
-        echo "本脚本中 web server 环境 检测/安装 的功能未经验证"
-        echo "建议自行处理后, 再执行安装脚本"
-        echo ""
-        echo "请选择要安装的 Web Server:"
-        echo "1) 退出安装脚本, 自行处理 (推荐)(默认)"
-        echo "2) Apache2"
-        echo "3) Nginx"
-        echo "4) Lighttpd"
-        echo "5) 继续安装脚本，不安装 web server"
-        read -rp "请选择 (1-5, 默认为 1): " webserver_choice
-        case "$webserver_choice" in
-            2)
-                WEB_SERVER_INSTALLED=true
-                WEB_SERVER_TYPE="apache2"
-                ;;
-            3)
-                WEB_SERVER_INSTALLED=true
-                WEB_SERVER_TYPE="nginx"
-                ;;
-            4)
-                WEB_SERVER_INSTALLED=true
-                WEB_SERVER_TYPE="lighttpd"
-                ;;
-            5)
-                WEB_SERVER_INSTALLED=false
-                WEB_SERVER_TYPE=""
-                ;;
-            *)
-                log "用户选择退出安装"
-                exit 1
-                ;;
-        esac
-    else
-        echo "系统已预装 web server ($WEB_SERVER_TYPE)，无法修改此配置"
-    fi
-}
+# ask_webserver() { 
+#     echo "-----------------------------"
+#     # 只有当web server不是预装时才允许修改web server配置
+#     if [ "$WEB_SERVER_PREINSTALLED" != true ]; then
+#         echo "Landscape Router 需要 web server 环境才能正常运行"
+#         echo "缺少 web server 可能会导致主机失联问题"
+#         echo ""
+#         echo "本脚本中 web server 环境 检测/安装 的功能未经验证"
+#         echo "建议自行处理后, 再执行安装脚本"
+#         echo ""
+#         echo "请选择要安装的 Web Server:"
+#         echo "1) 退出安装脚本, 自行处理 (推荐)(默认)"
+#         echo "2) Apache2"
+#         echo "3) Nginx"
+#         echo "4) Lighttpd"
+#         echo "5) 继续安装脚本，不安装 web server"
+#         read -rp "请选择 (1-5, 默认为 1): " webserver_choice
+#         case "$webserver_choice" in
+#             2)
+#                 WEB_SERVER_INSTALLED=true
+#                 WEB_SERVER_TYPE="apache2"
+#                 ;;
+#             3)
+#                 WEB_SERVER_INSTALLED=true
+#                 WEB_SERVER_TYPE="nginx"
+#                 ;;
+#             4)
+#                 WEB_SERVER_INSTALLED=true
+#                 WEB_SERVER_TYPE="lighttpd"
+#                 ;;
+#             5)
+#                 WEB_SERVER_INSTALLED=false
+#                 WEB_SERVER_TYPE=""
+#                 ;;
+#             *)
+#                 log "用户选择退出安装"
+#                 exit 1
+#                 ;;
+#         esac
+#     else
+#         echo "系统已预装 web server ($WEB_SERVER_TYPE)，无法修改此配置"
+#     fi
+# }
 
 ask_docker_mirror() {
     local mirror_name="未知"
@@ -1506,19 +1507,20 @@ perform_installation() {
         install_docker
         configure_docker
     fi
-    # 9. 检查并安装 webserver
-    # 当系统已安装web server时，不再执行安装
-    if [ "$WEB_SERVER_INSTALLED" = true ] && [ -n "$WEB_SERVER_TYPE" ]; then
-        if ! dpkg -l | grep -q "$WEB_SERVER_TYPE" && ! command -v "$WEB_SERVER_TYPE" >/dev/null 2>&1; then
-            log "检测到系统未安装 $WEB_SERVER_TYPE, 将自动安装"
-            install_webserver
-        else
-            log "检测到系统已安装 $WEB_SERVER_TYPE，跳过安装"
-        fi
-    # elif [ "$WEB_SERVER_INSTALLED" = true ] && [ -z "$WEB_SERVER_TYPE" ]; then
-    else
-        log "用户选择不安装 web server, 跳过安装步骤"
-    fi
+
+    # # 9. 检查并安装 webserver
+    # # 当系统已安装web server时，不再执行安装
+    # if [ "$WEB_SERVER_INSTALLED" = true ] && [ -n "$WEB_SERVER_TYPE" ]; then
+    #     if ! dpkg -l | grep -q "$WEB_SERVER_TYPE" && ! command -v "$WEB_SERVER_TYPE" >/dev/null 2>&1; then
+    #         log "检测到系统未安装 $WEB_SERVER_TYPE, 将自动安装"
+    #         install_webserver
+    #     else
+    #         log "检测到系统已安装 $WEB_SERVER_TYPE，跳过安装"
+    #     fi
+    # # elif [ "$WEB_SERVER_INSTALLED" = true ] && [ -z "$WEB_SERVER_TYPE" ]; then
+    # else
+    #     log "用户选择不安装 web server, 跳过安装步骤"
+    # fi
     
 
     
@@ -2223,28 +2225,28 @@ change_apt_mirror() {
     log "apt 软件源更换完成"
 }
 
-# 安装 webserver
-install_webserver() {
-    log "安装 Web Server: $WEB_SERVER_TYPE"
-    apt_update
+# # 安装 webserver
+# install_webserver() {
+#     log "安装 Web Server: $WEB_SERVER_TYPE"
+#     apt_update
     
-    case "$WEB_SERVER_TYPE" in
-        "apache2")
-            apt_install "apache2"
-            ;;
-        "nginx")
-            apt_install "nginx"
-            ;;
-        "lighttpd")
-            apt_install "lighttpd"
-            ;;
-        *)
-            log "未知的 Web Server 类型: $WEB_SERVER_TYPE"
-            apt_install "apache2"
-            WEB_SERVER_TYPE="apache2"
-            ;;
-    esac
-}
+#     case "$WEB_SERVER_TYPE" in
+#         "apache2")
+#             apt_install "apache2"
+#             ;;
+#         "nginx")
+#             apt_install "nginx"
+#             ;;
+#         "lighttpd")
+#             apt_install "lighttpd"
+#             ;;
+#         *)
+#             log "未知的 Web Server 类型: $WEB_SERVER_TYPE"
+#             apt_install "apache2"
+#             WEB_SERVER_TYPE="apache2"
+#             ;;
+#     esac
+# }
 
 # 安装 Docker
 install_docker() {
