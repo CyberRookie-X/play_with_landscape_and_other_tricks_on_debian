@@ -1232,6 +1232,50 @@ get_available_interfaces() {
     ip link show | awk -F': ' '/^[0-9]+: [a-zA-Z]/ {print $2}' | grep -v lo
 }
 
+# 检查是否为虚拟网卡
+is_virtual_interface() {
+    local iface="$1"
+    
+    # 定义虚拟网卡前缀数组
+    local virtual_prefixes=(
+        "docker" "veth" "br" "tap" "tun" "vboxnet" "vmnet" "macvtap" "ip6tnl" "sit"
+        "gre" "gretap" "erspan" "ipip" "ip6gre" "ip6gretap" "ip6erspan" "vti" "vti6"
+        "nlmon" "nflog" "nfqueue" "vcan" "vxcan" "mpls" "rwl" "wwan" "ppp" "sl"
+        "isdn" "hdlc" "arc" "appletalk" "rose" "netrom" "ax25" "dccp" "sctp"
+        "llc" "ieee802154" "caif" "caif6" "caif2" "caif4" "caif5" "caif7" "caif8"
+        "caif9" "caif10" "caif11" "caif12" "caif13" "caif14" "caif15" "caif16"
+        "caif17" "caif18" "caif19" "caif20"
+    )
+    
+    # 检查是否为虚拟网卡
+    for prefix in "${virtual_prefixes[@]}"; do
+        if [[ "$iface" == "$prefix"* ]]; then
+            return 0  # 是虚拟网卡
+        fi
+    done
+    
+    return 1  # 不是虚拟网卡
+}
+
+# 获取可用的物理网络接口（排除虚拟网卡）
+get_physical_interfaces() {
+    local all_interfaces
+    all_interfaces=$(get_available_interfaces)
+    local physical_interfaces=""
+    
+    for iface in $all_interfaces; do
+        if ! is_virtual_interface "$iface"; then
+            if [ -z "$physical_interfaces" ]; then
+                physical_interfaces="$iface"
+            else
+                physical_interfaces="$physical_interfaces $iface"
+            fi
+        fi
+    done
+    
+    echo "$physical_interfaces"
+}
+
 # 显示网络接口信息
 display_interface_info() {
     local interfaces="$1"
@@ -1280,6 +1324,14 @@ select_interfaces() {
     local -n selected_interfaces_ref=$3
     
     selected_interfaces_ref=()
+    
+    # 检查是否有可用的物理接口
+    if [ -z "$interfaces" ]; then
+        echo "错误: 未找到任何可用的物理网络接口"
+        echo "请检查系统网络接口状态，确保至少有一个非虚拟网卡"
+        return 1
+    fi
+    
     local valid_input=false
     
     while [ "$valid_input" = false ]; do
@@ -1297,6 +1349,11 @@ select_interfaces() {
         for iface in $interfaces; do
             interface_count=$((interface_count+1))
         done
+        
+        if [ "$interface_count" -eq 0 ]; then
+            echo "错误: 没有可用的接口，请检查网络接口"
+            return 1
+        fi
         
         # 检查每个编号的有效性
         valid_input=true
@@ -1329,12 +1386,22 @@ select_interfaces() {
     done
     
     # 处理选择的网卡
-    echo "已选择的网卡: "
+    echo ""
+    echo "已选择的网卡:"
+    
+    # 将接口列表转换为数组并按索引选择
+    IFS=' ' read -ra interface_array <<< "$interfaces"
+    local actual_count=${#interface_array[@]}
+    
     for c in $choice; do
-        local selected_iface
-        selected_iface=$(echo "$interfaces" | sed -n "${c}p")
-        selected_interfaces_ref+=("$selected_iface")
-        echo "- $selected_iface"
+        if [ "$c" -ge 1 ] && [ "$c" -le "$actual_count" ]; then
+            local selected_iface="${interface_array[$((c-1))]}"
+            selected_interfaces_ref+=("$selected_iface")
+            echo "- $selected_iface"
+        else
+            echo "错误: 编号 $c 无效"
+            return 1
+        fi
     done
 }
 
@@ -1430,9 +1497,9 @@ config_lan_interface() {
         bridge_name="lan1"
     fi
     
-    # 获取可用网卡列表
+    # 获取可用网卡列表（排除虚拟网卡）
     local interfaces
-    interfaces=$(get_available_interfaces)
+    interfaces=$(get_physical_interfaces)
     
     # 显示网卡详细信息
     display_interface_info "$interfaces"
@@ -3090,39 +3157,12 @@ iface lo inet loopback
 
 EOF
 
-    # 获取所有网络接口
-    local all_interfaces
-    all_interfaces=$(get_available_interfaces)
+    # 获取所有物理网络接口（排除虚拟网卡）
+    local physical_interfaces
+    physical_interfaces=$(get_physical_interfaces)
     
-    # 处理所有网卡，将物理网卡设置为manual模式（排除虚拟网卡）
-    for iface in $all_interfaces; do
-        # 跳过虚拟网卡 (docker、veth、br、tap、tun等开头的接口)
-        # 定义虚拟网卡前缀数组，提高可读性和性能
-        local virtual_prefixes=(
-            "docker" "veth" "br" "tap" "tun" "vboxnet" "vmnet" "macvtap" "ip6tnl" "sit"
-            "gre" "gretap" "erspan" "ipip" "ip6gre" "ip6gretap" "ip6erspan" "vti" "vti6"
-            "nlmon" "nflog" "nfqueue" "vcan" "vxcan" "mpls" "rwl" "wwan" "ppp" "sl"
-            "isdn" "hdlc" "arc" "appletalk" "rose" "netrom" "ax25" "dccp" "sctp"
-            "llc" "ieee802154" "caif" "caif6" "caif2" "caif4" "caif5" "caif7" "caif8"
-            "caif9" "caif10" "caif11" "caif12" "caif13" "caif14" "caif15" "caif16"
-            "caif17" "caif18" "caif19" "caif20"
-        )
-        
-        # 检查是否为虚拟网卡
-        local is_virtual=false
-        for prefix in "${virtual_prefixes[@]}"; do
-            if [[ "$iface" == "$prefix"* ]]; then
-                is_virtual=true
-                break
-            fi
-        done
-        
-        if [[ "$is_virtual" == true ]]; then
-            log "跳过虚拟网卡: $iface"
-            continue
-        fi
-        
-        # 将物理网卡设置为manual模式
+    # 处理所有物理网卡，将它们设置为manual模式
+    for iface in $physical_interfaces; do
         log "将物理网卡 $iface 设置为 manual 模式"
         cat >> /etc/network/interfaces << EOF
 auto $iface
