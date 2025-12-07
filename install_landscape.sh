@@ -285,13 +285,15 @@ check_kernel_bug() {
     # 在全局变量中填入这个表达式
     # KERNEL_BUG_REGEX="^6\.(1[0-9]|2[0-9])\."  # 示例：6.10-6.29 版本可能有问题
     
-    if [[ "$KERNEL_VERSION" =~ $KERNEL_BUG_REGEX ]]; then
-        KERNEL_HAS_BUG=true
-        log "检测到内核版本 $KERNEL_VERSION 可能存在 bug"
-    else
-        KERNEL_HAS_BUG=false
-        log "内核版本 $KERNEL_VERSION 未发现已知问题"
-    fi
+    # 防火墙 bug 在0.9.4中得到修复，暂时注释掉这里，直接返回 false，以跳过 存在 bug 版本的检查
+    KERNEL_HAS_BUG=false
+    # if [[ "$KERNEL_VERSION" =~ $KERNEL_BUG_REGEX ]]; then
+    #     KERNEL_HAS_BUG=true
+    #     log "检测到内核版本 $KERNEL_VERSION 可能存在 bug"
+    # else
+    #     KERNEL_HAS_BUG=false
+    #     log "内核版本 $KERNEL_VERSION 未发现已知问题"
+    # fi
 }
 
 # 检查下载工具可用性并初始化全局变量
