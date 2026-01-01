@@ -1125,7 +1125,7 @@ ask_github_mirror() {
     echo "https://ghfast.top 速度较慢，尽量别用"
     echo "https://ghfast.top 速度较慢，尽量别用"
     echo "https://ghfast.top 速度较慢，尽量别用"
-    ehco ""
+    echo ""
     echo "请选择 GitHub 镜像加速地址 (默认启用 https://ghfast.top):"
     echo "0) 不使用加速(需要能正常访问 github )"
     echo "1) https://ghfast.top (默认)(速度较慢，尽量别用)"
