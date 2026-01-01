@@ -714,6 +714,8 @@ ask_admin_config() {
 ask_install_path_config() {
     echo "-----------------------------"
     while true; do
+        echo "脚本将采用安装路径作为配置文件目录"
+        echo "如需调整可自行修改 /etc/systemd/system/landscape-router.service "
         read -rp "请输入 Landscape Router 安装路径 (默认: /root/.landscape-router): " path_response
         if [ -z "$path_response" ]; then
             LANDSCAPE_DIR="/root/.landscape-router"
@@ -1111,9 +1113,22 @@ ask_docker_mirror() {
 
 ask_github_mirror() { 
     echo "-----------------------------"
+    echo "https://ghfast.top 速度较慢，尽量别用"
+    echo "https://ghfast.top 速度较慢，尽量别用"
+    echo "https://ghfast.top 速度较慢，尽量别用"
+    echo "https://ghfast.top 速度较慢，尽量别用"
+    echo "https://ghfast.top 速度较慢，尽量别用"
+    echo "https://ghfast.top 速度较慢，尽量别用"
+    echo "https://ghfast.top 速度较慢，尽量别用"
+    echo "https://ghfast.top 速度较慢，尽量别用"
+    echo "https://ghfast.top 速度较慢，尽量别用"
+    echo "https://ghfast.top 速度较慢，尽量别用"
+    echo "https://ghfast.top 速度较慢，尽量别用"
+    echo "https://ghfast.top 速度较慢，尽量别用"
+    ehco ""
     echo "请选择 GitHub 镜像加速地址 (默认启用 https://ghfast.top):"
-    echo "0) 不使用加速"
-    echo "1) https://ghfast.top (默认)"
+    echo "0) 不使用加速(需要能正常访问 github )"
+    echo "1) https://ghfast.top (默认)(速度较慢，尽量别用)"
     echo "2) 自定义地址"
     read -rp "请选择 (0-2, 默认为 1 ): " github_mirror_response
     case "$github_mirror_response" in
@@ -3124,7 +3139,8 @@ create_systemd_service() {
 Description=Landscape Router
 
 [Service]
-ExecStart=$LANDSCAPE_DIR/$binary_filename
+ExecStart=$LANDSCAPE_DIR/$binary_filename -c $LANDSCAPE_DIR
+# -c, --config-dir <CONFIG_DIR> 
 Restart=always
 User=root
 LimitMEMLOCK=infinity
