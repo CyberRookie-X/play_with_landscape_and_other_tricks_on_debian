@@ -886,7 +886,7 @@ get_redirect_pkg_handler_url() {
     if [ "$file_type" = "script" ]; then
         # redirect_pkg_handler.sh从相同地址下载，支持中国镜像加速，不需要GitHub token
         if [ "$USE_CN_MIRROR" = true ]; then
-            download_url="${CN_MIRROR_BASE_URL}/${REDIRECT_PKG_HANDLER_BASE_URL}/redirect_pkg_handler.sh"
+            download_url="${CN_MIRROR_BASE_URL}${REDIRECT_PKG_HANDLER_BASE_URL}/redirect_pkg_handler.sh"
         else
             download_url="${REDIRECT_PKG_HANDLER_BASE_URL}/redirect_pkg_handler.sh"
         fi
