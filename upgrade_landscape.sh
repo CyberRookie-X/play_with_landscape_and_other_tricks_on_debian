@@ -38,7 +38,7 @@ readonly MAX_API_RETRIES=3
 readonly MAX_DOWNLOAD_RETRIES=3
 readonly MAX_FILE_REPLACE_RETRIES=5
 readonly API_BASE_URL="https://api.github.com/repos/ThisSeanZhang/landscape"
-readonly CN_MIRROR_BASE_URL="https://ghfast.top/https://github.com/ThisSeanZhang/landscape"
+readonly CN_MIRROR_BASE_URL="https://ghfast.top/"
 readonly REDIRECT_PKG_HANDLER_BASE_URL="https://raw.githubusercontent.com/CyberRookie-X/Install_landscape_on_debian12_and_manage_compose_by_dpanel/main"
 
 # ========== 全局变量 ==========
@@ -837,7 +837,7 @@ get_download_info() {
     case "$version_type" in
         "stable")
             if [ "$USE_CN_MIRROR" = true ]; then
-                download_url="${CN_MIRROR_BASE_URL}/releases/latest/download/$filename"
+                download_url="${CN_MIRROR_BASE_URL}https://github.com/ThisSeanZhang/landscape/releases/latest/download/$filename"
             else
                 download_url="https://github.com/ThisSeanZhang/landscape/releases/latest/download/$filename"
             fi
@@ -861,7 +861,7 @@ get_static_download_url() {
     case "$version_type" in
         "stable")
             if [ "$USE_CN_MIRROR" = true ]; then
-                download_url="${CN_MIRROR_BASE_URL}/releases/latest/download/static.zip"
+                download_url="${CN_MIRROR_BASE_URL}https://github.com/ThisSeanZhang/landscap/releases/latest/download/static.zip"
             else
                 download_url="https://github.com/ThisSeanZhang/landscape/releases/latest/download/static.zip"
             fi
@@ -895,7 +895,7 @@ get_redirect_pkg_handler_url() {
         case "$version_type" in
             "stable")
                 if [ "$USE_CN_MIRROR" = true ]; then
-                    download_url="${CN_MIRROR_BASE_URL}/releases/latest/download/$binary_name"
+                    download_url="${CN_MIRROR_BASE_URL}https://github.com/ThisSeanZhang/landscap/releases/latest/download/$binary_name"
                 else
                     download_url="https://github.com/ThisSeanZhang/landscape/releases/latest/download/$binary_name"
                 fi
